@@ -12,6 +12,18 @@ python3 -m spacy link en_core_web_md en_default
 ln -s /path/to/gigaword/5ed data/gigaword
 ```
 
+### Specific instructions for DAS-5
+
+If you get error `No module named 'pip'` while importing spacy, you might want to log in to one of the compute nodes and install pip.
+For example:
+
+```
+ssh node057
+easy_install-3.4 --user pip
+python3 -c 'import pip'
+exit
+```
+
 ## Stesps
 
 1. Create a word2vec model from Gigaword corpus: `sbatch word2vec_gigaword.job`

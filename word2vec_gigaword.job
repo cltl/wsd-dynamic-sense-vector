@@ -2,6 +2,6 @@
 #SBATCH --time=12:00:00
 #SBATCH -C cpunode&ssd
 
-python3 -u process-gigaword.py > output/gigaword.txt && \
+python3 -u process-gigaword.py > output/gigaword.txt 2> output/gigaword.log && \
     cp output/gigaword.txt /local-ssd/ && \
     python3 -u train-word2vec.py /local-ssd/gigaword.txt

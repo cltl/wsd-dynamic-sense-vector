@@ -12,3 +12,10 @@ It did. Running on regular disk, the program can only use 200-300% CPU (i.e. the
   PID USER      PR  NI    VIRT    RES    SHR S  %CPU %MEM     TIME+ COMMAND
  1925 minhle    20   0 4061164 464940  11880 R  3051  0.7  43:50.84 python3
 ```
+
+Started my script for running for 12 hours. If that's not enough, we need to ask for a dedicated server.
+
+```
+[minhle@fs0 wsd-with-marten]$ sbatch word2vec_gigaword.job
+Submitted batch job 1394936
+```
