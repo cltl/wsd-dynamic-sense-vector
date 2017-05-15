@@ -4,4 +4,4 @@
 
 python3 -u process-gigaword.py > output/gigaword.txt 2> output/gigaword.log && \
     cp output/gigaword.txt /local-ssd/ && \
-    python3 -u train-word2vec.py /local-ssd/gigaword.txt
+    python3 -u train-word2vec.py /local-ssd/gigaword.txt output/gigaword
