@@ -1,0 +1,530 @@
+%% This BibTeX bibliography file was created using BibDesk.
+%% http://bibdesk.sourceforge.net/
+
+
+%% Created for Marten Postma at 2017-05-11 08:36:42 +0200 
+
+
+%% Saved with string encoding Unicode (UTF-8) 
+
+
+
+@inproceedings{N15-1132,
+	Author = {Bhingardive, Sudha and Singh, Dhirendra and V, Rudramurthy and Redkar, Hanumant and Bhattacharyya, Pushpak},
+	Booktitle = {Proceedings of the 2015 Conference of the North American Chapter of the Association for Computational Linguistics: Human Language Technologies},
+	Date-Added = {2017-05-10 12:48:39 +0000},
+	Date-Modified = {2017-05-11 05:34:28 +0000},
+	Doi = {10.3115/v1/N15-1132},
+	Keywords = {checked},
+	Location = {Denver, Colorado},
+	Pages = {1238--1243},
+	Publisher = {Association for Computational Linguistics},
+	Title = {Unsupervised Most Frequent Sense Detection using Word Embeddings},
+	Url = {http://aclweb.org/anthology/N15-1132},
+	Year = {2015},
+	Bdsk-Url-1 = {http://aclweb.org/anthology/N15-1132},
+	Bdsk-Url-2 = {http://dx.doi.org/10.3115/v1/N15-1132}}
+
+@inproceedings{Flekova:2016aa,
+	Author = {Flekova, Lucie and Gurevych, Iryna},
+	Booktitle = {Proceedings of the 54th Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers)},
+	Date-Added = {2017-05-10 12:46:24 +0000},
+	Date-Modified = {2017-05-11 06:17:44 +0000},
+	Doi = {10.18653/v1/P16-1191},
+	Keywords = {checked},
+	Location = {Berlin, Germany},
+	Pages = {2029--2041},
+	Publisher = {Association for Computational Linguistics},
+	Title = {Supersense Embeddings: A Unified Model for Supersense Interpretation, Prediction, and Utilization},
+	Url = {http://aclweb.org/anthology/P16-1191},
+	Year = {2016},
+	Bdsk-Url-1 = {http://aclweb.org/anthology/P16-1191},
+	Bdsk-Url-2 = {http://dx.doi.org/10.18653/v1/P16-1191}}
+
+@inproceedings{P15-1010,
+	Author = {Iacobacci, Ignacio and Pilehvar, Taher Mohammad and Navigli, Roberto},
+	Booktitle = {Proceedings of the 53rd Annual Meeting of the Association for Computational Linguistics and the 7th International Joint Conference on Natural Language Processing (Volume 1: Long Papers)},
+	Date-Added = {2017-05-10 12:18:22 +0000},
+	Date-Modified = {2017-05-11 06:36:42 +0000},
+	Doi = {10.3115/v1/P15-1010},
+	Keywords = {checked},
+	Location = {Beijing, China},
+	Pages = {95--105},
+	Publisher = {Association for Computational Linguistics},
+	Title = {SensEmbed: Learning Sense Embeddings for Word and Relational Similarity},
+	Url = {http://aclweb.org/anthology/P15-1010},
+	Year = {2015},
+	Bdsk-Url-1 = {http://aclweb.org/anthology/P15-1010},
+	Bdsk-Url-2 = {http://dx.doi.org/10.3115/v1/P15-1010}}
+
+@inproceedings{single_or_multiple,
+	Abstract = {
+
+motivation:
+	1) word embeddings extract succesfully semantic information about words based on co-occurence patterns extracted from large corpora.
+	2) recently, the combination of knowledge knowledge bases (KBs) and distributed word representations (DWSs) has gained strength
+
+	in this paper, explore combination of indepdently learned representations from KBs and DWSs.
+
+
+
+corpus:
+	1) WBU: English Wikipedia, British National Corpus, ukWaC (5 billion tokens)
+	skipgram model
+
+
+combination methods:
+	1) single vector combinations
+		[CAT]: concatenation
+		[CEN]: centroid
+		[CMP]: complex number
+	2) correlation analysis
+		[PCA]: lower dimensional representation of CAT
+		[CCA]: canonical correlation analysis
+	3) corpus combination
+		[COR]: shuffle corpora
+	4) result combination
+		combines similarity scores
+
+
+datasets:
+	three similarity datasets:
+		-RG
+		-SimLex999
+		-WordSim353
+	four relatedness datasets:
+		-WordSimi353 relatedness
+		-MTURK287
+		-MEN
+		-full WordSim353
+
+
+
+results:
+	-wordnet performs better at similarity, for relatedness occurence based seems to be better.
+	-Principal Component Analysis seems to be working really well. (concatenation seems to be work well)
+
+
+comparison to retrofitting:
+	-better than baseline, not better than PCA or CAT
+
+combining more than two systems:
+	-combing systems leads to beating the state of the art.
+
+
+
+
+
+
+},
+	Author = {Josu Goikoetxea and Eneko Agirre and Aitor Soroa},
+	Date-Added = {2016-01-11 14:18:41 +0000},
+	Date-Modified = {2017-05-11 05:34:54 +0000},
+	Keywords = {checked},
+	Title = {Single or Multiple? Combing Word Representations Indepedently Learned From Text and WordNet}}
+
+@inproceedings{goikoetxea2015random,
+	Abstract = {
+motivation:
+	1) graph based techniques have been useful in WSD, Semantic Similarity and Semantic Relatedness
+	2) model the meaning of words using the structual information in knowledge bases instead of on co-occurence data
+
+methodology:
+
+	random walks over KB graphs to create synthetic contexts which are fed into the NNLM architecture, creating novel word representations.
+
+	KB represented as undirected graph G = (V,E)
+	V = set of concepts
+	E = E links among concepts
+
+
+	dictionary = association from words to KB concepts.
+		more specifically, a mapping from concept -> probability of being lexicalized by a specific word
+	inverse dictionary = mapping from graph vertices to the words that can be linked to it.
+
+
+input:
+	1) graph G = (V<E)
+	2) inverse dictionary
+	3) damping factor
+
+
+settings:
+	1) wordnet ( 117.522 nodes + 525.356 edges)
+
+
+procedure:
+
+for vertex in random_walk(start=random_vertex,  damping=alpha):
+	
+	if probability <= (1-alpha):
+		terminate
+		return pseudo sentence + start again till max_sent_number is reached
+
+	else:
+		emit word from the inverse dictionary (using the probabilities from the inverse dictionary)
+	
+
+training:
+	1) CBOW + Skipgram with default parameters
+
+evaluation:
+	1) WS353 + SL999 with spearman rank correlation
+
+
+results:
+	1) convergence at 70m pseudo sentences
+	2) Skipgram performs better dan CBOW
+	3) RW skipgram outperforms default Skipgram for similarity, not for relatedness
+	4) RW sgram + ppv + skipgram combined improve the result (seem to be complementary)
+
+
+},
+	Author = {Goikoetxea, Josu and Soroa, Aitor and Agirre, Eneko and Donostia, Basque Country},
+	Booktitle = {Proceedings of the 2015 Conference of the North American Chapter of the Association for Computational Linguistics: Human Language Technologies},
+	Date-Added = {2016-01-11 12:59:41 +0000},
+	Date-Modified = {2017-05-11 05:30:05 +0000},
+	Keywords = {checked},
+	Pages = {1434--1439},
+	Title = {Random walks and neural network language models on knowledge bases},
+	Year = {2015},
+	Bdsk-File-1 = {YnBsaXN0MDDUAQIDBAUGJCVYJHZlcnNpb25YJG9iamVjdHNZJGFyY2hpdmVyVCR0b3ASAAGGoKgHCBMUFRYaIVUkbnVsbNMJCgsMDxJXTlMua2V5c1pOUy5vYmplY3RzViRjbGFzc6INDoACgAOiEBGABIAFgAdccmVsYXRpdmVQYXRoWWFsaWFzRGF0YV8QOi4uLy4uL0xGUy9wcmV2aW91c193b3JrL3NlbnNlX2VtYmVkZGluZ19wYXBlcnMvUldfTk5MTS5wZGbSFwsYGVdOUy5kYXRhTxECEAAAAAACEAACAAAMTWFjaW50b3NoIEhEAAAAAAAAAAAAAAAAAAAAzpe500grAAAFTKquC1JXX05OTE0ucGRmAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHujLSulgCAAAAAAAAAAAAAgAEAAAJIAAAAAAAAAAAAAAAAAAAABZzZW5zZV9lbWJlZGRpbmdfcGFwZXJzABAACAAAzperwwAAABEACAAA0rpJ8gAAAAEAIAVMqq4GA82hBQ3lygUJ490AUv0nAFL8agAI+ccAAmSOAAIAc01hY2ludG9zaCBIRDpVc2VyczoAbWFydGVuOgBHb29nbGVEcml2ZToAU3Bpbm96YToAUmVzZWFyY2g6AExGUzoAcHJldmlvdXNfd29yazoAc2Vuc2VfZW1iZWRkaW5nX3BhcGVyczoAUldfTk5MTS5wZGYAAA4AGAALAFIAVwBfAE4ATgBMAE0ALgBwAGQAZgAPABoADABNAGEAYwBpAG4AdABvAHMAaAAgAEgARAASAF5Vc2Vycy9tYXJ0ZW4vR29vZ2xlRHJpdmUvU3Bpbm96YS9SZXNlYXJjaC9MRlMvcHJldmlvdXNfd29yay9zZW5zZV9lbWJlZGRpbmdfcGFwZXJzL1JXX05OTE0ucGRmABMAAS8AABUAAgAN//8AAIAG0hscHR5aJGNsYXNzbmFtZVgkY2xhc3Nlc11OU011dGFibGVEYXRhox0fIFZOU0RhdGFYTlNPYmplY3TSGxwiI1xOU0RpY3Rpb25hcnmiIiBfEA9OU0tleWVkQXJjaGl2ZXLRJidUcm9vdIABAAgAEQAaACMALQAyADcAQABGAE0AVQBgAGcAagBsAG4AcQBzAHUAdwCEAI4AywDQANgC7ALuAvMC/gMHAxUDGQMgAykDLgM7Az4DUANTA1gAAAAAAAACAQAAAAAAAAAoAAAAAAAAAAAAAAAAAAADWg==}}
+
+@inproceedings{liu2015learning,
+	Abstract = {
+
+
+motivation:
+	1) one word one vector
+
+two kinds of clustering:
+	1) word embedding: mixture of different prototypes
+	2) topic embedding: averaged vector of all words under a topic
+
+
+integrating word and topic vectors
+magic: replacing bilinear layer with a tensor layer in the skipgram model
+},
+	Author = {Liu, Pengfei and Qiu, Xipeng and Huang, Xuanjing},
+	Booktitle = {Proceedings of the 24th International Conference on Artificial Intelligence},
+	Date-Added = {2016-01-04 09:36:39 +0000},
+	Date-Modified = {2017-05-11 05:32:13 +0000},
+	Keywords = {checked},
+	Organization = {AAAI Press},
+	Pages = {1284--1290},
+	Title = {Learning context-sensitive word embeddings with neural tensor skip-gram model},
+	Year = {2015}}
+
+@article{li2015multi,
+	Abstract = {
+
+
+motivation:
+	1) single embeddings are not useful
+
+
+pipeline architecture:
+	1) Sense-specific representation learning
+	2) sense induction
+	3) Representation acquisition for phrases or
+sentences
+
+
+claim: most systems focus on step 1 and not on the others.
+
+idea: chinese restaurant processes
+
+
+greedy search: assign each token with the locally optimum sense label
+expectation: Compute the probability of each possible sense for the current word, and represent the word with the expectation vector.
+
+Wikipedia dataset which is comprised of 1.1 billion tokens and a large dataset by combining
+Wikipedia, Gigaword and Common crawl dataset, which is comprised of 120 billion tokens. We iterate
+over the dataset for 3 times, with window size 11.
+
+},
+	Author = {Li, Jiwei and Jurafsky, Dan},
+	Date-Added = {2016-01-02 10:49:57 +0000},
+	Date-Modified = {2017-05-11 05:28:39 +0000},
+	Journal = {arXiv preprint arXiv:1506.01070},
+	Keywords = {checked},
+	Title = {Do multi-sense embeddings improve natural language understanding?},
+	Url = {http://aclweb.org/anthology/D15-1200},
+	Year = {2015},
+	Bdsk-File-1 = {YnBsaXN0MDDUAQIDBAUGJCVYJHZlcnNpb25YJG9iamVjdHNZJGFyY2hpdmVyVCR0b3ASAAGGoKgHCBMUFRYaIVUkbnVsbNMJCgsMDxJXTlMua2V5c1pOUy5vYmplY3RzViRjbGFzc6INDoACgAOiEBGABIAFgAdccmVsYXRpdmVQYXRoWWFsaWFzRGF0YV8QJS4uLy4uLy4uLy4uL0Rvd25sb2Fkcy9saTIwMTVtdWx0aS5wZGbSFwsYGVdOUy5kYXRhTxEBggAAAAABggACAAAMTWFjaW50b3NoIEhEAAAAAAAAAAAAAAAAAAAAzpe500grAAAACPnKD2xpMjAxNW11bHRpLnBkZgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAV5TazSrdUtAAAAAAAAAAAABAACAAAJIAAAAAAAAAAAAAAAAAAAAAlEb3dubG9hZHMAABAACAAAzperwwAAABEACAAA0q3HHQAAAAEADAAI+coACPnHAAJkjgACADZNYWNpbnRvc2ggSEQ6VXNlcnM6AG1hcnRlbjoARG93bmxvYWRzOgBsaTIwMTVtdWx0aS5wZGYADgAgAA8AbABpADIAMAAxADUAbQB1AGwAdABpAC4AcABkAGYADwAaAAwATQBhAGMAaQBuAHQAbwBzAGgAIABIAEQAEgAmVXNlcnMvbWFydGVuL0Rvd25sb2Fkcy9saTIwMTVtdWx0aS5wZGYAEwABLwAAFQACAA3//wAAgAbSGxwdHlokY2xhc3NuYW1lWCRjbGFzc2VzXU5TTXV0YWJsZURhdGGjHR8gVk5TRGF0YVhOU09iamVjdNIbHCIjXE5TRGljdGlvbmFyeaIiIF8QD05TS2V5ZWRBcmNoaXZlctEmJ1Ryb290gAEACAARABoAIwAtADIANwBAAEYATQBVAGAAZwBqAGwAbgBxAHMAdQB3AIQAjgC2ALsAwwJJAksCUAJbAmQCcgJ2An0ChgKLApgCmwKtArACtQAAAAAAAAIBAAAAAAAAACgAAAAAAAAAAAAAAAAAAAK3}}
+
+@article{rothe2015autoextend,
+	Abstract = {
+
+main contribution:
+input: word vectors
+output: embeddings of synsets and lexemes
+
+lexeme embeddings worked the best
+
+constrainst: related synsets are used if not enough information
+
+goal: enrich wordnet with embeddings for synsets and lexemes
+
+synset: set of synonyms
+lexeme: pairs a particular spelling with a particular meaning
+
+we view words as the sum of their lexemes
+and synsets as the sum of their lexemes
+
+},
+	Author = {Rothe, Sascha and Sch{\"u}tze, Hinrich},
+	Date-Added = {2015-12-12 20:26:09 +0000},
+	Date-Modified = {2017-05-10 12:53:14 +0000},
+	Journal = {arXiv preprint arXiv:1507.01127},
+	Keywords = {checked},
+	Title = {AutoExtend: Extending word embeddings to embeddings for synsets and lexemes},
+	Url = {http://www.aclweb.org/anthology/P15-1173},
+	Year = {2015},
+	Bdsk-Url-1 = {http://www.aclweb.org/anthology/P15-1173}}
+
+@inproceedings{guo2014learning,
+	Abstract = {sense specifc embeddings using bilingual corpora
+
+
+evaluate on word similarity + Chinese named entity recognition.
+
+word sense induction (WSI) is performed prior to the training of NNLMs
+
+We exploit bilingual parallel data for WSI, which is motivated by the intuition that the same word in the
+source language with different senses is supposed to have different translations in the foreign language.
+
+
+
+steps:
+1) extract translations of the source language from bilingual data
+2) cluster the translation words
+3) tagging the source language
+4) train model
+
+
+evaluation of made dataset for chinese + NER (barely above baseline)},
+	Author = {Guo, Jiang and Che, Wanxiang and Wang, Haifeng and Liu, Ting},
+	Booktitle = {Proceedings of COLING},
+	Date-Added = {2015-11-27 11:21:21 +0000},
+	Date-Modified = {2017-05-10 12:22:04 +0000},
+	Keywords = {checked},
+	Pages = {497--507},
+	Title = {Learning sense-specific word embeddings by exploiting bilingual resources},
+	Year = {2014},
+	Bdsk-File-1 = {YnBsaXN0MDDUAQIDBAUGJCVYJHZlcnNpb25YJG9iamVjdHNZJGFyY2hpdmVyVCR0b3ASAAGGoKgHCBMUFRYaIVUkbnVsbNMJCgsMDxJXTlMua2V5c1pOUy5vYmplY3RzViRjbGFzc6INDoACgAOiEBGABIAFgAdccmVsYXRpdmVQYXRoWWFsaWFzRGF0YV8QOi4uLy4uL0xGUy9wcmV2aW91c193b3JrL3NlbnNlX2VtYmVkZGluZ19wYXBlcnMvZ3VvMjAxNC5wZGbSFwsYGVdOUy5kYXRhTxECEAAAAAACEAACAAAMTWFjaW50b3NoIEhEAAAAAAAAAAAAAAAAAAAAzpe500grAAAFTKquC2d1bzIwMTQucGRmAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAVNwG3QCsVqAAAAAAAAAAAAAgAEAAAJIAAAAAAAAAAAAAAAAAAAABZzZW5zZV9lbWJlZGRpbmdfcGFwZXJzABAACAAAzperwwAAABEACAAA0AqpSgAAAAEAIAVMqq4GA82hBQ3lygUJ490AUv0nAFL8agAI+ccAAmSOAAIAc01hY2ludG9zaCBIRDpVc2VyczoAbWFydGVuOgBHb29nbGVEcml2ZToAU3Bpbm96YToAUmVzZWFyY2g6AExGUzoAcHJldmlvdXNfd29yazoAc2Vuc2VfZW1iZWRkaW5nX3BhcGVyczoAZ3VvMjAxNC5wZGYAAA4AGAALAGcAdQBvADIAMAAxADQALgBwAGQAZgAPABoADABNAGEAYwBpAG4AdABvAHMAaAAgAEgARAASAF5Vc2Vycy9tYXJ0ZW4vR29vZ2xlRHJpdmUvU3Bpbm96YS9SZXNlYXJjaC9MRlMvcHJldmlvdXNfd29yay9zZW5zZV9lbWJlZGRpbmdfcGFwZXJzL2d1bzIwMTQucGRmABMAAS8AABUAAgAN//8AAIAG0hscHR5aJGNsYXNzbmFtZVgkY2xhc3Nlc11OU011dGFibGVEYXRhox0fIFZOU0RhdGFYTlNPYmplY3TSGxwiI1xOU0RpY3Rpb25hcnmiIiBfEA9OU0tleWVkQXJjaGl2ZXLRJidUcm9vdIABAAgAEQAaACMALQAyADcAQABGAE0AVQBgAGcAagBsAG4AcQBzAHUAdwCEAI4AywDQANgC7ALuAvMC/gMHAxUDGQMgAykDLgM7Az4DUANTA1gAAAAAAAACAQAAAAAAAAAoAAAAAAAAAAAAAAAAAAADWg==}}
+
+@inproceedings{tian2014probabilistic,
+	Author = {Tian, Fei and Dai, Hanjun and Bian, Jiang and Gao, Bin and Zhang, Rui and Chen, Enhong and Liu, Tie-Yan},
+	Booktitle = {Proceedings of COLING},
+	Date-Added = {2015-11-27 11:19:59 +0000},
+	Date-Modified = {2017-05-10 12:20:16 +0000},
+	Keywords = {checked},
+	Pages = {151--160},
+	Title = {A probabilistic model for learning multi-prototype word embeddings},
+	Year = {2014},
+	Bdsk-File-1 = {YnBsaXN0MDDUAQIDBAUGJCVYJHZlcnNpb25YJG9iamVjdHNZJGFyY2hpdmVyVCR0b3ASAAGGoKgHCBMUFRYaIVUkbnVsbNMJCgsMDxJXTlMua2V5c1pOUy5vYmplY3RzViRjbGFzc6INDoACgAOiEBGABIAFgAdccmVsYXRpdmVQYXRoWWFsaWFzRGF0YV8QNy4uLy4uL0xGUy9wcmV2aW91c193b3JrL3NlbnNlX2VtYmVkZGluZ19wYXBlcnMvdGlhbi5wZGbSFwsYGVdOUy5kYXRhTxECBAAAAAACBAACAAAMTWFjaW50b3NoIEhEAAAAAAAAAAAAAAAAAAAAzpe500grAAAFTKquCHRpYW4ucGRmAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAVNv5DQEJjXAAAAAAAAAAAAAgAEAAAJIAAAAAAAAAAAAAAAAAAAABZzZW5zZV9lbWJlZGRpbmdfcGFwZXJzABAACAAAzperwwAAABEACAAA0BB8twAAAAEAIAVMqq4GA82hBQ3lygUJ490AUv0nAFL8agAI+ccAAmSOAAIAcE1hY2ludG9zaCBIRDpVc2VyczoAbWFydGVuOgBHb29nbGVEcml2ZToAU3Bpbm96YToAUmVzZWFyY2g6AExGUzoAcHJldmlvdXNfd29yazoAc2Vuc2VfZW1iZWRkaW5nX3BhcGVyczoAdGlhbi5wZGYADgASAAgAdABpAGEAbgAuAHAAZABmAA8AGgAMAE0AYQBjAGkAbgB0AG8AcwBoACAASABEABIAW1VzZXJzL21hcnRlbi9Hb29nbGVEcml2ZS9TcGlub3phL1Jlc2VhcmNoL0xGUy9wcmV2aW91c193b3JrL3NlbnNlX2VtYmVkZGluZ19wYXBlcnMvdGlhbi5wZGYAABMAAS8AABUAAgAN//8AAIAG0hscHR5aJGNsYXNzbmFtZVgkY2xhc3Nlc11OU011dGFibGVEYXRhox0fIFZOU0RhdGFYTlNPYmplY3TSGxwiI1xOU0RpY3Rpb25hcnmiIiBfEA9OU0tleWVkQXJjaGl2ZXLRJidUcm9vdIABAAgAEQAaACMALQAyADcAQABGAE0AVQBgAGcAagBsAG4AcQBzAHUAdwCEAI4AyADNANUC3QLfAuQC7wL4AwYDCgMRAxoDHwMsAy8DQQNEA0kAAAAAAAACAQAAAAAAAAAoAAAAAAAAAAAAAAAAAAADSw==}}
+
+@article{neelakantan2015efficient,
+	Abstract = {
+
+multi sense skipgram model (MSSG)
+
+motivation:
+	1) k= a fixed number is a problem
+	2) one vector per word: traingle inequality (the senses of two words are similar/synonymous, but not the other senses)
+	3) approaches are slow	
+
+1) jointly performing word sense discrimination and disambiguation
+2) scales better (fast)
+3) in the non parametric variant, you do not have to indicate the number of clusters.(which does not always yield the best results)
+
+
+
+wt (vector representation of context): average of context word vectors
+
+clustering the contexts vectors to create sense vectors. (similar to k-means)
+for every word:  cluster of its contexts
+
+
+wsd: cluster that is closest to context vector.
+crucial difference: wsd and learning embeddings are done jointly
+
+
+
+non parametric version:
+	-only a new sense is added if the similarity is lower than threshold
+},
+	Author = {Neelakantan, Arvind and Shankar, Jeevan and Passos, Alexandre and McCallum, Andrew},
+	Date-Added = {2015-11-27 11:18:37 +0000},
+	Date-Modified = {2017-05-11 05:27:52 +0000},
+	Journal = {arXiv preprint arXiv:1504.06654},
+	Keywords = {checked},
+	Title = {Efficient non-parametric estimation of multiple embeddings per word in vector space},
+	Year = {2015},
+	Bdsk-File-1 = {YnBsaXN0MDDUAQIDBAUGJCVYJHZlcnNpb25YJG9iamVjdHNZJGFyY2hpdmVyVCR0b3ASAAGGoKgHCBMUFRYaIVUkbnVsbNMJCgsMDxJXTlMua2V5c1pOUy5vYmplY3RzViRjbGFzc6INDoACgAOiEBGABIAFgAdccmVsYXRpdmVQYXRoWWFsaWFzRGF0YV8QPC4uLy4uL0xGUy9wcmV2aW91c193b3JrL3NlbnNlX2VtYmVkZGluZ19wYXBlcnMvbmVlbGFrdGFuLnBkZtIXCxgZV05TLmRhdGFPEQIYAAAAAAIYAAIAAAxNYWNpbnRvc2ggSEQAAAAAAAAAAAAAAAAAAADOl7nTSCsAAAVMqq4NbmVlbGFrdGFuLnBkZgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABU2+FtJ9+rgAAAAAAAAAAAACAAQAAAkgAAAAAAAAAAAAAAAAAAAAFnNlbnNlX2VtYmVkZGluZ19wYXBlcnMAEAAIAADOl6vDAAAAEQAIAADSfeyoAAAAAQAgBUyqrgYDzaEFDeXKBQnj3QBS/ScAUvxqAAj5xwACZI4AAgB1TWFjaW50b3NoIEhEOlVzZXJzOgBtYXJ0ZW46AEdvb2dsZURyaXZlOgBTcGlub3phOgBSZXNlYXJjaDoATEZTOgBwcmV2aW91c193b3JrOgBzZW5zZV9lbWJlZGRpbmdfcGFwZXJzOgBuZWVsYWt0YW4ucGRmAAAOABwADQBuAGUAZQBsAGEAawB0AGEAbgAuAHAAZABmAA8AGgAMAE0AYQBjAGkAbgB0AG8AcwBoACAASABEABIAYFVzZXJzL21hcnRlbi9Hb29nbGVEcml2ZS9TcGlub3phL1Jlc2VhcmNoL0xGUy9wcmV2aW91c193b3JrL3NlbnNlX2VtYmVkZGluZ19wYXBlcnMvbmVlbGFrdGFuLnBkZgATAAEvAAAVAAIADf//AACABtIbHB0eWiRjbGFzc25hbWVYJGNsYXNzZXNdTlNNdXRhYmxlRGF0YaMdHyBWTlNEYXRhWE5TT2JqZWN00hscIiNcTlNEaWN0aW9uYXJ5oiIgXxAPTlNLZXllZEFyY2hpdmVy0SYnVHJvb3SAAQAIABEAGgAjAC0AMgA3AEAARgBNAFUAYABnAGoAbABuAHEAcwB1AHcAhACOAM0A0gDaAvYC+AL9AwgDEQMfAyMDKgMzAzgDRQNIA1oDXQNiAAAAAAAAAgEAAAAAAAAAKAAAAAAAAAAAAAAAAAAAA2Q=}}
+
+@inproceedings{chen2014unified,
+	Abstract = {source code: http://pan.baidu.com/s/1eQcPK8i
+
+problems with current approaches:
+-number of clusters (k=?)
+-typically offline
+-linking sense vectors to resource is difficult
+
+their approach:
+-number of clusters is number of senses in resource
+-[debatable]: when a new sense appears, it can be adapted.
+-every senses has a corresponding vector in their model
+
+1. initialize word vectors and sense vectors
+	a. initialize word vectors (Skipgram)
+	b. initialize sense vectors based sense glosses.
+		I. average vector of similar words in the glosses (with certain threshold)
+2. performing wsd
+
+	context vector: average of all content words
+	for each sense, cosine similarity of sense vector and context vector.
+	for every disambiguated word, they replace the word in the context vector with the sense vector.
+
+	a. L2R: left to right:
+	b. S2C: simple to complex:
+
+
+3. learning sense vectors from relevant occurences
+	apply this to a corpus and learn vectors from that.
+
+evaluation:
+	-Stanford's Contextual Word Similarities (SCWS)
+	-AvgSimC: average similarity given the context
+
+
+Semeval-2007: 
+	-nouns only (+7.9 compared to MFS)
+	-all words: (+3.7 compared to MFS)
+
+TODO: does their system still have this bias?},
+	Author = {Chen, Xinxiong and Liu, Zhiyuan and Sun, Maosong},
+	Booktitle = {Proceedings of the 2014 Conference on Empirical Methods in Natural Language Processing (EMNLP)},
+	Date-Added = {2015-11-27 11:17:37 +0000},
+	Date-Modified = {2017-05-10 12:14:33 +0000},
+	Keywords = {checked},
+	Pages = {1025--1035},
+	Title = {A unified model for word sense representation and disambiguation},
+	Year = {2014},
+	Bdsk-File-1 = {YnBsaXN0MDDUAQIDBAUGJCVYJHZlcnNpb25YJG9iamVjdHNZJGFyY2hpdmVyVCR0b3ASAAGGoKgHCBMUFRYaIVUkbnVsbNMJCgsMDxJXTlMua2V5c1pOUy5vYmplY3RzViRjbGFzc6INDoACgAOiEBGABIAFgAdccmVsYXRpdmVQYXRoWWFsaWFzRGF0YV8QQi4uLy4uL0xGUy9wcmV2aW91c193b3JrL3NlbnNlX2VtYmVkZGluZ19wYXBlcnMvY2hlbjIwMTR1bmlmaWVkLnBkZtIXCxgZV05TLmRhdGFPEQIwAAAAAAIwAAIAAAxNYWNpbnRvc2ggSEQAAAAAAAAAAAAAAAAAAADOl7nTSCsAAAVMqq4TY2hlbjIwMTR1bmlmaWVkLnBkZgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABZHDQ9LAaEtQREYgQ0FSTwACAAQAAAkgAAAAAAAAAAAAAAAAAAAAFnNlbnNlX2VtYmVkZGluZ19wYXBlcnMAEAAIAADOl6vDAAAAEQAIAADSwFo7AAAAAQAgBUyqrgYDzaEFDeXKBQnj3QBS/ScAUvxqAAj5xwACZI4AAgB7TWFjaW50b3NoIEhEOlVzZXJzOgBtYXJ0ZW46AEdvb2dsZURyaXZlOgBTcGlub3phOgBSZXNlYXJjaDoATEZTOgBwcmV2aW91c193b3JrOgBzZW5zZV9lbWJlZGRpbmdfcGFwZXJzOgBjaGVuMjAxNHVuaWZpZWQucGRmAAAOACgAEwBjAGgAZQBuADIAMAAxADQAdQBuAGkAZgBpAGUAZAAuAHAAZABmAA8AGgAMAE0AYQBjAGkAbgB0AG8AcwBoACAASABEABIAZlVzZXJzL21hcnRlbi9Hb29nbGVEcml2ZS9TcGlub3phL1Jlc2VhcmNoL0xGUy9wcmV2aW91c193b3JrL3NlbnNlX2VtYmVkZGluZ19wYXBlcnMvY2hlbjIwMTR1bmlmaWVkLnBkZgATAAEvAAAVAAIADf//AACABtIbHB0eWiRjbGFzc25hbWVYJGNsYXNzZXNdTlNNdXRhYmxlRGF0YaMdHyBWTlNEYXRhWE5TT2JqZWN00hscIiNcTlNEaWN0aW9uYXJ5oiIgXxAPTlNLZXllZEFyY2hpdmVy0SYnVHJvb3SAAQAIABEAGgAjAC0AMgA3AEAARgBNAFUAYABnAGoAbABuAHEAcwB1AHcAhACOANMA2ADgAxQDFgMbAyYDLwM9A0EDSANRA1YDYwNmA3gDewOAAAAAAAAAAgEAAAAAAAAAKAAAAAAAAAAAAAAAAAAAA4I=}}
+
+@inproceedings{huang2012improving,
+	Abstract = {source code: http://ai.stanford.edu/ehhuang/
+
+
+
+each word is only represented with one vector, which is unable to represent homonymy and polysemy.
+
+idea: combing local context and global context
+
+evaluation:
+WordSim 353
+Word similarity in context
+
+},
+	Author = {Huang, Eric H and Socher, Richard and Manning, Christopher D and Ng, Andrew Y},
+	Booktitle = {Proceedings of the 50th Annual Meeting of the Association for Computational Linguistics: Long Papers-Volume 1},
+	Date-Added = {2015-11-27 11:15:49 +0000},
+	Date-Modified = {2017-05-10 12:16:09 +0000},
+	Keywords = {checked},
+	Organization = {Association for Computational Linguistics},
+	Pages = {873--882},
+	Title = {Improving word representations via global context and multiple word prototypes},
+	Year = {2012},
+	Bdsk-File-1 = {YnBsaXN0MDDUAQIDBAUGJCVYJHZlcnNpb25YJG9iamVjdHNZJGFyY2hpdmVyVCR0b3ASAAGGoKgHCBMUFRYaIVUkbnVsbNMJCgsMDxJXTlMua2V5c1pOUy5vYmplY3RzViRjbGFzc6INDoACgAOiEBGABIAFgAdccmVsYXRpdmVQYXRoWWFsaWFzRGF0YV8QPC4uLy4uL0xGUy9wcmV2aW91c193b3JrL3NlbnNlX2VtYmVkZGluZ19wYXBlcnMvaHVhbmcyMDEyLnBkZtIXCxgZV05TLmRhdGFPEQIYAAAAAAIYAAIAAAxNYWNpbnRvc2ggSEQAAAAAAAAAAAAAAAAAAADOl7nTSCsAAAVMqq4NaHVhbmcyMDEyLnBkZgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABU28J8vbm98AAAAAAAAAAAACAAQAAAkgAAAAAAAAAAAAAAAAAAAAFnNlbnNlX2VtYmVkZGluZ19wYXBlcnMAEAAIAADOl6vDAAAAEQAIAADL23+/AAAAAQAgBUyqrgYDzaEFDeXKBQnj3QBS/ScAUvxqAAj5xwACZI4AAgB1TWFjaW50b3NoIEhEOlVzZXJzOgBtYXJ0ZW46AEdvb2dsZURyaXZlOgBTcGlub3phOgBSZXNlYXJjaDoATEZTOgBwcmV2aW91c193b3JrOgBzZW5zZV9lbWJlZGRpbmdfcGFwZXJzOgBodWFuZzIwMTIucGRmAAAOABwADQBoAHUAYQBuAGcAMgAwADEAMgAuAHAAZABmAA8AGgAMAE0AYQBjAGkAbgB0AG8AcwBoACAASABEABIAYFVzZXJzL21hcnRlbi9Hb29nbGVEcml2ZS9TcGlub3phL1Jlc2VhcmNoL0xGUy9wcmV2aW91c193b3JrL3NlbnNlX2VtYmVkZGluZ19wYXBlcnMvaHVhbmcyMDEyLnBkZgATAAEvAAAVAAIADf//AACABtIbHB0eWiRjbGFzc25hbWVYJGNsYXNzZXNdTlNNdXRhYmxlRGF0YaMdHyBWTlNEYXRhWE5TT2JqZWN00hscIiNcTlNEaWN0aW9uYXJ5oiIgXxAPTlNLZXllZEFyY2hpdmVy0SYnVHJvb3SAAQAIABEAGgAjAC0AMgA3AEAARgBNAFUAYABnAGoAbABuAHEAcwB1AHcAhACOAM0A0gDaAvYC+AL9AwgDEQMfAyMDKgMzAzgDRQNIA1oDXQNiAAAAAAAAAgEAAAAAAAAAKAAAAAAAAAAAAAAAAAAAA2Q=}}
+
+@inproceedings{chen2015improving,
+	Abstract = {limitations of clustering:
+
+(1) The performance of these approaches is sensitive to
+the clustering algorithm which requires the setting
+of the sense number for each word.
+
+(2) The initial value of sense representation is critical for
+most statistical clustering based approaches.
+
+source code: https://github.com/yoonkim/CNN_sentence
+
+approach: variation of MSSG},
+	Author = {Chen, Tao and Xu, Ruifeng and He, Yulan and Wang, Xuan},
+	Date-Added = {2015-11-27 10:34:03 +0000},
+	Date-Modified = {2017-05-10 12:14:27 +0000},
+	Keywords = {checked},
+	Organization = {Association for Computational Linguistics},
+	Title = {Improving distributed representation of word sense via WordNet Gloss composition and context clustering},
+	Year = {2015},
+	Bdsk-File-1 = {YnBsaXN0MDDUAQIDBAUGJCVYJHZlcnNpb25YJG9iamVjdHNZJGFyY2hpdmVyVCR0b3ASAAGGoKgHCBMUFRYaIVUkbnVsbNMJCgsMDxJXTlMua2V5c1pOUy5vYmplY3RzViRjbGFzc6INDoACgAOiEBGABIAFgAdccmVsYXRpdmVQYXRoWWFsaWFzRGF0YV8QRi4uLy4uL0xGUy9wcmV2aW91c193b3JrL3NlbnNlX2VtYmVkZGluZ19wYXBlcnMvaW1wcm92ZWRfd2Vfd29yZG5ldC5wZGbSFwsYGVdOUy5kYXRhTxECQAAAAAACQAACAAAMTWFjaW50b3NoIEhEAAAAAAAAAAAAAAAAAAAAzpe500grAAAFTKquF2ltcHJvdmVkX3dlX3dvcmRuZXQucGRmAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAVNiFTR1O7IAAAAAAAAAAAAAgAEAAAJIAAAAAAAAAAAAAAAAAAAABZzZW5zZV9lbWJlZGRpbmdfcGFwZXJzABAACAAAzperwwAAABEACAAA0dTSqAAAAAEAIAVMqq4GA82hBQ3lygUJ490AUv0nAFL8agAI+ccAAmSOAAIAf01hY2ludG9zaCBIRDpVc2VyczoAbWFydGVuOgBHb29nbGVEcml2ZToAU3Bpbm96YToAUmVzZWFyY2g6AExGUzoAcHJldmlvdXNfd29yazoAc2Vuc2VfZW1iZWRkaW5nX3BhcGVyczoAaW1wcm92ZWRfd2Vfd29yZG5ldC5wZGYAAA4AMAAXAGkAbQBwAHIAbwB2AGUAZABfAHcAZQBfAHcAbwByAGQAbgBlAHQALgBwAGQAZgAPABoADABNAGEAYwBpAG4AdABvAHMAaAAgAEgARAASAGpVc2Vycy9tYXJ0ZW4vR29vZ2xlRHJpdmUvU3Bpbm96YS9SZXNlYXJjaC9MRlMvcHJldmlvdXNfd29yay9zZW5zZV9lbWJlZGRpbmdfcGFwZXJzL2ltcHJvdmVkX3dlX3dvcmRuZXQucGRmABMAAS8AABUAAgAN//8AAIAG0hscHR5aJGNsYXNzbmFtZVgkY2xhc3Nlc11OU011dGFibGVEYXRhox0fIFZOU0RhdGFYTlNPYmplY3TSGxwiI1xOU0RpY3Rpb25hcnmiIiBfEA9OU0tleWVkQXJjaGl2ZXLRJidUcm9vdIABAAgAEQAaACMALQAyADcAQABGAE0AVQBgAGcAagBsAG4AcQBzAHUAdwCEAI4A1wDcAOQDKAMqAy8DOgNDA1EDVQNcA2UDagN3A3oDjAOPA5QAAAAAAAACAQAAAAAAAAAoAAAAAAAAAAAAAAAAAAADlg==}}
+
+@inproceedings{reisinger2010multi,
+	Abstract = {
+
+
+word vectors violate the triangle inequality
+a single vector is unable to capture phenomena such as homonymy and polysemy
+
+(1) a word's contexts are clustered
+(2) average centroid is used
+
+Prototype models: single prototype (efficient)
+Examplar model: all examples together (not efficient)
+
+disadvantage distributional approach: thematically similar words will occur together.
+
+clustering: MisesFisher distributions (movMF)
+first order unigram contexts
+10 word window around w
+
+
+
+measurements
+
+without contexts
+AvgSim(w,w'): average of all similarities
+MaxSim(w,w'): max similarity
+
+with contexts
+MaxSimC: max likelihood of context c belonging to cluster 
+AvgSimC: average
+
+
+
+Corpora:
+Wikipedia: wider range of sense distributions
+than Gigaword
+
+Evaluation:
+WordSim353
+
+
+
+
+},
+	Author = {Reisinger, Joseph and Mooney, Raymond J},
+	Booktitle = {Human Language Technologies: The 2010 Annual Conference of the North American Chapter of the Association for Computational Linguistics},
+	Date-Added = {2015-11-27 10:25:59 +0000},
+	Date-Modified = {2017-05-10 12:14:37 +0000},
+	Keywords = {checked},
+	Organization = {Association for Computational Linguistics},
+	Pages = {109--117},
+	Title = {Multi-prototype vector-space models of word meaning},
+	Year = {2010},
+	Bdsk-File-1 = {YnBsaXN0MDDUAQIDBAUGJCVYJHZlcnNpb25YJG9iamVjdHNZJGFyY2hpdmVyVCR0b3ASAAGGoKgHCBMUFRYaIVUkbnVsbNMJCgsMDxJXTlMua2V5c1pOUy5vYmplY3RzViRjbGFzc6INDoACgAOiEBGABIAFgAdccmVsYXRpdmVQYXRoWWFsaWFzRGF0YV8QUy4uLy4uL0xGUy9wcmV2aW91c193b3JrL3NlbnNlX2VtYmVkZGluZ19wYXBlcnMvbXVsdGlfcHJvdG90eXBlX3ZzbV93b3JkX21lYW5pbmcucGRm0hcLGBlXTlMuZGF0YU8RAnAAAAAAAnAAAgAADE1hY2ludG9zaCBIRAAAAAAAAAAAAAAAAAAAAM6XudNIKwAABUyqrh9tdWx0aV9wcm90b3R5cGVfdnNtIzU0RDgwRDMucGRmAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFTYDTyDyisAAAAAAAAAAAAAIABAAACSAAAAAAAAAAAAAAAAAAAAAWc2Vuc2VfZW1iZWRkaW5nX3BhcGVycwAQAAgAAM6Xq8MAAAARAAgAAMg8hpAAAAABACAFTKquBgPNoQUN5coFCePdAFL9JwBS/GoACPnHAAJkjgACAIdNYWNpbnRvc2ggSEQ6VXNlcnM6AG1hcnRlbjoAR29vZ2xlRHJpdmU6AFNwaW5vemE6AFJlc2VhcmNoOgBMRlM6AHByZXZpb3VzX3dvcms6AHNlbnNlX2VtYmVkZGluZ19wYXBlcnM6AG11bHRpX3Byb3RvdHlwZV92c20jNTREODBEMy5wZGYAAA4ASgAkAG0AdQBsAHQAaQBfAHAAcgBvAHQAbwB0AHkAcABlAF8AdgBzAG0AXwB3AG8AcgBkAF8AbQBlAGEAbgBpAG4AZwAuAHAAZABmAA8AGgAMAE0AYQBjAGkAbgB0AG8AcwBoACAASABEABIAd1VzZXJzL21hcnRlbi9Hb29nbGVEcml2ZS9TcGlub3phL1Jlc2VhcmNoL0xGUy9wcmV2aW91c193b3JrL3NlbnNlX2VtYmVkZGluZ19wYXBlcnMvbXVsdGlfcHJvdG90eXBlX3ZzbV93b3JkX21lYW5pbmcucGRmAAATAAEvAAAVAAIADf//AACABtIbHB0eWiRjbGFzc25hbWVYJGNsYXNzZXNdTlNNdXRhYmxlRGF0YaMdHyBWTlNEYXRhWE5TT2JqZWN00hscIiNcTlNEaWN0aW9uYXJ5oiIgXxAPTlNLZXllZEFyY2hpdmVy0SYnVHJvb3SAAQAIABEAGgAjAC0AMgA3AEAARgBNAFUAYABnAGoAbABuAHEAcwB1AHcAhACOAOQA6QDxA2UDZwNsA3cDgAOOA5IDmQOiA6cDtAO3A8kDzAPRAAAAAAAAAgEAAAAAAAAAKAAAAAAAAAAAAAAAAAAAA9M=}}
+
+@inproceedings{sense2vec,
+	Abstract = {given a pre-trained word embedding model, each context embedding is generated by computing a weighted
+sum of the words in the context (weighted by tf-idf).
+
+Then, for each term, the associated context embeddings are clustered. The clusters are used to re-label each occurrence of each word in the corpus. Once these terms have been re-labeled with the cluster's number, a new word model is trained on the labeled embeddings (with a different vector for each) generating the word-sense embeddings.
+
+
+pos specific word embeddings},
+	Date-Added = {2015-11-27 07:44:53 +0000},
+	Date-Modified = {2017-05-11 05:35:25 +0000},
+	Keywords = {checked},
+	Bdsk-File-1 = {YnBsaXN0MDDUAQIDBAUGJCVYJHZlcnNpb25YJG9iamVjdHNZJGFyY2hpdmVyVCR0b3ASAAGGoKgHCBMUFRYaIVUkbnVsbNMJCgsMDxJXTlMua2V5c1pOUy5vYmplY3RzViRjbGFzc6INDoACgAOiEBGABIAFgAdccmVsYXRpdmVQYXRoWWFsaWFzRGF0YV8QPC4uLy4uL0xGUy9wcmV2aW91c193b3JrL3NlbnNlX2VtYmVkZGluZ19wYXBlcnMvc2Vuc2UydmVjLnBkZtIXCxgZV05TLmRhdGFPEQIYAAAAAAIYAAIAAAxNYWNpbnRvc2ggSEQAAAAAAAAAAAAAAAAAAADOl7nTSCsAAAVMqq4Nc2Vuc2UydmVjLnBkZgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABUy1pNJ9yWIAAAAAAAAAAAACAAQAAAkgAAAAAAAAAAAAAAAAAAAAFnNlbnNlX2VtYmVkZGluZ19wYXBlcnMAEAAIAADOl6vDAAAAEQAIAADSfbtSAAAAAQAgBUyqrgYDzaEFDeXKBQnj3QBS/ScAUvxqAAj5xwACZI4AAgB1TWFjaW50b3NoIEhEOlVzZXJzOgBtYXJ0ZW46AEdvb2dsZURyaXZlOgBTcGlub3phOgBSZXNlYXJjaDoATEZTOgBwcmV2aW91c193b3JrOgBzZW5zZV9lbWJlZGRpbmdfcGFwZXJzOgBzZW5zZTJ2ZWMucGRmAAAOABwADQBzAGUAbgBzAGUAMgB2AGUAYwAuAHAAZABmAA8AGgAMAE0AYQBjAGkAbgB0AG8AcwBoACAASABEABIAYFVzZXJzL21hcnRlbi9Hb29nbGVEcml2ZS9TcGlub3phL1Jlc2VhcmNoL0xGUy9wcmV2aW91c193b3JrL3NlbnNlX2VtYmVkZGluZ19wYXBlcnMvc2Vuc2UydmVjLnBkZgATAAEvAAAVAAIADf//AACABtIbHB0eWiRjbGFzc25hbWVYJGNsYXNzZXNdTlNNdXRhYmxlRGF0YaMdHyBWTlNEYXRhWE5TT2JqZWN00hscIiNcTlNEaWN0aW9uYXJ5oiIgXxAPTlNLZXllZEFyY2hpdmVy0SYnVHJvb3SAAQAIABEAGgAjAC0AMgA3AEAARgBNAFUAYABnAGoAbABuAHEAcwB1AHcAhACOAM0A0gDaAvYC+AL9AwgDEQMfAyMDKgMzAzgDRQNIA1oDXQNiAAAAAAAAAgEAAAAAAAAAKAAAAAAAAAAAAAAAAAAAA2Q=}}
