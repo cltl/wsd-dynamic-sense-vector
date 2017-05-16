@@ -65,3 +65,4 @@ not bad? At least we know that it captured something.
 ```
 
 Notice: this model is trained on a compute node so you need to enter one to load it back into memory.
+Otherwise it might throw "ImportError: No module named 'UserString'".
