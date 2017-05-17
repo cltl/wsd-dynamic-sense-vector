@@ -66,3 +66,26 @@ not bad? At least we know that it captured something.
 
 Notice: this model is trained on a compute node so you need to enter one to load it back into memory.
 Otherwise it might throw "ImportError: No module named 'UserString'".
+
+## Tue 16 May
+
+Today I'll adapt gensim to train sense vectors. Found this 
+[super helpful thread](https://groups.google.com/d/msg/gensim/LTdrGBysMyw/joGz8F9uCAAJ)
+where some guy tried to modify it to reproduce Omer Levy's paper. Let me paste
+the instructions here for later reference:
+
+1. Ensure your Python environment is using your working-copy of gensim for the python & the `_inner` compiled code (typically `.so` shared-libraries) – this might involve invoking setup.py from inside your project directory, or doing a 'pip' install using a local path
+2. When your changes to the `.pyx` files seem ready, use `cython` to compile them to `.c` code. (You *might* need to do this from the root of the project, eg: `cython gensim/models/word2vec_inner.pyx`)
+3. Use the command `python ./setup.py build_ext --inplace`, from the root of your gensim directory, to compile the `.c` to shared-libraries. (Depending on how well you did step (1), you might also need to do something like `python ./setup.py install` to also install the shared-libraries elsewhere.)
+4. Run your tests, confirming especially that your changed code (and not some older or elsewhere-installed version) is being run from where you expect it. Debug & repeat (2)-(3) as necessary. 
+ 
+Modified the vocabulary code to recognize and register senses.
+ 
+Went out to attent Antske's talk.
+
+## Wed 17 May
+
+Finished, checked Python implementation of new CBOW. When provided with a 
+`sense_delimiter`, it will only train sense embeddings, leaving word 
+(and context) embeddings untouched.
+It is rather hard to write automated tests to check these requirement... 

@@ -354,6 +354,22 @@ class TestWord2VecModel(unittest.TestCase):
         # input not empty, but rather completely filtered out
         self.assertRaises(RuntimeError, word2vec.Word2Vec, corpus, min_count=total_words+1)
 
+    def testVocabSense(self):
+        """Test word2vec vocabulary building from disambiguated text."""
+        model = word2vec.Word2Vec()
+        raw_corpus = word2vec.LineSentence(datapath('sample-raw-text.txt'))
+        dis_corpus = word2vec.LineSentence(datapath('sample-disambiguated-text.txt'))
+        model.build_vocab(raw_corpus, update=False)
+        model.min_count=1
+        model.build_vocab(dis_corpus, sense_delimiter='---', update=True)
+        import re
+        senses = [key for key in model.wv.vocab if re.search(r'\.0\d$', key)]
+        raw_words = [key for key in model.wv.vocab if not re.search(r'\.0\d$', key)]
+        remaining_dashs = [w for w in raw_words if '---' in w]
+        assert len(senses) > 0
+        assert len(raw_words) > 0
+        assert len(remaining_dashs) == 0
+
     def testTraining(self):
         """Test word2vec training."""
         # build vocabulary, don't train yet

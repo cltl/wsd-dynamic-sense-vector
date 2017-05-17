@@ -129,12 +129,25 @@ from six.moves import xrange
 from types import GeneratorType
 from scipy import stats
 
+from math import ceil, floor
+
+
 logger = logging.getLogger(__name__)
 
+def sense_split(word, sense_delimiter):
+    if sense_delimiter:
+        pos = word.rfind(sense_delimiter)
+        if pos > 0 and pos < len(word)-len(sense_delimiter):
+            word2 = word[:pos]
+            sense = word[pos+len(sense_delimiter):]
+            return (word2, sense)
+    return (word, None)
+
 try:
-    from gensim.models.word2vec_inner import train_batch_sg, train_batch_cbow
-    from gensim.models.word2vec_inner import score_sentence_sg, score_sentence_cbow
-    from gensim.models.word2vec_inner import FAST_VERSION, MAX_WORDS_IN_BATCH
+#     from gensim.models.word2vec_inner import train_batch_sg, train_batch_cbow
+#     from gensim.models.word2vec_inner import score_sentence_sg, score_sentence_cbow
+#     from gensim.models.word2vec_inner import FAST_VERSION, MAX_WORDS_IN_BATCH
+    raise ImportError
 except ImportError:
     # failed... fall back to plain numpy (20-80x slower training than the above)
     FAST_VERSION = -1
@@ -167,7 +180,7 @@ except ImportError:
             result += len(word_vocabs)
         return result
 
-    def train_batch_cbow(model, sentences, alpha, work=None, neu1=None):
+    def train_batch_cbow(model, sentences, alpha, work=None, neu1=None, sense_delimiter=None):
         """
         Update CBOW model by training on a sequence of sentences.
 
@@ -180,17 +193,40 @@ except ImportError:
         """
         result = 0
         for sentence in sentences:
-            word_vocabs = [model.wv.vocab[w] for w in sentence if w in model.wv.vocab and
-                           model.wv.vocab[w].sample_int > model.random.rand() * 2**32]
-            for pos, word in enumerate(word_vocabs):
+            if sense_delimiter:
+                word_vocabs = []
+                cxt_pos = []
+                cxt_vocabs = []
+                for i, w in enumerate(sentence):
+                    word, sense = sense_split(w, sense_delimiter)
+                    context_added = (word in model.wv.vocab and 
+                                     model.wv.vocab[word].sample_int > model.random.rand() * 2**32)
+                    if sense:
+                        word_vocabs.append(model.wv.vocab[sense])
+                        cxt_pos.append(len(cxt_vocabs) - (0 if context_added else 0.5))
+                    if context_added:
+                        cxt_vocabs.append(model.wv.vocab[word])
+            else:
+                word_vocabs = [model.wv.vocab[w] for w in sentence if w in model.wv.vocab and
+                               model.wv.vocab[w].sample_int > model.random.rand() * 2**32]
+                cxt_vocabs = word_vocabs
+                cxt_pos = list(range(len(word_vocabs)))
+            for pos, word in zip(cxt_pos, word_vocabs):
                 reduced_window = model.random.randint(model.window)  # `b` in the original word2vec code
-                start = max(0, pos - model.window + reduced_window)
-                window_pos = enumerate(word_vocabs[start:(pos + model.window + 1 - reduced_window)], start)
-                word2_indices = [word2.index for pos2, word2 in window_pos if (word2 is not None and pos2 != pos)]
-                l1 = np_sum(model.wv.syn0[word2_indices], axis=0)  # 1 x vector_size
-                if word2_indices and model.cbow_mean:
-                    l1 /= len(word2_indices)
-                train_cbow_pair(model, word, word2_indices, l1, alpha)
+                start = max(0, ceil(pos - model.window + reduced_window))
+                stop = min(len(cxt_vocabs), floor(pos + model.window + 1 - reduced_window))
+                window_pos = enumerate(cxt_vocabs[start:stop], start)
+                cxt_indices = [word2.index for pos2, word2 in window_pos if (word2 is not None and pos2 != pos)]
+                l1 = np_sum(model.wv.syn0[cxt_indices], axis=0)  # 1 x vector_size
+                if cxt_indices and model.cbow_mean:
+                    l1 /= len(cxt_indices)
+                train_cbow_pair(model, word, cxt_indices, l1, alpha,
+                                learn_hidden=(sense_delimiter is None))
+#                 debug_str = []
+#                 debug_str.extend(model.wv.index2word[cxt_vocabs[i].index] for i in range(start, ceil(pos)))
+#                 debug_str.append('>>>%s<<<' %model.wv.index2word[word.index])
+#                 debug_str.extend(model.wv.index2word[cxt_vocabs[i].index] for i in range(floor(pos+1), stop))
+#                 print(' '.join(debug_str))
             result += len(word_vocabs)
         return result
 
@@ -224,7 +260,7 @@ except ImportError:
 
         return log_prob_sentence
 
-    def score_sentence_cbow(model, sentence, alpha, work=None, neu1=None):
+    def score_sentence_cbow(model, sentence, alpha, work=None, neu1=None, sense_delimiter=None):
         """
         Obtain likelihood score for a single sentence in a fitted CBOW representaion.
 
@@ -366,8 +402,25 @@ class Word2Vec(utils.SaveLoad):
             self, sentences=None, size=100, alpha=0.025, window=5, min_count=5,
             max_vocab_size=None, sample=1e-3, seed=1, workers=3, min_alpha=0.0001,
             sg=0, hs=0, negative=5, cbow_mean=1, hashfxn=hash, iter=5, null_word=0,
-            trim_rule=None, sorted_vocab=1, batch_words=MAX_WORDS_IN_BATCH):
+            trim_rule=None, sorted_vocab=1, batch_words=MAX_WORDS_IN_BATCH,
+            sense_delimiter=None):
         """
+        Modified from gensim's Word2Vec to train sense embeddings.
+        
+        I added a parameter: sense_delimiter. When it is not None, the code 
+        will look for words that have the form <word> <sense_delimiter> <sense>
+        and train embeddings for the sense instead of the word. The context
+        used for training is words though (even if they are tagged with senses).
+        Words that are not tagged won't be trained.
+        
+        Notice that when sense_delimiter is used, the vocabulary and embeddings
+        (input and output embeddings) must be already trained. Otherwise, 
+        the resulting sense embeddings won't make sense. 
+        
+        Original Word2Vec comes below.
+        
+        --- 
+        
         Initialize the model from an iterable of `sentences`. Each sentence is a
         list of words (unicode strings) that will be used for training.
 
@@ -475,9 +528,10 @@ class Word2Vec(utils.SaveLoad):
         if sentences is not None:
             if isinstance(sentences, GeneratorType):
                 raise TypeError("You can't pass a generator as the sentences argument. Try an iterator.")
-            self.build_vocab(sentences, trim_rule=trim_rule)
+            self.build_vocab(sentences, trim_rule=trim_rule, sense_delimiter=sense_delimiter)
             self.train(sentences, total_examples=self.corpus_count, epochs=self.iter,
-                       start_alpha=self.alpha, end_alpha=self.min_alpha)
+                       start_alpha=self.alpha, end_alpha=self.min_alpha, 
+                       sense_delimiter=sense_delimiter)
         else :
             if trim_rule is not None :
                 logger.warning("The rule, if given, is only used to prune vocabulary during build_vocab() and is not stored as part of the model. ")
@@ -544,17 +598,19 @@ class Word2Vec(utils.SaveLoad):
 
             logger.info("built huffman tree with maximum node depth %i", max_depth)
 
-    def build_vocab(self, sentences, keep_raw_vocab=False, trim_rule=None, progress_per=10000, update=False):
+    def build_vocab(self, sentences, keep_raw_vocab=False, trim_rule=None, 
+                    progress_per=10000, update=False, sense_delimiter=None):
         """
         Build vocabulary from a sequence of sentences (can be a once-only generator stream).
         Each sentence must be a list of unicode strings.
 
         """
-        self.scan_vocab(sentences, progress_per=progress_per, trim_rule=trim_rule)  # initial survey
+        self.scan_vocab(sentences, progress_per=progress_per, trim_rule=trim_rule,
+                        sense_delimiter=sense_delimiter)  # initial survey
         self.scale_vocab(keep_raw_vocab=keep_raw_vocab, trim_rule=trim_rule, update=update)  # trim by min_count & precalculate downsampling
         self.finalize_vocab(update=update)  # build tables & arrays
 
-    def scan_vocab(self, sentences, progress_per=10000, trim_rule=None):
+    def scan_vocab(self, sentences, progress_per=10000, trim_rule=None, sense_delimiter=None):
         """Do an initial scan of all words appearing in sentences."""
         logger.info("collecting all words and their counts")
         sentence_no = -1
@@ -573,9 +629,14 @@ class Word2Vec(utils.SaveLoad):
             if sentence_no % progress_per == 0:
                 logger.info("PROGRESS: at sentence #%i, processed %i words, keeping %i word types",
                             sentence_no, sum(itervalues(vocab)) + total_words, len(vocab))
-            for word in sentence:
-                vocab[word] += 1
-
+            if sense_delimiter is None:
+                for word in sentence:
+                    vocab[word] += 1
+            else:
+                for word in sentence:
+                    _, sense = sense_split(word, sense_delimiter)
+                    if sense: vocab[sense] += 1
+                
             if self.max_vocab_size and len(vocab) > self.max_vocab_size:
                 total_words += utils.prune_vocab(vocab, min_reduce, trim_rule=trim_rule)
                 min_reduce += 1
@@ -748,7 +809,7 @@ class Word2Vec(utils.SaveLoad):
         self.corpus_count = other_model.corpus_count
         self.reset_weights()
 
-    def _do_train_job(self, sentences, alpha, inits):
+    def _do_train_job(self, sentences, alpha, inits, sense_delimiter):
         """
         Train a single batch of sentences. Return 2-tuple `(effective word count after
         ignoring unknown words and sentence length trimming, total word count)`.
@@ -756,9 +817,9 @@ class Word2Vec(utils.SaveLoad):
         work, neu1 = inits
         tally = 0
         if self.sg:
-            tally += train_batch_sg(self, sentences, alpha, work)
+            tally += train_batch_sg(self, sentences, alpha, work, sense_delimiter)
         else:
-            tally += train_batch_cbow(self, sentences, alpha, work, neu1)
+            tally += train_batch_cbow(self, sentences, alpha, work, neu1, sense_delimiter)
         return tally, self._raw_word_count(sentences)
 
     def _raw_word_count(self, job):
@@ -768,7 +829,7 @@ class Word2Vec(utils.SaveLoad):
     def train(self, sentences, total_examples=None, total_words=None,
               epochs=None, start_alpha=None, end_alpha=None,
               word_count=0,
-              queue_factor=2, report_delay=1.0):
+              queue_factor=2, report_delay=1.0, sense_delimiter=None):
         """
         Update the model's neural weights from a sequence of sentences (can be a once-only generator stream).
         For Word2Vec, each sentence must be a list of unicode strings. (Subclasses may accept other examples.)
@@ -836,7 +897,7 @@ class Word2Vec(utils.SaveLoad):
                     progress_queue.put(None)
                     break  # no more jobs => quit this worker
                 sentences, alpha = job
-                tally, raw_tally = self._do_train_job(sentences, alpha, (work, neu1))
+                tally, raw_tally = self._do_train_job(sentences, alpha, (work, neu1), sense_delimiter)
                 progress_queue.put((len(sentences), tally, raw_tally))  # report back progress
                 jobs_processed += 1
             logger.debug("worker exiting, processed %i jobs", jobs_processed)
@@ -1027,7 +1088,7 @@ class Word2Vec(utils.SaveLoad):
                     if self.sg:
                         score = score_sentence_sg(self, sentence, work)
                     else:
-                        score = score_sentence_cbow(self, sentence, work, neu1)
+                        score = score_sentence_cbow(self, sentence, work, neu1, sense_delimiter)
                     sentence_scores[sentence_id] = score
                     ns += 1
                 progress_queue.put(ns)  # report progress
