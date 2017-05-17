@@ -6,9 +6,18 @@ pip3 install --user beautifulsoup4 gensim sklearn testfixtures unittest2 pyemd m
 pip3 install --user spacy 
 pip3 install --user https://github.com/explosion/spacy-models/releases/download/en_core_web_md-1.2.1/en_core_web_md-1.2.1.tar.gz
 python3 -m spacy link en_core_web_md en_default
+```
 
-# put a link to your copy of Gigaword 5th edition
+Put a link to your copy of Gigaword 5th edition
+
+```
 ln -s /path/to/gigaword/5ed data/gigaword
+```
+
+Install the modified version of gensim in order to train sense embeddings.
+
+```
+./install-gensim-modified.sh
 ```
 
 ### Specific instructions for DAS-5
