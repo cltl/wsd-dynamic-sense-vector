@@ -1,0 +1,38 @@
+3rd Party Libraries Used by the BabelNet API:
+---------------------------------------------
+
+This document contains license information regarding all 3rd party
+libraries used by the BabelNet API.
+
+1. Using the Apache License (APACHE_LICENSE.txt)
+
+   commons-collections-3.2.jar
+   commons-configuration-1.5.jar
+   commons-digester-1.8.jar
+   httpclient-4.3.6.jar
+   httpcore-4.3.3.jar
+   commons-logging-1.2.jar
+   commons-lang-2.3.jar
+   log4j-api-2.1.jar
+   log4j-core-2.1.jar
+   commons.codec-1.8.jar
+   commons-beanutils-1.7.0.jar
+   commons-beanutils-core-1.7.0.jar
+   gson-2.2.4.jar
+   guava-18.0.jar
+   lucene-core-4.9.0.jar
+   lucene-queryparser-4.9.0.jar
+
+2. Using the Creative Commons Attribution Version 3.0 Unported License
+   (JWI_LICENSE.txt)
+
+   jwi-2.2.3.jar
+   
+3. Using the Creative Commons Attribution-NonCommercial-ShareAlike 3.0 
+   Unported License (JLTUTILS_LICENSE.txt)
+
+   jltutils-2.2.jar
+
+4. Using the ICU License - ICU 1.8.1 and later(ICU_LICENSE.txt)
+
+  icu4j-56.1.jar

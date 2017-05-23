@@ -1,0 +1,24 @@
+-classpath
+'/home/cecconi/.m2/repository/commons-logging/commons-logging/1.2/commons-logging-1.2.jar:/home/cecconi/.m2/repository/commons-digester/commons-digester/1.8/commons-digester-1.8.jar:/home/cecconi/.m2/repository/org/apache/lucene/lucene-core/4.9.0/lucene-core-4.9.0.jar:/home/cecconi/.m2/repository/org/apache/lucene/lucene-queries/4.9.0/lucene-queries-4.9.0.jar:/home/cecconi/.m2/repository/com/ibm/icu/icu4j/56.1/icu4j-56.1.jar:/home/cecconi/.m2/repository/commons-configuration/commons-configuration/1.5/commons-configuration-1.5.jar:/home/cecconi/.m2/repository/org/apache/logging/log4j/log4j-api/2.1/log4j-api-2.1.jar:/home/cecconi/.m2/repository/commons-codec/commons-codec/1.8/commons-codec-1.8.jar:/home/cecconi/.m2/repository/org/apache/logging/log4j/log4j-core/2.1/log4j-core-2.1.jar:/home/cecconi/.m2/repository/com/google/code/gson/gson/2.2.4/gson-2.2.4.jar:/home/cecconi/workspace/babelnet-api/lib/jltutils-2.2.jar:/home/cecconi/.m2/repository/commons-beanutils/commons-beanutils-core/1.7.0/commons-beanutils-core-1.7.0.jar:/home/cecconi/.m2/repository/org/apache/lucene/lucene-analyzers-common/4.9.0/lucene-analyzers-common-4.9.0.jar:/home/cecconi/.m2/repository/edu/mit/jwi/2.2.3/jwi-2.2.3.jar:/home/cecconi/.m2/repository/commons-beanutils/commons-beanutils/1.7.0/commons-beanutils-1.7.0.jar:/home/cecconi/.m2/repository/commons-collections/commons-collections/3.2/commons-collections-3.2.jar:/home/cecconi/.m2/repository/org/apache/lucene/lucene-queryparser/4.9.0/lucene-queryparser-4.9.0.jar:/home/cecconi/.m2/repository/org/apache/lucene/lucene-sandbox/4.9.0/lucene-sandbox-4.9.0.jar:/home/cecconi/.m2/repository/org/apache/httpcomponents/httpcore/4.3.3/httpcore-4.3.3.jar:/home/cecconi/.m2/repository/org/apache/httpcomponents/httpclient/4.3.6/httpclient-4.3.6.jar:/home/cecconi/.m2/repository/commons-lang/commons-lang/2.3/commons-lang-2.3.jar:/home/cecconi/.m2/repository/com/google/guava/guava/18.0/guava-18.0.jar'
+-encoding
+'UTF-8'
+-protected
+-sourcepath
+'/home/cecconi/workspace/babelnet-api/src/main/java'
+-author
+-bottom
+'Copyright &#169; 2016. All rights reserved.'
+-charset
+'UTF-8'
+-d
+'/home/cecconi/workspace/babelnet-api/target/site/apidocs'
+-docencoding
+'UTF-8'
+-doctitle
+'babelnet-api 3.7 API'
+-linkoffline
+'http://docs.oracle.com/javase/8/docs/api' '/home/cecconi/workspace/babelnet-api/target/javadoc-bundle-options'
+-use
+-version
+-windowtitle
+'babelnet-api 3.7 API'

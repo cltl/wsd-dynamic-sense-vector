@@ -1,0 +1,14 @@
+Author 	Roberto Bartolini
+Maintainer 	Roberto Bartolini
+Last updated 	May 22, 2015
+License 	Open Data Commons Attribution License
+http://www.opendefinition.org/licenses/odc-by
+
+Open Data Commons is not a law firm and does not provide legal services of any kind.
+
+Open Data Commons has no formal relationship with you. Your receipt of this document does not create any kind of agent-client relationship. 
+Please seek the advice of a suitably qualified legal professional licensed to practice in your jurisdiction before using this document.
+
+No warranties and disclaimer of any damages. This information is provided ‘as is‘, and this site makes no warranties on the information provided. 
+Any damages resulting from its use are disclaimed.
+

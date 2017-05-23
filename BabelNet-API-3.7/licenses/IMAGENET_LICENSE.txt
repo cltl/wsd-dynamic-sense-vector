@@ -1,0 +1,4 @@
+IMAGENET LICENSE
+
+
+All image URLs are freely available. For more details about the original images, have a look at http://image-net.org/download-faq.

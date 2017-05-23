@@ -20,6 +20,8 @@ Install the modified version of gensim in order to train sense embeddings.
 ./install-gensim-modified.sh
 ```
 
+Make sure you have some Java JDK installed.
+
 ### Specific instructions for DAS-5
 
 If you get error `No module named 'pip'` while importing spacy, you might want to log in to one of the compute nodes and install pip.
@@ -35,3 +37,4 @@ exit
 ## Stesps
 
 1. Create a word2vec model from Gigaword corpus: `sbatch word2vec_gigaword.job`
+2. Extract BabelNet-to-WordNet mappings: `./extract-bn-wn-mappings.sh`

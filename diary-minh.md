@@ -89,3 +89,10 @@ Finished, checked Python implementation of new CBOW. When provided with a
 `sense_delimiter`, it will only train sense embeddings, leaving word 
 (and context) embeddings untouched.
 It is rather hard to write automated tests to check these requirement... 
+
+TODO:
+
+- Implement the C version of CBOW
+- Put some kind of warning in Skip-gram part
+- What to do with `score_sentence_cbow`?
+- How to write automated test?

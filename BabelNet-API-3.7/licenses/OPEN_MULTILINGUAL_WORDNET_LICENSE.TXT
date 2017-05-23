@@ -1,0 +1,8 @@
+Open Multilingual Wordnet
+
+Documentation of and links to data for wordnets in 31 languages
+ (Albanian, Arabic, Danish, English, Persian, Finnish, French, Hebrew, Italian, Japanese, Basque, Catalan, Galician, Spanish,
+  Indonesian, Malaysian, Norwegian (Bokmal and Nynorsk), Portuguese, Thai, Greek, Polish, Chinese, Swedish, Slovene, ...). Size, quality and license varies widely, 
+  but all licenses are open licenses that allow redistribution. 
+
+info: http://compling.hss.ntu.edu.sg/omw/

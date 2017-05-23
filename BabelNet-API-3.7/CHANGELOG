@@ -1,0 +1,35 @@
+Changelog for BabelNet and the BabelNet API:
+
+Ver     : Release Date  : Changes
+=================================
+3.7 	: August 01, 2016    : Updated domains; Added FrameNet, WN-Map (automatically generated mappings among WordNet versions) and the key concepts; Minor bug fixing
+---------------------------------
+3.6.1 	: April 08, 2016     : Minor bug fixing
+---------------------------------
+3.6.0 	: February 01, 2016  : Added ItalWordNet and the other forms; Minor bug fixing
+---------------------------------
+3.5.1   : October 30, 2015   : Minor bug fixing
+---------------------------------
+3.5.0   : September 17, 2015 : Added Wikiquote, GeoNames, Microsoft Terminology, WoNeF, VerbNet, ImageNet and the domains; Java API improvement; Minor bug fixing
+---------------------------------
+3.0.0   : January 15, 2015   : 271 languages covered; Java API improvement and support for RESTFul calls; Bug fixing;
+---------------------------------
+2.5.1   : November 20, 2014  : Minor bug fixing
+---------------------------------
+2.5.0   : May 12, 2014       : Added Wiktionary and Wikidata; Minor bug fixing
+---------------------------------
+2.0.1   : February 28, 2014  : License decoupling and aggregation; Minor bug fixing
+---------------------------------
+2.0.0   : October 01, 2013   : Added OmegaWiki and Open Multilingual WordNet; 50 languages covered; images of different scales allowed; Java API improvement; Bug fixing
+---------------------------------
+1.1.0   : January 07, 2013   : Major API cleanup and documentation
+---------------------------------
+1.0.1   : July 19, 2012      : Fixed SenseFilter to use Words instead of Strings
+---------------------------------
+1.0.0   : May 23, 2012       : Initial Release
+---------------------------------
+
+Bug Reports
+ID  : Priority : Reported  : Fixed in Ver : Description
+=======================================================
+
