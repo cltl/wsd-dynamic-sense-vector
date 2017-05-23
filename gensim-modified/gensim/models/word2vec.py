@@ -144,10 +144,10 @@ def sense_split(word, sense_delimiter):
     return (word, None)
 
 try:
-#     from gensim.models.word2vec_inner import train_batch_sg, train_batch_cbow
-#     from gensim.models.word2vec_inner import score_sentence_sg, score_sentence_cbow
-#     from gensim.models.word2vec_inner import FAST_VERSION, MAX_WORDS_IN_BATCH
-    raise ImportError
+    from gensim.models.word2vec_inner import train_batch_sg, train_batch_cbow
+    from gensim.models.word2vec_inner import score_sentence_sg, score_sentence_cbow
+    from gensim.models.word2vec_inner import FAST_VERSION, MAX_WORDS_IN_BATCH
+#     print('Using C version')
 except ImportError:
     # failed... fall back to plain numpy (20-80x slower training than the above)
     FAST_VERSION = -1
@@ -289,6 +289,52 @@ except ImportError:
             log_prob_sentence += score_cbow_pair(model, word, word2_indices, l1)
 
         return log_prob_sentence
+
+
+
+def train_batch_cbow2(model, sentences, alpha, sense_delimiter, work=None, neu1=None):
+    """
+    Update CBOW model by training on a sequence of sentences.
+
+    Each sentence is a list of string tokens, which are looked up in the model's
+    vocab dictionary. Called internally from `Word2Vec.train()`.
+
+    This is the non-optimized, Python version. If you have cython installed, gensim
+    will use the optimized version from word2vec_inner instead.
+
+    """
+    result = 0
+    for sentence in sentences:
+        word_vocabs = []
+        cxt_pos = []
+        cxt_vocabs = []
+        for i, w in enumerate(sentence):
+            word, sense = sense_split(w, sense_delimiter)
+            context_added = (word in model.wv.vocab and 
+                             model.wv.vocab[word].sample_int > model.random.rand() * 2**32)
+            if sense:
+                word_vocabs.append(model.wv.vocab[sense])
+                cxt_pos.append(len(cxt_vocabs) - (0 if context_added else 0.5))
+            if context_added:
+                cxt_vocabs.append(model.wv.vocab[word])
+        for pos, word in zip(cxt_pos, word_vocabs):
+            reduced_window = model.random.randint(model.window)  # `b` in the original word2vec code
+            start = max(0, ceil(pos - model.window + reduced_window))
+            stop = min(len(cxt_vocabs), floor(pos + model.window + 1 - reduced_window))
+            window_pos = enumerate(cxt_vocabs[start:stop], start)
+            cxt_indices = [word2.index for pos2, word2 in window_pos if (word2 is not None and pos2 != pos)]
+            l1 = np_sum(model.wv.syn0[cxt_indices], axis=0)  # 1 x vector_size
+            if cxt_indices and model.cbow_mean:
+                l1 /= len(cxt_indices)
+            train_cbow_pair(model, word, cxt_indices, l1, alpha,
+                            learn_hidden=(sense_delimiter is None))
+#                 debug_str = []
+#                 debug_str.extend(model.wv.index2word[cxt_vocabs[i].index] for i in range(start, ceil(pos)))
+#                 debug_str.append('>>>%s<<<' %model.wv.index2word[word.index])
+#                 debug_str.extend(model.wv.index2word[cxt_vocabs[i].index] for i in range(floor(pos+1), stop))
+#                 print(' '.join(debug_str))
+        result += len(word_vocabs)
+    return result
 
 
 def train_sg_pair(model, word, context_index, alpha, learn_vectors=True, learn_hidden=True,
@@ -817,9 +863,12 @@ class Word2Vec(utils.SaveLoad):
         work, neu1 = inits
         tally = 0
         if self.sg:
-            tally += train_batch_sg(self, sentences, alpha, work, sense_delimiter)
+            tally += train_batch_sg(self, sentences, alpha, work)
         else:
-            tally += train_batch_cbow(self, sentences, alpha, work, neu1, sense_delimiter)
+            if sense_delimiter:
+                tally += train_batch_cbow2(self, sentences, alpha, sense_delimiter, work, neu1)
+            else:
+                tally += train_batch_cbow(self, sentences, alpha, work, neu1)
         return tally, self._raw_word_count(sentences)
 
     def _raw_word_count(self, job):
@@ -846,9 +895,10 @@ class Word2Vec(utils.SaveLoad):
         """
         if (self.model_trimmed_post_training):
             raise RuntimeError("Parameters for training were discarded using model_trimmed_post_training method")
-        if FAST_VERSION < 0:
-            warnings.warn("C extension not loaded for Word2Vec, training will be slow. "
-                          "Install a C compiler and reinstall gensim for fast training.")
+        if FAST_VERSION < 0 or sense_delimiter:
+            if not sense_delimiter:
+                warnings.warn("C extension not loaded for Word2Vec, training will be slow. "
+                              "Install a C compiler and reinstall gensim for fast training.")
             self.neg_labels = []
             if self.negative > 0:
                 # precompute negative labels optimization for pure-python training
