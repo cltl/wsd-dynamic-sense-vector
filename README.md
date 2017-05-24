@@ -40,3 +40,4 @@ exit
 2. Extract BabelNet-to-WordNet mappings: `./extract-bn-wn-mappings.sh`
 3. Convert disambiguated Wikipedia?
 4. Train sense embeddings: `./train-sense-embeddings.sh`
+5. Check your sense embeddings: `python3 examine-sense-embeddings.py`
