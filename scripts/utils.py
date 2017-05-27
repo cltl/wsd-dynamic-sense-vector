@@ -231,7 +231,7 @@ class Sentence:
                     wn_id = expr_obj.meaning.wn_id
                     offset = wn_id[3:-1]
                     pos = wn_id[-1]
-                    meaning = f'eng-30-%s-%s' % (offset, pos)
+                    meaning = 'eng-30-%s-%s' % (offset, pos)
 
                     if meaning not in all_meanings:
                         meaning = None
