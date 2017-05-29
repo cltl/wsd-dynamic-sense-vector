@@ -388,32 +388,38 @@ def get_sent_objs(doc, all_sent_ids, token_id2sent_id):
 
     return sentence_objs
 
-def get_instances(path_to_xml_gz):
+def get_instances(path_to_xml_gz, worker_id):
     """
 
     given path to a babelfied wikipedia file
     extract all training instances
 
     :param str path_to_xml: path to xml file
+    :param str worker_id: thread id
 
     :rtype: generator
     :return: generator of strings (representing training instances)
     """
-    print(path_to_xml_gz)
-    if path_to_xml_gz.endswith('gz'):
-        try:
-            doc = etree.parse(gzip.open(path_to_xml_gz))
-        except etree.XMLSyntaxError:
-            return []
-    else:
-        try:
-            doc = etree.parse(path_to_xml_gz)
-        except etree.XMLSyntaxError:
-            return []
+    try:
+        doc = etree.parse(gzip.open(path_to_xml_gz))
+    except etree.XMLSyntaxError:
+        return None
+
 
     token_id2sent_id, all_sent_ids = get_token_id2sent_id(doc)
 
-    sentence_objs = get_sent_objs(doc, all_sent_ids, token_id2sent_id)
+    try:
+        sentence_objs = get_sent_objs(doc, all_sent_ids, token_id2sent_id)
+    except KeyError:
+        print('problem with file %s' % path_to_xml_gz)
+        sentence_objs = dict()
+
+
+    synset_output_path = 'output' + '/synset/' + worker_id + '.txt'
+    hdn_output_path = 'output' + '/hdn/' + worker_id + '.txt'
+
+    synset_file = open(synset_output_path, 'w')
+    hdn_file = open(hdn_output_path, 'w')
 
     for sent_obj in sentence_objs.values():
 
@@ -423,8 +429,14 @@ def get_instances(path_to_xml_gz):
         sent_obj.generate_sw_word2vec_format(meaning_type='hdn')
         sent_obj.generate_mw_word2vec_format(meaning_type='hdn')
 
-        for instance in sent_obj.instances:
-            yield instance
+        for meaning_type, instance in sent_obj.instances:
+            if meaning_type == 'synset':
+                synset_file.write(instance + '\n')
+            elif meaning_type == 'hdn':
+                hdn_file.write(instance + '\n')
+
+    synset_file.close()
+    hdn_file.close()
 
 
 def start_logger(log_path):
