@@ -4,11 +4,11 @@ import pandas
 from lxml import etree
 from collections import defaultdict
 import wn_utils
-
-
+import pickle
+import os
 from nltk.corpus import wordnet as wn
-from nltk.stem import WordNetLemmatizer
 
+# load mapping babelnet to wikipedia
 mapping_file = '../output/the_bn_wn_mappings.txt'
 bn2wn = dict()
 with open(mapping_file) as infile:
@@ -18,8 +18,43 @@ with open(mapping_file) as infile:
         if len(wn_ids) == 1:
             bn2wn[bn_id] = wn_ids[0]
 
+# load wsd dataframe
 df = pandas.read_pickle('sem2013-aw.p')
 
+
+# load offset,pos -> lemmas
+offset_pos2lemmas = dict()
+for synset in wn.all_synsets(pos='n'):
+    offset = synset.offset()
+    pos = synset.pos()
+
+    if pos == 'n':
+        offset_pos2lemmas[(offset, pos)] = synset.lemma_names()
+
+
+# load graph info
+graph_info_path = 'graph_info.bin'
+
+if os.path.exists(graph_info_path):
+    lemma_pos2graph_info = pickle.load(open(graph_info_path, 'rb'))
+else:
+    lemma_pos2offsets = wn_utils.load_lemma_pos2offsets('wordnets/index.sense.30')
+    lemma_pos2graph_info = dict()
+    for (lemma, pos), offsets in lemma_pos2offsets.items():
+
+        if all([len(offsets) >= 2,
+                pos == 'n']):
+            graph_info = wn_utils.synsets_graph_info(wn_instance=wn,
+                                                     wn_version='30',
+                                                     lemma=lemma,
+                                                     pos=pos)
+            lemma_pos2graph_info[(lemma, pos)] = graph_info
+
+    with open(graph_info_path, 'wb') as outfile:
+        pickle.dump(lemma_pos2graph_info, outfile)
+
+
+# load relevant meanings and hdns for sem2013-aw
 all_hdn = set()
 all_meanings = set()
 for index, row in df.iterrows():
@@ -36,8 +71,6 @@ for index, row in df.iterrows():
 
         if hdn is not None:
             all_hdn.add(hdn)
-
-wnl = WordNetLemmatizer()
 
 class Meaning:
     """
@@ -103,26 +136,31 @@ class Meaning:
         offset = self.wn_id[3:-1]
         self.wn_offset = offset
 
-        synset = wn._synset_from_pos_and_offset(self.pos, int(offset))
+        candidate_lemmas = []
+        if (int(offset), self.pos) in offset_pos2lemmas:
+            candidate_lemmas = offset_pos2lemmas[(int(offset), pos)]
 
         lemma = None
-        candidate_lemmas = synset.lemma_names()
-
         # if only one candidate lemma -> pick that one
         if len(candidate_lemmas) == 1:
             return 'one candidate', candidate_lemmas[0]
 
         elif len(candidate_lemmas) >= 2:
             # else ->  direct match
-            for lemma in synset.lemma_names():
+            for lemma in candidate_lemmas:
                 if lemma == mention_lower_underscore:
                     return 'direct match', lemma
 
-            # else -> lemmatize and then direct match
-            lemma_of_mention = wnl.lemmatize(mention_lower_underscore, self.pos)
-            for lemma in synset.lemma_names():
-                if lemma == lemma_of_mention:
-                    return 'wn lemmatizer', lemma
+            # else -> highest levenhstein and then direct match
+            min_levenshtein = 1000
+            best_lemma = None
+            for candidate_lemma in candidate_lemmas:
+                levenshtein = wn_utils.levenshtein(candidate_lemma, mention_lower_underscore)
+                if levenshtein < min_levenshtein:
+                    min_levenshtein = levenshtein
+                    best_lemma = candidate_lemma
+
+            return 'levenhstein', best_lemma
 
         return strategy, target_lemma
 
@@ -139,10 +177,12 @@ class Meaning:
                 self.wn_offset]):
             wn_identifier = 'eng-30-%s-%s' % (self.wn_offset, self.pos)
 
-            graph_info = wn_utils.synsets_graph_info(wn_instance=wn,
-                                            wn_version='30',
-                                            lemma=self.wn_lemma,
-                                            pos=self.pos)
+            if (self.wn_lemma, self.pos) in lemma_pos2graph_info:
+                graph_info = lemma_pos2graph_info[(self.wn_lemma,
+                                                   self.pos)]
+            else:
+                graph_info = dict()
+
 
             if wn_identifier in graph_info:
                 hdn = graph_info[wn_identifier]['under_lcs']
@@ -366,9 +406,6 @@ def get_sent_objs(doc, all_sent_ids, token_id2sent_id):
         end = int(anno_el.find('anchorEnd').text)
         bn_id = anno_el.find('babelNetID').text
         wsd_system = anno_el.find('type').text
-
-        # TODO: link to wordnet
-            # TODO: use link to wordnet to find lemma
 
         expr_obj = Expression(mention,
                               start,

@@ -1,4 +1,79 @@
 import nltk
+from collections import defaultdict
+
+def load_lemma_pos2offsets(path_to_index_sense):
+    '''
+    given with index.sense from wordnet distributions such as
+    casuistical%3:01:01:: 03053657 1 0
+
+    this function returns a dictionary mapping (lemma,pos)
+    to the offsets they can refer to.
+
+    :param str path_to_index_sense: path to wordnet index.sense file
+
+    :rtype: collections.defaultdict
+    :return: mapping of (lemma,pos) to offsets they can refer to
+    '''
+    lemmapos2offsets = defaultdict(set)
+    with open(path_to_index_sense) as infile:
+        for line in infile:
+            key, offset, sqr, freq = line.strip().split()
+            lemma, info = key.split('%')
+
+            if info.startswith('1'):
+                pos = 'n'
+            elif info.startswith('2'):
+                pos = 'v'
+            elif info.startswith('4'):
+                pos = 'r'
+            else:
+                pos = 'a'
+
+            lemmapos2offsets[(lemma, pos)].add(offset)
+
+    return lemmapos2offsets
+
+
+def levenshtein(s, t):
+    ''' 
+    source: https://en.wikibooks.org/wiki/Algorithm_Implementation/Strings/Levenshtein_distance#Python
+
+    >>> levenshtein('house', 'home')
+    2
+
+    @type  s: str
+    @param s: a string (for example 'house')
+
+    @type  t: str
+    @param t: a string (for example ('home')
+
+    @rtype: int
+    @param: levenshtein distance
+    '''
+
+    if s == t:
+        return 0
+
+    elif len(s) == 0:
+        return len(t)
+    elif len(t) == 0:
+        return len(s)
+
+    v0 = [None] * (len(t) + 1)
+    v1 = [None] * (len(t) + 1)
+
+    for i in range(len(v0)):
+        v0[i] = i
+
+    for i in range(len(s)):
+        v1[0] = i + 1
+        for j in range(len(t)):
+            cost = 0 if s[i] == t[j] else 1
+            v1[j + 1] = min(v1[j] + 1, v0[j + 1] + 1, v0[j] + cost)
+        for j in range(len(v0)):
+            v0[j] = v1[j]
+
+    return v1[len(t)]
 
 def synset2identifier(synset, wn_version):
     """
