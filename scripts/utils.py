@@ -418,8 +418,8 @@ def get_instances(path_to_xml_gz, worker_id):
     synset_output_path = 'output' + '/synset/' + worker_id + '.txt'
     hdn_output_path = 'output' + '/hdn/' + worker_id + '.txt'
 
-    synset_file = open(synset_output_path, 'w')
-    hdn_file = open(hdn_output_path, 'w')
+    synset_file = open(synset_output_path, 'a')
+    hdn_file = open(hdn_output_path, 'a')
 
     for sent_obj in sentence_objs.values():
 

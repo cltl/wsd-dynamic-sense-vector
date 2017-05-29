@@ -12,11 +12,11 @@ class Worker(multiprocessing.Process):
             worker_id = multiprocessing.current_process().name
             get_instances(path, worker_id)
 
-num_workers = 8
+num_workers = 1
 request_queue = multiprocessing.Queue()
 for _ in range(num_workers):
     Worker(request_queue).start()
 
 main_input_folder = '/mnt/scistor1/group/marten/babelfied-wikipediaXML/'
-for path in glob(main_input_folder + '/**/*.xml.gz'):
+for path in glob(main_input_folder + '/610/*.xml.gz'):
     request_queue.put(path)

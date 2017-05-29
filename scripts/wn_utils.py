@@ -1,3 +1,5 @@
+import nltk
+
 def synset2identifier(synset, wn_version):
     """
     return synset identifier of
@@ -59,8 +61,12 @@ def synsets_graph_info(wn_instance, wn_version, lemma, pos):
 
         for sy2 in synsets:
             if sy1 != sy2:
-                lcs_s = sy1.lowest_common_hypernyms(sy2)
-                lcs = lcs_s[0]
+                try:
+                    lcs_s = sy1.lowest_common_hypernyms(sy2)
+                    lcs = lcs_s[0]
+                except:
+                    lcs = None
+                    print('wordnet error', sy1, sy2)
 
                 path_distance = sy1.shortest_path_distance(lcs)
 
