@@ -399,10 +399,17 @@ def get_instances(path_to_xml_gz):
     :rtype: generator
     :return: generator of strings (representing training instances)
     """
+    print(path_to_xml_gz)
     if path_to_xml_gz.endswith('gz'):
-        doc = etree.parse(gzip.open(path_to_xml_gz))
+        try:
+            doc = etree.parse(gzip.open(path_to_xml_gz))
+        except etree.XMLSyntaxError:
+            return []
     else:
-        doc = etree.parse(path_to_xml_gz)
+        try:
+            doc = etree.parse(path_to_xml_gz)
+        except etree.XMLSyntaxError:
+            return []
 
     token_id2sent_id, all_sent_ids = get_token_id2sent_id(doc)
 

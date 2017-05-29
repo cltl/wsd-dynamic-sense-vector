@@ -7,21 +7,24 @@ import utils
 
 logger = utils.start_logger('log.txt')
 
-main_input_folder = 'input'
+main_input_folder = '/mnt/scistor1/group/marten/babelfied-wikipediaXML/'
 main_output_folder = 'output'
 
 for input_folder in glob(main_input_folder + '*'):
     if os.path.isdir(input_folder):
         dir_name = os.path.basename(input_folder)
 
+        if dir_name != '39':
+            continue
+
         synset_output_path = main_output_folder + '/synset/' + dir_name + '.txt'
         hdn_output_path = main_output_folder + '/hdn/' + dir_name + '.txt'
 
-        iterable = glob(input_folder + '/*.xml')
+        iterable = glob(input_folder + '/*.xml.gz')
 
         logger.info('starting with folder %s' % input_folder)
 
-        pool = ThreadPool(10)
+        pool = ThreadPool(20)
         all_generators = pool.map(utils.get_instances, iterable)
 
         num_docs = len(all_generators)
@@ -46,4 +49,4 @@ for input_folder in glob(main_input_folder + '*'):
 
         logger.info('finished %s docs' % num_docs)
         logger.info('synset instances %s' % synset_count)
-        logger.info('hdn instances %s' hdn_count)
+        logger.info('hdn instances %s' % hdn_count)
