@@ -1,0 +1,8 @@
+#!/bin/bash
+#SBATCH --time=3:00:00
+#SBATCH -C cpunode
+
+echo -n 'Started: ' && date
+python3 -u train-sense-embeddings.py output/gigaword data/disambiguated-wikipedia-wordnet/hdn output/hdn
+python3 -u train-sense-embeddings.py output/gigaword data/disambiguated-wikipedia-wordnet/synset output/synset
+echo -n 'Finished: ' && date

@@ -1,4 +1,5 @@
 eclipse.preferences.version=1
+encoding//gensim-modified/build/lib.macosx-10.5-x86_64-2.7/gensim/models/word2vec.py=utf-8
 encoding//gensim-modified/gensim/models/keyedvectors.py=utf-8
 encoding//gensim-modified/gensim/models/word2vec.py=utf-8
 encoding//gensim-modified/gensim/test/test_word2vec.py=utf-8

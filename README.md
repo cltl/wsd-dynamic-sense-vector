@@ -34,9 +34,9 @@ python3 -c 'import pip'
 exit
 ```
 
-## Stesps
+## Steps
 
-1. Create a word2vec model from Gigaword corpus: `sbatch word2vec_gigaword.job`
+1. Create a word2vec model from Gigaword corpus: `./train-word-embeddings.sh`
 2. Extract BabelNet-to-WordNet mappings: `./extract-bn-wn-mappings.sh`
 3. Convert disambiguated Wikipedia?
 4. Train sense embeddings: `./train-sense-embeddings.sh`

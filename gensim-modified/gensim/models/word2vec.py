@@ -144,10 +144,10 @@ def sense_split(word, sense_delimiter):
     return (word, None)
 
 try:
-    from gensim.models.word2vec_inner import train_batch_sg, train_batch_cbow
+    from gensim.models.word2vec_inner import train_batch_sg, train_batch_cbow, train_batch_cbow2
     from gensim.models.word2vec_inner import score_sentence_sg, score_sentence_cbow
     from gensim.models.word2vec_inner import FAST_VERSION, MAX_WORDS_IN_BATCH
-#     print('Using C version')
+    sys.stderr.write('Word2vec: Using C version\n')
 except ImportError:
     # failed... fall back to plain numpy (20-80x slower training than the above)
     FAST_VERSION = -1
@@ -180,7 +180,7 @@ except ImportError:
             result += len(word_vocabs)
         return result
 
-    def train_batch_cbow(model, sentences, alpha, work=None, neu1=None, sense_delimiter=None):
+    def train_batch_cbow(model, sentences, alpha, work=None, neu1=None):
         """
         Update CBOW model by training on a sequence of sentences.
 
@@ -193,40 +193,17 @@ except ImportError:
         """
         result = 0
         for sentence in sentences:
-            if sense_delimiter:
-                word_vocabs = []
-                cxt_pos = []
-                cxt_vocabs = []
-                for i, w in enumerate(sentence):
-                    word, sense = sense_split(w, sense_delimiter)
-                    context_added = (word in model.wv.vocab and 
-                                     model.wv.vocab[word].sample_int > model.random.rand() * 2**32)
-                    if sense:
-                        word_vocabs.append(model.wv.vocab[sense])
-                        cxt_pos.append(len(cxt_vocabs) - (0 if context_added else 0.5))
-                    if context_added:
-                        cxt_vocabs.append(model.wv.vocab[word])
-            else:
-                word_vocabs = [model.wv.vocab[w] for w in sentence if w in model.wv.vocab and
-                               model.wv.vocab[w].sample_int > model.random.rand() * 2**32]
-                cxt_vocabs = word_vocabs
-                cxt_pos = list(range(len(word_vocabs)))
-            for pos, word in zip(cxt_pos, word_vocabs):
+            word_vocabs = [model.wv.vocab[w] for w in sentence if w in model.wv.vocab and
+                           model.wv.vocab[w].sample_int > model.random.rand() * 2**32]
+            for pos, word in enumerate(word_vocabs):
                 reduced_window = model.random.randint(model.window)  # `b` in the original word2vec code
-                start = max(0, ceil(pos - model.window + reduced_window))
-                stop = min(len(cxt_vocabs), floor(pos + model.window + 1 - reduced_window))
-                window_pos = enumerate(cxt_vocabs[start:stop], start)
-                cxt_indices = [word2.index for pos2, word2 in window_pos if (word2 is not None and pos2 != pos)]
-                l1 = np_sum(model.wv.syn0[cxt_indices], axis=0)  # 1 x vector_size
-                if cxt_indices and model.cbow_mean:
-                    l1 /= len(cxt_indices)
-                train_cbow_pair(model, word, cxt_indices, l1, alpha,
-                                learn_hidden=(sense_delimiter is None))
-#                 debug_str = []
-#                 debug_str.extend(model.wv.index2word[cxt_vocabs[i].index] for i in range(start, ceil(pos)))
-#                 debug_str.append('>>>%s<<<' %model.wv.index2word[word.index])
-#                 debug_str.extend(model.wv.index2word[cxt_vocabs[i].index] for i in range(floor(pos+1), stop))
-#                 print(' '.join(debug_str))
+                start = max(0, pos - model.window + reduced_window)
+                window_pos = enumerate(word_vocabs[start:(pos + model.window + 1 - reduced_window)], start)
+                word2_indices = [word2.index for pos2, word2 in window_pos if (word2 is not None and pos2 != pos)]
+                l1 = np_sum(model.wv.syn0[word2_indices], axis=0)  # 1 x vector_size
+                if word2_indices and model.cbow_mean:
+                    l1 /= len(word2_indices)
+                train_cbow_pair(model, word, word2_indices, l1, alpha)
             result += len(word_vocabs)
         return result
 
@@ -290,52 +267,50 @@ except ImportError:
 
         return log_prob_sentence
 
-
-
-def train_batch_cbow2(model, sentences, alpha, sense_delimiter, work=None, neu1=None):
-    """
-    Update CBOW model by training on a sequence of sentences.
-
-    Each sentence is a list of string tokens, which are looked up in the model's
-    vocab dictionary. Called internally from `Word2Vec.train()`.
-
-    This is the non-optimized, Python version. If you have cython installed, gensim
-    will use the optimized version from word2vec_inner instead.
-
-    """
-    result = 0
-    for sentence in sentences:
-        word_vocabs = []
-        cxt_pos = []
-        cxt_vocabs = []
-        for i, w in enumerate(sentence):
-            word, sense = sense_split(w, sense_delimiter)
-            context_added = (word in model.wv.vocab and 
-                             model.wv.vocab[word].sample_int > model.random.rand() * 2**32)
-            if sense:
-                word_vocabs.append(model.wv.vocab[sense])
-                cxt_pos.append(len(cxt_vocabs) - (0 if context_added else 0.5))
-            if context_added:
-                cxt_vocabs.append(model.wv.vocab[word])
-        for pos, word in zip(cxt_pos, word_vocabs):
-            reduced_window = model.random.randint(model.window)  # `b` in the original word2vec code
-            start = max(0, ceil(pos - model.window + reduced_window))
-            stop = min(len(cxt_vocabs), floor(pos + model.window + 1 - reduced_window))
-            window_pos = enumerate(cxt_vocabs[start:stop], start)
-            cxt_indices = [word2.index for pos2, word2 in window_pos if (word2 is not None and pos2 != pos)]
-            l1 = np_sum(model.wv.syn0[cxt_indices], axis=0)  # 1 x vector_size
-            if cxt_indices and model.cbow_mean:
-                l1 /= len(cxt_indices)
-            train_cbow_pair(model, word, cxt_indices, l1, alpha,
-                            learn_hidden=(sense_delimiter is None))
-#                 debug_str = []
-#                 debug_str.extend(model.wv.index2word[cxt_vocabs[i].index] for i in range(start, ceil(pos)))
-#                 debug_str.append('>>>%s<<<' %model.wv.index2word[word.index])
-#                 debug_str.extend(model.wv.index2word[cxt_vocabs[i].index] for i in range(floor(pos+1), stop))
-#                 print(' '.join(debug_str))
-        result += len(word_vocabs)
-    return result
-
+    def train_batch_cbow2(model, sentences, alpha, sense_delimiter, work=None, neu1=None):
+        """
+        Update CBOW model by training on a sequence of sentences.
+    
+        Each sentence is a list of string tokens, which are looked up in the model's
+        vocab dictionary. Called internally from `Word2Vec.train()`.
+    
+        This is the non-optimized, Python version. If you have cython installed, gensim
+        will use the optimized version from word2vec_inner instead.
+    
+        """
+        result = 0
+        for sentence in sentences:
+            sense_vocabs = []
+            cxt_pos = []
+            cxt_vocabs = []
+            for i, w in enumerate(sentence):
+                word, sense = sense_split(w, sense_delimiter)
+                is_context_added = (word in model.wv.vocab and 
+                                    model.wv.vocab[word].sample_int > model.random.rand() * 2**32)
+                if sense:
+                    sense_vocabs.append(model.wv.vocab[sense])
+                    cxt_pos.append(len(cxt_vocabs) - (0 if is_context_added else 0.5))
+                if is_context_added:
+                    cxt_vocabs.append(model.wv.vocab[word])
+            for pos, word in zip(cxt_pos, sense_vocabs):
+                reduced_window = model.random.randint(model.window)  # `b` in the original word2vec code
+                start = max(0, ceil(pos - model.window + reduced_window))
+                stop = min(len(cxt_vocabs), floor(pos + model.window + 1 - reduced_window))
+                window_pos = enumerate(cxt_vocabs[start:stop], start)
+                cxt_indices = [word2.index for pos2, word2 in window_pos if (word2 is not None and pos2 != pos)]
+                l1 = np_sum(model.wv.syn0[cxt_indices], axis=0)  # 1 x vector_size
+                if cxt_indices and model.cbow_mean:
+                    l1 /= len(cxt_indices)
+                train_cbow_pair(model, word, cxt_indices, l1, alpha,
+                                learn_hidden=(sense_delimiter is None))
+    #                 debug_str = []
+    #                 debug_str.extend(model.wv.index2word[cxt_vocabs[i].index] for i in range(start, ceil(pos)))
+    #                 debug_str.append('>>>%s<<<' %model.wv.index2word[word.index])
+    #                 debug_str.extend(model.wv.index2word[cxt_vocabs[i].index] for i in range(floor(pos+1), stop))
+    #                 print(' '.join(debug_str))
+            result += len(sense_vocabs)
+        return result
+    
 
 def train_sg_pair(model, word, context_index, alpha, learn_vectors=True, learn_hidden=True,
                   context_vectors=None, context_locks=None):
