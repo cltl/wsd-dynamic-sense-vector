@@ -96,3 +96,61 @@ TODO:
 - Put some kind of warning in Skip-gram part
 - What to do with `score_sentence_cbow`?
 - How to write automated test?
+
+## Tue 23 May
+
+BabelNet-WordNet mappings.
+
+Don't know how to deal with the C implementation... For now I use only
+the Python implementation for sense embeddings. 
+Will it be fast enough?? I'll need to run on full data to find out.
+
+## Tue 30 May
+
+Marten has created a version of disambiguated Wikipedia. I fixed some small 
+bugs and ran sense embedding script on it. This is after 1.5 hour:
+
+```
+2017-05-30 14:59:13,067 : INFO : PROGRESS: at 0.40% examples, 515 words/s, in_qsize 64, out_qsize 0
+2017-05-30 14:59:16,951 : INFO : PROGRESS: at 0.40% examples, 516 words/s, in_qsize 64, out_qsize 0
+2017-05-30 14:59:28,178 : INFO : PROGRESS: at 0.40% examples, 516 words/s, in_qsize 63, out_qsize 0
+2017-05-30 14:59:32,155 : INFO : PROGRESS: at 0.40% examples, 517 words/s, in_qsize 64, out_qsize 0
+2017-05-30 14:59:44,045 : INFO : PROGRESS: at 0.40% examples, 517 words/s, in_qsize 63, out_qsize 0
+```
+
+Apparently I need to complete that C implementation.
+
+Hurraaaaah! I can't believe I managed to do this in an afternoon. 
+The difference between C and Python is drastic.  
+
+```
+2017-05-30 17:15:33,480 : INFO : PROGRESS: at 0.95% examples, 92117 words/s, in_qsize 0, out_qsize 0
+2017-05-30 17:15:34,536 : INFO : PROGRESS: at 0.96% examples, 92076 words/s, in_qsize 0, out_qsize 0
+2017-05-30 17:15:35,546 : INFO : PROGRESS: at 0.98% examples, 92182 words/s, in_qsize 0, out_qsize 0
+2017-05-30 17:15:36,584 : INFO : PROGRESS: at 0.99% examples, 92152 words/s, in_qsize 0, out_qsize 0
+2017-05-30 17:15:37,636 : INFO : PROGRESS: at 1.00% examples, 92142 words/s, in_qsize 0, out_qsize 0
+```
+
+For now it's good that it runs. I will need to check the resulting embeddings
+next week. Hopefully they make sense.
+
+```
+[minhle@fs0 wsd-with-marten]$ tail slurm-1411884.out
+2017-05-30 17:43:44,800 : INFO : PROGRESS: at sentence #3380000, processed 7838951 words, keeping 799 word types
+2017-05-30 17:43:44,898 : INFO : PROGRESS: at sentence #3390000, processed 7862696 words, keeping 799 word types
+...
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+

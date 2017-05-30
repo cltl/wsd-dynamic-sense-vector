@@ -2,6 +2,9 @@
 #SBATCH --time=12:00:00
 #SBATCH -C cpunode&ssd
 
+echo -n 'Started: ' && date
 python3 -u process-gigaword.py > output/gigaword.txt 2> output/gigaword.log && \
     cp output/gigaword.txt /local-ssd/ && \
     python3 -u train-word-embeddings.py /local-ssd/gigaword.txt output/gigaword
+echo -n 'Finished: ' && date
+    

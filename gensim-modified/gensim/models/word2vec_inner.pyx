@@ -148,10 +148,10 @@ cdef unsigned long long fast_sentence_sg_neg(
 
 
 cdef void fast_sentence_cbow_hs(
-    const np.uint32_t *word_point, const np.uint8_t *word_code, int codelens[MAX_SENTENCE_LEN],
+    const np.uint32_t *word_point, const np.uint8_t *word_code, int codelen,
     REAL_t *neu1, REAL_t *syn0, REAL_t *syn1, const int size,
     const np.uint32_t indexes[MAX_SENTENCE_LEN], const REAL_t alpha, REAL_t *work,
-    int i, int j, int k, int cbow_mean, REAL_t *word_locks) nogil:
+    int ignore_idx, int j, int k, int cbow_mean, REAL_t *word_locks) nogil:
 
     cdef long long a, b
     cdef long long row2
@@ -161,7 +161,7 @@ cdef void fast_sentence_cbow_hs(
     memset(neu1, 0, size * cython.sizeof(REAL_t))
     count = <REAL_t>0.0
     for m in range(j, k):
-        if m == i:
+        if m == ignore_idx:
             continue
         else:
             count += ONEF
@@ -172,7 +172,7 @@ cdef void fast_sentence_cbow_hs(
         sscal(&size, &inv_count, neu1, &ONE)  # (does this need BLAS-variants like saxpy?)
 
     memset(work, 0, size * cython.sizeof(REAL_t))
-    for b in range(codelens[i]):
+    for b in range(codelen):
         row2 = word_point[b] * size
         f = our_dot(&size, neu1, &ONE, &syn1[row2], &ONE)
         if f <= -MAX_EXP or f >= MAX_EXP:
@@ -186,31 +186,29 @@ cdef void fast_sentence_cbow_hs(
         sscal(&size, &inv_count, work, &ONE)  # (does this need BLAS-variants like saxpy?)
 
     for m in range(j, k):
-        if m == i:
+        if m == ignore_idx:
             continue
         else:
             our_saxpy(&size, &word_locks[indexes[m]], work, &ONE, &syn0[indexes[m] * size], &ONE)
 
 
-cdef unsigned long long fast_sentence_cbow_neg(
-    const int negative, np.uint32_t *cum_table, unsigned long long cum_table_len, int codelens[MAX_SENTENCE_LEN],
+cdef unsigned long long fast_sentence_cbow_neg(const np.uint32_t word_index,
+    const int negative, np.uint32_t *cum_table, unsigned long long cum_table_len,
     REAL_t *neu1,  REAL_t *syn0, REAL_t *syn1neg, const int size,
     const np.uint32_t indexes[MAX_SENTENCE_LEN], const REAL_t alpha, REAL_t *work,
-    int i, int j, int k, int cbow_mean, unsigned long long next_random, REAL_t *word_locks) nogil:
+    int ignore_idx, int j, int k, int cbow_mean, unsigned long long next_random, REAL_t *word_locks) nogil:
 
     cdef long long a
     cdef long long row2
     cdef unsigned long long modulo = 281474976710655ULL
     cdef REAL_t f, g, count, inv_count = 1.0, label
-    cdef np.uint32_t target_index, word_index
+    cdef np.uint32_t target_index
     cdef int d, m
-
-    word_index = indexes[i]
 
     memset(neu1, 0, size * cython.sizeof(REAL_t))
     count = <REAL_t>0.0
     for m in range(j, k):
-        if m == i:
+        if m == ignore_idx:
             continue
         else:
             count += ONEF
@@ -246,7 +244,7 @@ cdef unsigned long long fast_sentence_cbow_neg(
         sscal(&size, &inv_count, work, &ONE)  # (does this need BLAS-variants like saxpy?)
 
     for m in range(j,k):
-        if m == i:
+        if m == ignore_idx:
             continue
         else:
             our_saxpy(&size, &word_locks[indexes[m]], work, &ONE, &syn0[indexes[m]*size], &ONE)
@@ -452,11 +450,140 @@ def train_batch_cbow(model, sentences, alpha, _work, _neu1):
                 if k > idx_end:
                     k = idx_end
                 if hs:
-                    fast_sentence_cbow_hs(points[i], codes[i], codelens, neu1, syn0, syn1, size, indexes, _alpha, work, i, j, k, cbow_mean, word_locks)
+                    fast_sentence_cbow_hs(points[i], codes[i], codelens[i], neu1, syn0, syn1, size, indexes, _alpha, work, i, j, k, cbow_mean, word_locks)
                 if negative:
-                    next_random = fast_sentence_cbow_neg(negative, cum_table, cum_table_len, codelens, neu1, syn0, syn1neg, size, indexes, _alpha, work, i, j, k, cbow_mean, next_random, word_locks)
+                    next_random = fast_sentence_cbow_neg(indexes[i], negative, cum_table, cum_table_len, neu1, syn0, syn1neg, size, indexes, _alpha, work, i, j, k, cbow_mean, next_random, word_locks)
 
     return effective_words
+
+def sense_split(word, sense_delimiter):
+    if sense_delimiter:
+        pos = word.rfind(sense_delimiter)
+        if pos > 0 and pos < len(word)-len(sense_delimiter):
+            word2 = word[:pos]
+            sense = word[pos+len(sense_delimiter):]
+            return (word2, sense)
+    return (word, None)
+
+def train_batch_cbow2(model, sentences, alpha, sense_delimiter, _work, _neu1):
+    cdef int hs = model.hs
+    cdef int negative = model.negative
+    cdef int sample = (model.sample != 0)
+    cdef int cbow_mean = model.cbow_mean
+
+    cdef REAL_t *syn0 = <REAL_t *>(np.PyArray_DATA(model.wv.syn0))
+    cdef REAL_t *word_locks = <REAL_t *>(np.PyArray_DATA(model.syn0_lockf))
+    cdef REAL_t *work
+    cdef REAL_t _alpha = alpha
+    cdef int size = model.layer1_size
+
+    cdef int sense_codelens[MAX_SENTENCE_LEN]
+    cdef np.uint32_t cxt_indexes[MAX_SENTENCE_LEN]
+    cdef np.uint32_t sense_indexes[MAX_SENTENCE_LEN]
+    cdef np.uint32_t sense_cxt_left[MAX_SENTENCE_LEN]
+    cdef np.uint32_t sense_cxt_right[MAX_SENTENCE_LEN]
+    cdef np.uint32_t reduced_windows[MAX_SENTENCE_LEN]
+    cdef int sentence_cxt_idx[MAX_SENTENCE_LEN + 1]
+    cdef int sentence_sense_idx[MAX_SENTENCE_LEN + 1]
+    cdef int window = model.window
+
+    cdef int i, j, k
+    cdef int effective_cxts = 0, effective_senses = 0, effective_sentences = 0
+    cdef int sent_idx, cxt_idx_start, cxt_idx_end
+
+    # For hierarchical softmax
+    cdef REAL_t *syn1
+    cdef np.uint32_t *sense_points[MAX_SENTENCE_LEN]
+    cdef np.uint8_t *sense_codes[MAX_SENTENCE_LEN]
+
+    # For negative sampling
+    cdef REAL_t *syn1neg
+    cdef np.uint32_t *cum_table
+    cdef unsigned long long cum_table_len
+    # for sampling (negative and frequent-word downsampling)
+    cdef unsigned long long next_random
+
+    if hs:
+        syn1 = <REAL_t *>(np.PyArray_DATA(model.syn1))
+
+    if negative:
+        syn1neg = <REAL_t *>(np.PyArray_DATA(model.syn1neg))
+        cum_table = <np.uint32_t *>(np.PyArray_DATA(model.cum_table))
+        cum_table_len = len(model.cum_table)
+    if negative or sample:
+        next_random = (2**24) * model.random.randint(0, 2**24) + model.random.randint(0, 2**24)
+
+    # convert Python structures to primitive types, so we can release the GIL
+    work = <REAL_t *>np.PyArray_DATA(_work)
+    neu1 = <REAL_t *>np.PyArray_DATA(_neu1)
+
+    # prepare C structures so we can go "full C" and release the Python GIL
+    vlookup = model.wv.vocab
+    sentence_cxt_idx[0] = 0  # indices of the first sentence always start at 0
+    sentence_sense_idx[0] = 0  # indices of the first sentence always start at 0
+    for sent in sentences:
+        if not sent:
+            continue  # ignore empty sentences; leave effective_sentences unchanged
+        for token in sent:
+            cxt, sense = sense_split(token, sense_delimiter)
+
+            cxt = vlookup[cxt] if cxt in vlookup else None
+            is_context_omitted = (cxt is None) or (sample and cxt.sample_int < random_int32(&next_random))
+
+            sense = vlookup[sense] if sense in vlookup else None
+            if sense:
+                if hs:
+                    sense_codelens[effective_senses] = <int>len(sense.code)
+                    sense_codes[effective_senses] = <np.uint8_t *>np.PyArray_DATA(sense.code)
+                    sense_points[effective_senses] = <np.uint32_t *>np.PyArray_DATA(sense.point)
+                sense_indexes[effective_senses] = sense.index
+                sense_cxt_left[effective_senses] = effective_cxts + 1 if is_context_omitted else effective_cxts
+                sense_cxt_right[effective_senses] = effective_cxts
+                effective_senses += 1
+                
+            if is_context_omitted:
+                pass  # leaving `effective_cxts` unchanged = shortening the sentence = expanding the window
+            else:
+                cxt_indexes[effective_cxts] = cxt.index
+                effective_cxts += 1
+            if effective_cxts == MAX_SENTENCE_LEN or effective_senses == MAX_SENTENCE_LEN:
+                break  # TODO: log warning, tally overflow?
+
+        # keep track of which words go into which sentence, so we don't train
+        # across sentence boundaries.
+        # context indices of sentence number X are between <sentence_cxt_idx[X], sentence_cxt_idx[X+1])
+        effective_sentences += 1
+        sentence_cxt_idx[effective_sentences] = effective_cxts
+        sentence_sense_idx[effective_sentences] = effective_senses
+
+        if effective_cxts == MAX_SENTENCE_LEN or effective_senses == MAX_SENTENCE_LEN:
+            break  # TODO: log warning, tally overflow?
+
+    # precompute "reduced window" offsets in a single randint() call
+    for i, item in enumerate(model.random.randint(0, window, effective_senses)):
+        reduced_windows[i] = item
+
+    # release GIL & train on all sentences
+    with nogil:
+        for sent_idx in range(effective_sentences):
+            sense_idx_start = sentence_sense_idx[sent_idx]
+            sense_idx_end = sentence_sense_idx[sent_idx + 1]
+            cxt_idx_start = sentence_cxt_idx[sent_idx]
+            cxt_idx_end = sentence_cxt_idx[sent_idx + 1]
+            for i in range(sense_idx_start, sense_idx_end):
+                j = sense_cxt_left[i] - window + reduced_windows[i]
+                if j < cxt_idx_start:
+                    j = cxt_idx_start
+                k = sense_cxt_right[i] + window + 1 - reduced_windows[i]
+                if k > cxt_idx_end:
+                    k = cxt_idx_end
+                ignore_cxt_idx = sense_cxt_left[i] if sense_cxt_left[i] == sense_cxt_right[i] else -1
+                if hs:
+                    fast_sentence_cbow_hs(sense_points[i], sense_codes[i], sense_codelens[i], neu1, syn0, syn1, size, cxt_indexes, _alpha, work, ignore_cxt_idx, j, k, cbow_mean, word_locks)
+                if negative:
+                    next_random = fast_sentence_cbow_neg(sense_indexes[i], negative, cum_table, cum_table_len, neu1, syn0, syn1neg, size, cxt_indexes, _alpha, work, ignore_cxt_idx, j, k, cbow_mean, next_random, word_locks)
+
+    return effective_senses
 
 
 # Score is only implemented for hierarchical softmax
