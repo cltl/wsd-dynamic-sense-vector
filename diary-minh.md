@@ -134,6 +134,12 @@ The difference between C and Python is drastic.
 For now it's good that it runs. I will need to check the resulting embeddings
 next week. Hopefully they make sense.
 
+```
+[minhle@fs0 wsd-with-marten]$ tail slurm-1411884.out
+2017-05-30 17:43:44,800 : INFO : PROGRESS: at sentence #3380000, processed 7838951 words, keeping 799 word types
+2017-05-30 17:43:44,898 : INFO : PROGRESS: at sentence #3390000, processed 7862696 words, keeping 799 word types
+...
+```
 
 
 
