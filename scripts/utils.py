@@ -237,7 +237,7 @@ class Sentence:
 
     def generate_word2vec_format(self,
                                  expr_objs,
-                                 ordered_allowed_wsd_systems=['HL', 'BABELFY'],
+                                 ordered_allowed_wsd_systems=['HL', 'BABELFY', 'MCS'],
                                  meaning_type=None,
                                  append_meaning=False):
         """
@@ -254,6 +254,8 @@ class Sentence:
         :return: lemma | lemma---meaning
         """
         lemma_under_lcs = None
+        wsd_system = None
+
         for wsd_system in ordered_allowed_wsd_systems:
             if wsd_system in expr_objs:
 
@@ -262,6 +264,7 @@ class Sentence:
                 # check for lemma
                 if expr_obj.meaning.wn_lemma is None:
                     continue
+
                 lemma = expr_obj.meaning.wn_lemma
 
 
@@ -279,7 +282,7 @@ class Sentence:
                 elif meaning_type == 'hdn':
                     meaning = expr_obj.meaning.hdn
 
-                if all([wsd_system in ordered_allowed_wsd_systems,
+                if all([wsd_system in ['HL', 'BABELFY'],
                         meaning is not None,
                         append_meaning]):
                     lemma_under_lcs = '%s---%s' % (lemma,
@@ -288,7 +291,9 @@ class Sentence:
                 else:
                     lemma_under_lcs = lemma
 
-        return lemma_under_lcs
+                return wsd_system, lemma_under_lcs
+
+        return wsd_system, lemma_under_lcs
 
     def generate_sw_word2vec_format(self, meaning_type=None):
         """
@@ -299,9 +304,9 @@ class Sentence:
         sentence = []
 
         for start, sw_expr_objs in sorted(self.sw_exprs.items()):
-            lemma_under_lcs = self.generate_word2vec_format(sw_expr_objs,
-                                                            meaning_type=meaning_type,
-                                                            append_meaning=True)
+            wsd_system, lemma_under_lcs = self.generate_word2vec_format(sw_expr_objs,
+                                                                        meaning_type=meaning_type,
+                                                                        append_meaning=True)
 
             if lemma_under_lcs is not None:
                 sentence.append(lemma_under_lcs)
@@ -331,13 +336,13 @@ class Sentence:
 
                 if any([start < target_range.start,
                         start >= target_range.stop]):
-                    lemma_under_lcs = self.generate_word2vec_format(sw_expr_objs,
-                                                                    meaning_type=meaning_type,
-                                                                    append_meaning=False)
+                    wsd_system, lemma_under_lcs = self.generate_word2vec_format(sw_expr_objs,
+                                                                               meaning_type=meaning_type,
+                                                                               append_meaning=False)
 
                 elif all([start in target_range,
                           to_add_mw]):
-                    lemma_under_lcs = self.generate_word2vec_format(mw_expr_objs,
+                    wsd_system, lemma_under_lcs = self.generate_word2vec_format(mw_expr_objs,
                                                                     meaning_type=meaning_type,
                                                                     append_meaning=True)
                     to_add_mw = False
@@ -425,7 +430,7 @@ def get_sent_objs(doc, all_sent_ids, token_id2sent_id):
 
     return sentence_objs
 
-def get_instances(path_to_xml_gz, worker_id):
+def get_instances(path_to_xml_gz, worker_id, debug=False):
     """
 
     given path to a babelfied wikipedia file
@@ -437,6 +442,9 @@ def get_instances(path_to_xml_gz, worker_id):
     :rtype: generator
     :return: generator of strings (representing training instances)
     """
+    if debug:
+        print(path_to_xml_gz)
+
     try:
         doc = etree.parse(gzip.open(path_to_xml_gz))
     except etree.XMLSyntaxError:
@@ -460,6 +468,7 @@ def get_instances(path_to_xml_gz, worker_id):
 
     for sent_obj in sentence_objs.values():
 
+
         sent_obj.generate_sw_word2vec_format(meaning_type='synset')
         sent_obj.generate_mw_word2vec_format(meaning_type='synset')
 
@@ -467,6 +476,10 @@ def get_instances(path_to_xml_gz, worker_id):
         sent_obj.generate_mw_word2vec_format(meaning_type='hdn')
 
         for meaning_type, instance in sent_obj.instances:
+            if debug:
+                print(meaning_type, instance)
+                input('continue?')
+
             if meaning_type == 'synset':
                 synset_file.write(instance + '\n')
             elif meaning_type == 'hdn':
