@@ -9,10 +9,13 @@ from glob import glob
 from utils import get_instances
 import shutil
 import os
-
+from collections import defaultdict
 
 # https://stackoverflow.com/questions/9038711/python-pool-with-worker-processes
 logger.info('loaded precomputed dictionaries')
+
+# keep track of how many files processed
+worked_id2files_processed = defaultdict(int)
 
 class Worker(multiprocessing.Process):
     def __init__(self, queue):
@@ -24,6 +27,11 @@ class Worker(multiprocessing.Process):
             worker_id = multiprocessing.current_process().name
             get_instances(path, worker_id, debug=False)
 
+            worked_id2files_processed[worker_id] += 1
+
+            num_processed = sum(worked_id2files_processed.values())
+            if num_processed % 10000 == 0:
+                logger.info('processed %s files' % num_processed)
 
 # rm and mkdir
 for dir_ in ['output/hdn', 'output/synset']:
@@ -32,7 +40,7 @@ for dir_ in ['output/hdn', 'output/synset']:
     os.mkdir(dir_)
 
 
-num_workers = 1
+num_workers = 8
 request_queue = multiprocessing.Queue()
 processes = []
 for _ in range(num_workers):
@@ -52,10 +60,6 @@ for path in glob(main_input_folder + '/14/*.xml.gz'):
 logger.info('killing workers')
 for i in range(num_workers):
     request_queue.put(None)
-
-
-logger.info('done')
-
 
 
 
