@@ -40,7 +40,7 @@ for dir_ in ['output/hdn', 'output/synset']:
     os.mkdir(dir_)
 
 
-num_workers = 8
+num_workers = 6
 request_queue = multiprocessing.Queue()
 processes = []
 for _ in range(num_workers):
@@ -50,9 +50,9 @@ for _ in range(num_workers):
 
 logger.info('started workers(s)')
 
-# main_input_folder = '/mnt/scistor1/group/marten/babelfied-wikipediaXML/'
-main_input_folder = 'input'
-for path in glob(main_input_folder + '/14/*.xml.gz'):
+main_input_folder = '/mnt/scistor1/group/marten/babelfied-wikipediaXML/'
+#main_input_folder = 'input'
+for path in glob(main_input_folder + '/**/*.xml.gz'):
     request_queue.put(path)
 
 
