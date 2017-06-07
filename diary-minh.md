@@ -1,3 +1,8 @@
+## Mon 8 May
+
+Meeting with Marten: 
+[notes](https://docs.google.com/document/d/1Y3RW_D2C1rgL0Gid9WBUR9ExYtq_Jd9AGGYaU-QtSYA/edit#)
+
 ## Tue 9 May
 
 Wrote a script to convert Gigaword to bare sentences and tokenize them.
@@ -141,9 +146,52 @@ next week. Hopefully they make sense.
 ...
 ```
 
+## Fri 2 Jun
 
+Met Marten, Piek and Jacopo.
 
+Priority decided: Marten will focus on this project.
 
+## Tue 6 Jun
+
+Talked to Marten: 
+[notes](https://docs.google.com/document/d/13ra6QYof8l1hKD8391cT_jK-78Mz1gSrc1uw5kL4uqk/edit).
+
+## Wed 7 Jun
+
+Examining the synset embeddings, they don't make sense to me whilst word 
+embeddings are still good. Could it be that the synset embeddings weren't
+trained after all?
+
+```
+--- Example: 09044862-n ---
+Synset('united_states.n.01')
+Nearest neighbors:
+    Tomango 0.454
+    construes   0.444
+    192-mile    0.432
+    --``If  0.420
+    Temping 0.416
+    20:2020 0.413
+    Rautbord    0.409
+    implimenting    0.408
+    rideable    0.405
+    Zilar   0.400
+>> US
+Nearest neighbors:
+    Canada  0.695
+    America 0.694
+    Japan   0.668
+    Europe  0.657
+    Germany 0.656
+    U.S.    0.655
+    France  0.654
+    UK  0.625
+    Australia   0.620
+    California  0.601
+```
+
+The focus now is to get LSTM running so synset embeddings will need to wait. 
 
 
 
