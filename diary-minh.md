@@ -193,6 +193,45 @@ Nearest neighbors:
 
 The focus now is to get LSTM running so synset embeddings will need to wait. 
 
+## Tue 13 Jun
+
+Finished data processing code. Now it's time to write the LSTM.
+
+```
+Divided into 3959 batches (1000195 elements each, std=23020, except last batch of 1000008)... Done.
+Added 4363547 elements as padding (0.11%).
+```
+
+Found super useful guide 
+[here](http://www.wildml.com/2016/08/rnns-in-tensorflow-a-practical-guide-and-undocumented-features/).
+
+```
+In [38]: # Create input data
+    ...: X = np.random.randn(2, 10, 8)
+    ...:
+    ...: # The second example is of length 6
+    ...: X[1,6:] = 0
+    ...: X_lengths = [10, 6]
+    ...:
+    ...: cell = tf.contrib.rnn.LSTMCell(num_units=64, state_is_tuple=True)
+    ...:
+    ...: outputs, last_states = tf.nn.dynamic_rnn(
+    ...:     cell=cell,
+    ...:     dtype=tf.float64,
+    ...:     sequence_length=X_lengths,
+    ...:     inputs=X)
+    ...:
+    ...: result = tf.contrib.learn.run_n(
+    ...:     {"outputs": outputs, "last_states": last_states},
+    ...:     n=1,
+    ...:     feed_dict=None)
+    ...:
+    ...: assert result[0]["outputs"].shape == (2, 10, 64)
+    ...:
+    ...: # Outputs for the second example past length 6 should be 0
+    ...: assert (result[0]["outputs"][1,7,:] == np.zeros(cell.output_size)).all()
+    ...:
+```
 
 
 

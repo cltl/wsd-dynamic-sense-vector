@@ -55,7 +55,9 @@ node. You might ssh to one of the compute nodes to continue your work.
 
 ## Steps
 
-1. Create a word2vec model from Gigaword corpus: `./train-word-embeddings.sh`
+1. Pre-process GigaWord into plain text: `python3 process-gigaword.py > output/gigaword.txt`
+1. Create a word2vec model from Gigaword corpus: 
+`./train-word-embeddings.sh output/gigaword.txt output/gigaword`
 2. Extract BabelNet-to-WordNet mappings: `./extract-bn-wn-mappings.sh`
 3. Convert [Babelfied Wikipedia](http://lcl.uniroma1.it/babelfied-wikipedia/)
 	* `cd scripts`
