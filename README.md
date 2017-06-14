@@ -55,6 +55,14 @@ node. You might ssh to one of the compute nodes to continue your work.
 
 ## Steps
 
+### For LSTM model
+
+1. Pre-process GigaWord into plain text: `python3 process-gigaword.py > output/gigaword.txt`
+2. Train a small LSTM model: `sbatch train-lstm-wsd-small.job`
+3. Use the LSTM model: `python3 test-lstm.py`
+
+### For word2vec model
+
 1. Pre-process GigaWord into plain text: `python3 process-gigaword.py > output/gigaword.txt`
 1. Create a word2vec model from Gigaword corpus: 
 `./train-word-embeddings.sh output/gigaword.txt output/gigaword`
