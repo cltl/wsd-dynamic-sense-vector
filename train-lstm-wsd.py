@@ -3,20 +3,15 @@ Adopted from TensorFlow LSTM demo:
 
     https://github.com/tensorflow/models/blob/master/tutorials/rnn/ptb/ptb_word_lm.py
 
-This file is used to learn about TensorFlow functionalities and test ideas.
-It is not part of any experiments.
-"""
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+Also borrow some parts from this guide:
 
-import inspect
+    http://www.wildml.com/2016/08/rnns-in-tensorflow-a-practical-guide-and-undocumented-features/
+
+"""
 import time
 
 import numpy as np
 import tensorflow as tf
-
-import reader
 
 flags = tf.flags
 logging = tf.logging
@@ -39,200 +34,139 @@ def data_type():
 
 
 class WSDModel(object):
-  """The PTB model."""
+    """The PTB model."""
 
-  def __init__(self, is_training, config, input_):
-    self._input = input_
+    def __init__(self, config):
+        self._x = tf.placeholder(tf.int32, shape=[None, None], name='x')
+        self._y = tf.placeholder(tf.int32, shape=[None])
+        
+        E_words = tf.get_variable("word_embedding", 
+                [config.vocab_size, config.emb_dims], dtype=data_type())
+        word_embs = tf.nn.embedding_lookup(E_words, self._x)
+        cell = tf.contrib.rnn.LSTMCell(num_units=config.hidden_size,
+                                       state_is_tuple=True)
+        outputs, _ = tf.nn.dynamic_rnn(cell, word_embs, dtype=data_type())
+        context_layer_weights = tf.get_variable("context_layer_weights",
+                [config.hidden_size, config.emb_dims], dtype=data_type())
+        self._predicted_context_embs = tf.matmul(outputs[:,-1], context_layer_weights, 
+                                                 name='predicted_context_embs')
+        E_contexts = tf.get_variable("context_embedding", 
+                [config.vocab_size, config.emb_dims], dtype=data_type())
+        pre_probs = tf.matmul(self._predicted_context_embs, tf.transpose(E_contexts))
+        
+        self._cost = tf.reduce_mean(
+                tf.nn.sparse_softmax_cross_entropy_with_logits(
+                logits=pre_probs, labels=self._y))
 
-    batch_size = input_.batch_size
-    num_steps = input_.num_steps
-    size = config.hidden_size
-    vocab_size = config.vocab_size
+        tvars = tf.trainable_variables()
+        grads, _ = tf.clip_by_global_norm(tf.gradients(self._cost, tvars),
+                                          config.max_grad_norm)
+        optimizer = tf.train.AdagradOptimizer(config.learning_rate)
+        self._train_op = optimizer.apply_gradients(
+            zip(grads, tvars),
+            global_step=tf.contrib.framework.get_or_create_global_step())
 
-    # Slightly better results can be obtained with forget gate biases
-    # initialized to 1 but the hyperparameters of the model would need to be
-    # different than reported in the paper.
-    def lstm_cell():
-      # With the latest TensorFlow source code (as of Mar 27, 2017),
-      # the BasicLSTMCell will need a reuse parameter which is unfortunately not
-      # defined in TensorFlow 1.0. To maintain backwards compatibility, we add
-      # an argument check here:
-      if 'reuse' in inspect.getargspec(
-          tf.contrib.rnn.BasicLSTMCell.__init__).args:
-        return tf.contrib.rnn.BasicLSTMCell(
-            size, forget_bias=0.0, state_is_tuple=True,
-            reuse=tf.get_variable_scope().reuse)
-      else:
-        return tf.contrib.rnn.BasicLSTMCell(
-            size, forget_bias=0.0, state_is_tuple=True)
-    attn_cell = lstm_cell
-    if is_training and config.keep_prob < 1:
-      def attn_cell():
-        return tf.contrib.rnn.DropoutWrapper(
-            lstm_cell(), output_keep_prob=config.keep_prob)
-    cell = tf.contrib.rnn.MultiRNNCell(
-        [attn_cell() for _ in range(config.num_layers)], state_is_tuple=True)
+        self._initial_state = cell.zero_state(tf.shape(self._x)[0], data_type())
 
-    self._initial_state = cell.zero_state(batch_size, data_type())
+    @property
+    def predict(self):
+        return self._predicted_context_embs
 
-    with tf.device("/cpu:0"):
-      embedding = tf.get_variable(
-          "embedding", [vocab_size, size], dtype=data_type())
-      inputs = tf.nn.embedding_lookup(embedding, input_.input_data)
+    @property
+    def x(self):
+        return self._x
 
-    if is_training and config.keep_prob < 1:
-      inputs = tf.nn.dropout(inputs, config.keep_prob)
+    @property
+    def y(self):
+        return self._y
 
-    # Simplified version of models/tutorials/rnn/rnn.py's rnn().
-    # This builds an unrolled LSTM for tutorial purposes only.
-    # In general, use the rnn() or state_saving_rnn() from rnn.py.
-    #
-    # The alternative version of the code below is:
-    #
-    # inputs = tf.unstack(inputs, num=num_steps, axis=1)
-    # outputs, state = tf.contrib.rnn.static_rnn(
-    #     cell, inputs, initial_state=self._initial_state)
-    outputs = []
-    state = self._initial_state
-    with tf.variable_scope("RNN"):
-      for time_step in range(num_steps):
-        if time_step > 0: tf.get_variable_scope().reuse_variables()
-        (cell_output, state) = cell(inputs[:, time_step, :], state)
-        outputs.append(cell_output)
+    @property
+    def initial_state(self):
+        return self._initial_state
 
-    output = tf.reshape(tf.stack(axis=1, values=outputs), [-1, size])
-    softmax_w = tf.get_variable(
-        "softmax_w", [size, vocab_size], dtype=data_type())
-    softmax_b = tf.get_variable("softmax_b", [vocab_size], dtype=data_type())
-    logits = tf.matmul(output, softmax_w) + softmax_b
-    loss = tf.contrib.legacy_seq2seq.sequence_loss_by_example(
-        [logits],
-        [tf.reshape(input_.targets, [-1])],
-        [tf.ones([batch_size * num_steps], dtype=data_type())])
-    self._cost = cost = tf.reduce_sum(loss) / batch_size
-    self._final_state = state
+    @property
+    def cost(self):
+        return self._cost
 
-    if not is_training:
-      return
-
-    tvars = tf.trainable_variables()
-    grads, _ = tf.clip_by_global_norm(tf.gradients(cost, tvars),
-                                      config.max_grad_norm)
-    optimizer = tf.train.AdagradOptimizer(config.learning_rate)
-    self._train_op = optimizer.apply_gradients(
-        zip(grads, tvars),
-        global_step=tf.contrib.framework.get_or_create_global_step())
-
-  @property
-  def input(self):
-    return self._input
-
-  @property
-  def initial_state(self):
-    return self._initial_state
-
-  @property
-  def cost(self):
-    return self._cost
-
-  @property
-  def final_state(self):
-    return self._final_state
-
-  @property
-  def train_op(self):
-    return self._train_op
+    @property
+    def train_op(self):
+        return self._train_op
 
 
 class SmallConfig(object):
   """Small config."""
   init_scale = 0.1
-  learning_rate = 1.0
+  learning_rate = 0.1
   max_grad_norm = 5
-  num_layers = 2
-  num_steps = 20
-  hidden_size = 200
-  max_epoch = 13
-  keep_prob = 1.0
+  hidden_size = 100
+  max_epoch = 10
   batch_size = 20
-  vocab_size = 10000
+  vocab_size = None # to be assigned
+  emb_dims = 10
 
 
 class MediumConfig(object):
   """Medium config."""
   init_scale = 0.05
-  learning_rate = 1.0
+  learning_rate = 0.1
   max_grad_norm = 5
-  num_layers = 2
-  num_steps = 35
-  hidden_size = 650
+  hidden_size = 200
   max_epoch = 39
-  keep_prob = 0.5
   batch_size = 20
-  vocab_size = 10**5
+  vocab_size = None # to be assigned
+  emb_dims = 100
 
 
 class LargeConfig(object):
   """Large config."""
   init_scale = 0.04
-  learning_rate = 1.0
+  learning_rate = 0.1
   max_grad_norm = 10
-  num_layers = 2
-  num_steps = 35
-  hidden_size = 1500
+  hidden_size = 512
   max_epoch = 55
-  keep_prob = 0.35
   batch_size = 20
-  vocab_size = 10**6
+  vocab_size = None # to be assigned
+  emb_dims = 128
 
 
 class TestConfig(object):
   """Tiny config, for testing."""
   init_scale = 0.1
-  learning_rate = 1.0
+  learning_rate = 0.1
   max_grad_norm = 1
-  num_layers = 1
-  num_steps = 2
   hidden_size = 2
   max_epoch = 1
-  keep_prob = 1.0
   batch_size = 20
-  vocab_size = 10000
+  vocab_size = None # to be assigned
 
 
-def run_epoch(session, model, eval_op=None, verbose=False):
-  """Runs the model on the given data."""
-  start_time = time.time()
-  costs = 0.0
-  iters = 0
-  state = session.run(model.initial_state)
+def train_epoch(session, model, data, target_id, verbose=False):
+    """Runs the model on the given data."""
+    total_cost = 0.0
+    total_rows = 0
 
-  fetches = {
-      "cost": model.cost,
-      "final_state": model.final_state,
-  }
-  if eval_op is not None:
-    fetches["eval_op"] = eval_op
+    fetches = { "cost": model.cost, "eval_op": model.train_op }
+    for batch_no, x in enumerate(data):
+        i =  np.random.randint(x.shape[1])
+        y = x[:,i].copy() # copy content
+        x[:,i] = target_id
 
-  for step in range(model.input.epoch_size):
-    feed_dict = {}
-    for i, (c, h) in enumerate(model.initial_state):
-      feed_dict[c] = state[i].c
-      feed_dict[h] = state[i].h
+        state = session.run(model.initial_state, {model.x: x})
+        feed_dict = {model.x: x, model.y: y}
+        c, h = model.initial_state
+        feed_dict[c] = state.c
+        feed_dict[h] = state.h
 
-    vals = session.run(fetches, feed_dict)
-    cost = vals["cost"]
-    state = vals["final_state"]
+        vals = session.run(fetches, feed_dict)
+        batch_cost = vals["cost"]
+        x[:,i] = y
 
-    costs += cost
-    iters += model.input.num_steps
-
-    if verbose and step % (model.input.epoch_size // 10) == 10:
-      print("%.3f perplexity: %.3f speed: %.0f wps" %
-            (step * 1.0 / model.input.epoch_size, np.exp(costs / iters),
-             iters * model.input.batch_size / (time.time() - start_time)))
-
-  return np.exp(costs / iters)
+        total_cost += batch_cost * x.shape[0]
+        total_rows += x.shape[0]
+        
+        if verbose and (batch_no+1) % 100 == 0:
+            print("batch #%d cost: %.7f" %(batch_no+1, batch_cost))
+    return total_cost / total_rows
 
 
 def get_config():
@@ -247,59 +181,45 @@ def get_config():
   else:
     raise ValueError("Invalid model: %s", FLAGS.model)
 
+def print_device_placement(model):
+    with tf.Session(config=tf.ConfigProto(log_device_placement=True)) as sess:
+        print("******** Start of device placement ********")
+        sess.run(tf.initialize_all_variables())
+        x, y = np.zeros((100, 10)), np.zeros(100)
+        c, h = model.initial_state
+        state = sess.run(model.initial_state, {model.x: x})
+        feed_dict = {model.x: x, model.y: y, c: state.c, h: state.h}
+        print(sess.run(model.train_op, feed_dict))
+        print("******** End of device placement ********")
 
 def main(_):
-  if not FLAGS.data_path:
-    raise ValueError("Must set --data_path to PTB data directory")
-
-  raw_data = reader.ptb_raw_data(FLAGS.data_path)
-  train_data, valid_data, test_data, _ = raw_data
-
-  config = get_config()
-  eval_config = get_config()
-  eval_config.batch_size = 1
-  eval_config.num_steps = 1
-
-  with tf.Graph().as_default():
-    initializer = tf.random_uniform_initializer(-config.init_scale,
-                                                config.init_scale)
-
-    with tf.name_scope("Train"):
-      train_input = PTBInput(config=config, data=train_data, name="TrainInput")
-      with tf.variable_scope("Model", reuse=None, initializer=initializer):
-        m = WSDModel(is_training=True, config=config, input_=train_input)
-      tf.summary.scalar("Training Loss", m.cost)
-      tf.summary.scalar("Learning Rate", m.lr)
-
-    with tf.name_scope("Valid"):
-      valid_input = PTBInput(config=config, data=valid_data, name="ValidInput")
-      with tf.variable_scope("Model", reuse=True, initializer=initializer):
-        mvalid = WSDModel(is_training=False, config=config, input_=valid_input)
-      tf.summary.scalar("Validation Loss", mvalid.cost)
-
-    with tf.name_scope("Test"):
-      test_input = PTBInput(config=eval_config, data=test_data, name="TestInput")
-      with tf.variable_scope("Model", reuse=True, initializer=initializer):
-        mtest = WSDModel(is_training=False, config=eval_config,
-                         input_=test_input)
-
-    sv = tf.train.Supervisor(logdir=FLAGS.save_path)
-    with sv.managed_session() as session:
-      for i in range(config.max_epoch):
-        print("Epoch: %d" % (i + 1))
-        train_perplexity = run_epoch(session, m, eval_op=m.train_op,
-                                     verbose=True)
-        print("Epoch: %d Train Perplexity: %.3f" % (i + 1, train_perplexity))
-        valid_perplexity = run_epoch(session, mvalid)
-        print("Epoch: %d Valid Perplexity: %.3f" % (i + 1, valid_perplexity))
-
-      test_perplexity = run_epoch(session, mtest)
-      print("Test Perplexity: %.3f" % test_perplexity)
-
-      if FLAGS.save_path:
-        print("Saving model to %s." % FLAGS.save_path)
-        sv.saver.save(session, FLAGS.save_path, global_step=sv.global_step)
-
+    if not FLAGS.data_path:
+        raise ValueError("Must set --data_path to the base path of "
+                         "prepared input (e.g. output/gigaword)")
+    vocab = np.load(FLAGS.data_path + '.index.pkl')
+    target_id = vocab['<target>']
+    train = np.load(FLAGS.data_path + '.train.npz')
+    train_batches = [train['batch%d' %i] for i in range(len(train.keys()))]
+    config = get_config()
+    config.vocab_size = len(vocab)
+    with tf.Graph().as_default():
+        initializer = tf.random_uniform_initializer(-config.init_scale,
+                                                    config.init_scale)
+    with tf.variable_scope("Model", reuse=None, initializer=initializer):
+        m = WSDModel(config=config)
+    print_device_placement(m)
+    with tf.Session() as session:
+        saver = tf.train.Saver()
+        start_time = time.time()
+        session.run(tf.initialize_all_variables())
+        for i in range(config.max_epoch):
+            print("Epoch: %d" % (i + 1))
+            train_cost = 0
+            train_cost = train_epoch(session, m, train_batches, target_id, verbose=True)
+            print("Epoch: %d -> Train cost: %.3f, elapsed time: %.1f minutes" % 
+                  (i + 1, train_cost, (time.time()-start_time)/60))
+        if FLAGS.save_path:
+            print("Saved model to %s." %saver.save(session, FLAGS.save_path))
 
 if __name__ == "__main__":
-  tf.app.run()
+    tf.app.run()

@@ -233,11 +233,15 @@ In [38]: # Create input data
     ...:
 ```
 
+## Wed 14 Jun
 
+Managed to train the LSTM model (and load it back, which is non-trivial!)
 
+TODO: monitor performance, guide: https://stackoverflow.com/questions/37751739/tensorflow-code-optimization-strategy/37774430#37774430
 
+TODO: print dev cost
 
-
+TODO: reduce output vocabulary size for faster softmax?
 
 
 

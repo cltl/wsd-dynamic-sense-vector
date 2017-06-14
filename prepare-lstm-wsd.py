@@ -20,9 +20,11 @@ import pickle
 import re
 import numpy as np
 
-batch_size = 10**6
-max_words = 10**6
+batch_size = 128000 # words
+vocab_size = 10**6
 min_count = 5
+
+special_symbols = ['<target>', '<unkn>', '<pad>']
 
 def progress(it):
     start = time()
@@ -40,7 +42,9 @@ def _build_vocab(filename):
             words = line.strip().split()
             counter.update(words)
     sys.stderr.write('Total unique words: %d\n' %len(counter))
-    words = [w for w, c in counter.most_common(max_words) if c >= min_count] 
+    for sym in special_symbols: assert sym not in counter
+    words = special_symbols + [w for w, c in counter.most_common(vocab_size) 
+                               if c >= min_count] 
     sys.stderr.write('Retained %d words\n' %len(words))
     word2id = dict((words[i], i) for i in range(len(words)))
     sys.stderr.write('Building vocabulary... Done.\n')
@@ -48,7 +52,7 @@ def _build_vocab(filename):
 
 def _file_to_sents(filename, word_to_id):
     sys.stderr.write('Reading sentences and converting words to indices...\n')
-    unkn_id = add_special_symbol(word2id, '<unkn>')
+    unkn_id = word2id['<unkn>']
     sents = []
     with codecs.open(filename, 'r', 'utf-8') as f:
         for line in progress(f):
@@ -72,8 +76,8 @@ pad = PadFunc()
 
 def pad_batches(sents):
     sys.stderr.write('Dividing and padding...\n')
-    add_special_symbol(word2id, '<target>')
-    pad_id = add_special_symbol(word2id, '<pad>')
+    pad_id = word2id['<pad>']
+    assert len(sents) > 10000, "This script requires more than 10.000 sentences to run."
     splitting_point = len(sents) - 10000
     train, dev = sents[:splitting_point], sents[splitting_point:]
     train.sort(key=lambda s: len(s))
@@ -91,17 +95,16 @@ def pad_batches(sents):
         batches['batch%d' %len(batches)] = pad(last_batch, last_max_len, pad_id)
     sys.stderr.write('Dividing and padding... Done.\n')
     sizes = np.array([b.size for b in batches.values()])
-    sys.stderr.write('Divided into %d batches (%d elements each, std=%d, '
-                     'except last batch of %d)... Done.\n'
-                     %(len(batches), sizes[:-1].mean(), sizes[:-1].std(), sizes[-1]))
+    if len(batches) >= 2:
+        sys.stderr.write('Divided into %d batches (%d elements each, std=%d, '
+                         'except last batch of %d).\n'
+                         %(len(batches), sizes[:-1].mean(), sizes[:-1].std(), sizes[-1]))
+    else:
+        assert len(batches) == 1
+        sys.stderr.write('Created 1 batch of %d elements.\n' %sizes[0])
     sys.stderr.write('Added %d elements as padding (%.2f%%).\n' 
                      %(pad.pads, pad.pads*100.0/pad.total))
     return batches, dev
-
-def add_special_symbol(word2id, sym):
-    assert sym not in word2id
-    word2id[sym] = len(word2id)
-    return word2id[sym]
 
 if __name__ == '__main__':
     inp_path = sys.argv[1]
@@ -126,6 +129,9 @@ if __name__ == '__main__':
     
     train_path = re.sub('.txt$', '.train.npz', inp_path)
     dev_path = re.sub('.txt$', '.dev.pkl', inp_path)
-    batches, dev = pad_batches(sents)
-    np.savez(train_path, **batches)
-    with open(dev_path, 'wb') as f: pickle.dump(dev, f)
+    if os.path.exists(train_path):
+        sys.stderr.write('Result already exists: %s. Skipped.\n' %train_path)
+    else:
+        batches, dev = pad_batches(sents)
+        np.savez(train_path, **batches)
+        with open(dev_path, 'wb') as f: pickle.dump(dev, f)
