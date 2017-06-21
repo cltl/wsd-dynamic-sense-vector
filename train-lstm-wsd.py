@@ -153,7 +153,13 @@ def train_epoch(session, model, data, verbose=False):
     total_rows = 0
 
     fetches = { "cost": model.cost, "eval_op": model.train_op }
-    for batch_no, (x, subvocab, target_id) in enumerate(data):
+    # resample the batches so that each token has equal chance to become target
+    # another effect is to randomize the order of batches
+    sentence_lens = np.array([x.shape[1] for x, _, _ in data])
+    samples = np.random.choice(len(data), size=len(data), 
+                               p=sentence_lens/sentence_lens.sum())
+    for batch_no, batch_id in enumerate(samples):
+        x, subvocab, target_id = data[batch_id]
         i =  np.random.randint(x.shape[1])
         y = x[:,i].copy() # copy content
         x[:,i] = target_id
@@ -166,13 +172,13 @@ def train_epoch(session, model, data, verbose=False):
 
         vals = session.run(fetches, feed_dict)
         batch_cost = vals["cost"]
-        x[:,i] = y
+        x[:,i] = y # restore the data
 
-        total_cost += batch_cost * x.shape[0]
-        total_rows += x.shape[0]
+        total_cost += batch_cost * x.shape[0] # because the cost is averaged
+        total_rows += x.shape[0]              # over rows in a batch
         
         if verbose and (batch_no+1) % 100 == 0:
-            print("batch #%d cost: %.7f" %(batch_no+1, batch_cost))
+            print("sample batch cost: %.7f" %batch_cost)
     return total_cost / total_rows
 
 

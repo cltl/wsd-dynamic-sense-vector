@@ -237,11 +237,44 @@ In [38]: # Create input data
 
 Managed to train the LSTM model (and load it back, which is non-trivial!)
 
+## Wed 21 Jun
+
+Implemented "sampled" softmax of Jean et al. (2015):
+
+Before:
+
+```
+Epoch: 10
+batch #100 cost: 7.1678638
+batch #200 cost: 7.1870413
+Epoch: 10 -> Train cost: 7.264, elapsed time: 6.4 minutes
+```
+
+After:
+
+```
+Epoch: 10
+batch #100 cost: 7.0222702
+batch #200 cost: 6.9646182
+Epoch: 10 -> Train cost: 6.980, elapsed time: 2.9 minutes
+```
+
+So the the time was cut in more than half and NLL is reduced (because the 
+vocabulary size is smaller).
+
+Added resampling of training batches so that each token has equal chance to 
+become target and batch order is erased.
+
+**References**
+
+Jean, S., Cho, K., Memisevic, R., & Bengio, Y. (2015). On Using Very Large Target Vocabulary for Neural Machine Translation. In Proceedings of the 53rd Annual Meeting of the Association for Computational Linguistics and the 7th International Joint Conference on Natural Language Processing (Volume 1: Long Papers) (pp. 1–10). Beijing, China: Association for Computational Linguistics. Retrieved from http://www.aclweb.org/anthology/P15-1001
+
 TODO: monitor performance, guide: https://stackoverflow.com/questions/37751739/tensorflow-code-optimization-strategy/37774430#37774430
 
-TODO: print dev cost
+TODO: print dev cost, use it to stop??? or maybe just run as long as you can afford
 
 TODO: reduce output vocabulary size for faster softmax?
 
-
+TODO: sampling one column from each batch --> words in larger batch has smaller
+chance to be trained. How can I compensate for this? 
 
