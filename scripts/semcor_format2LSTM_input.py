@@ -1,11 +1,11 @@
 
-# TODO run for semcor + omsti on computer science server
 # TODO log some extra information
 
 import os
 from nltk.corpus import WordNetCorpusReader
 from nltk.corpus import wordnet as wn
 from lxml import html, etree
+from collections import defaultdict
 import wn_utils
 
 
@@ -113,12 +113,16 @@ def load_instance_id2offset(mapping_path, sensekey2offset, debug=False):
 
 # experiment settings
 wn_version = '30'
-corpora_to_include = ['semcor', 'mun']  # semcor | mun
+corpora_to_include = ['semcor',
+                      # 'mun'
+                      ]  # semcor | mun
+
 accepted_pos = {'NOUN'}
 entailment_setting = 'any_hdn'  # lemma_hdn | any_hdn
+lemma2annotations = defaultdict(dict)
 
 if wn_version == '30':
-    path_to_wn_dict_folder = str(wn._get_root) # change this for other wn versions
+    path_to_wn_dict_folder = str(wn._get_root()) # change this for other wn versions
     path_to_wn_index_sense = os.path.join(path_to_wn_dict_folder, 'index.sense') # change this for other wn versions
 
 
@@ -190,18 +194,20 @@ for corpus_node in my_html_tree.xpath('body/corpus'):
         # loop through sentences
         for sent_node in corpus_node.xpath('text/sentence'):
 
-            sentence_lemmas = []
+            sentence_tokens = []
             synset_annotations = []
             hdn_annotations = []
 
             for child_el in sent_node.getchildren():
 
                 lemma = child_el.get('lemma')
+                token = child_el.text
                 pos = child_el.get('pos')
 
                 assert lemma is not None
+                assert token is not None
 
-                sentence_lemmas.append(lemma)
+                sentence_tokens.append(token)
                 sent_synset_annotations = []
                 sent_hdn_annotations = []
 
@@ -210,6 +216,14 @@ for corpus_node in my_html_tree.xpath('body/corpus'):
 
                     instance_id = child_el.get('id')
                     synset_id = instance_id2offset[instance_id]
+
+                    # update counter for logging purposes
+                    if synset_id not in lemma2annotations[lemma]:
+                        lemma2annotations[lemma][synset_id] = {'hdn': 0, 'synset': 0}
+
+                    lemma2annotations[lemma][synset_id]['synset'] += 1
+
+
                     sent_synset_annotations.append(synset_id)
 
                     # option lemma-based hdn
@@ -226,23 +240,50 @@ for corpus_node in my_html_tree.xpath('body/corpus'):
                             if hdn is not None:
                                 sent_hdn_annotations.append(hdn)
 
+                                lemma2annotations[lemma][synset_id]['hdn'] += 1
+
+
                     elif entailment_setting == 'any_hdn':
                         hypernyms = sy_id2hypernyms[synset_id]
                         for hypernym in hypernyms:
                             if hypernym in all_hdns:
                                 sent_hdn_annotations.append(hypernym)
 
+                                lemma2annotations[lemma][synset_id]['hdn'] += 1
+
                 synset_annotations.append(sent_synset_annotations)
                 hdn_annotations.append(sent_hdn_annotations)
 
-            for synset_sentence in wn_utils.generate_training_instances(sentence_lemmas,
+            for synset_sentence in wn_utils.generate_training_instances(sentence_tokens,
                                                                         synset_annotations):
                 synset_outfile.write(synset_sentence + '\n')
 
-            for hdn_sentence in wn_utils.generate_training_instances(sentence_lemmas,
+            for hdn_sentence in wn_utils.generate_training_instances(sentence_tokens,
                                                                      hdn_annotations):
                 hdn_outfile.write(hdn_sentence + '\n')
 
 hdn_outfile.close()
 synset_outfile.close()
 
+
+per_lemma = []
+per_synset = []
+per_hdn = []
+meanings = set()
+
+for lemma, info in lemma2annotations.items():
+    lemma_count = 0
+    for sy_id, sy_info in info.items():
+        lemma_count += sy_info['synset']
+        per_synset.append(sy_info['synset'])
+        per_hdn.append(sy_info['hdn'])
+
+        meanings.add(sy_id)
+
+    per_lemma.append(lemma_count)
+
+print('number of unique lemmas: %s' % len(lemma2annotations))
+print('number of unique meanings: %s' % len(meanings))
+print('min avg max lemma', min(per_lemma), round(sum(per_lemma) / len(per_lemma), 2), max(per_lemma))
+print('min avg max synset', min(per_synset), round(sum(per_synset) / len(per_synset), 2), max(per_synset))
+print('min avg max hdn', min(per_hdn), round(sum(per_hdn) / len(per_hdn), 2), max(per_hdn))
