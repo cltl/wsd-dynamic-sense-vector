@@ -12,6 +12,7 @@ import time
 
 import numpy as np
 import tensorflow as tf
+import sys
 
 flags = tf.flags
 logging = tf.logging
@@ -38,7 +39,8 @@ class WSDModel(object):
 
     def __init__(self, config):
         self._x = tf.placeholder(tf.int32, shape=[None, None], name='x')
-        self._y = tf.placeholder(tf.int32, shape=[None])
+        self._y = tf.placeholder(tf.int32, shape=[None], name='y')
+        self._subvocab = tf.placeholder(tf.int32, shape=[None], name='subvocab')
         
         E_words = tf.get_variable("word_embedding", 
                 [config.vocab_size, config.emb_dims], dtype=data_type())
@@ -52,7 +54,8 @@ class WSDModel(object):
                                                  name='predicted_context_embs')
         E_contexts = tf.get_variable("context_embedding", 
                 [config.vocab_size, config.emb_dims], dtype=data_type())
-        pre_probs = tf.matmul(self._predicted_context_embs, tf.transpose(E_contexts))
+        subcontexts = tf.nn.embedding_lookup(E_contexts, self._subvocab)
+        pre_probs = tf.matmul(self._predicted_context_embs, tf.transpose(subcontexts))
         
         self._cost = tf.reduce_mean(
                 tf.nn.sparse_softmax_cross_entropy_with_logits(
@@ -75,6 +78,10 @@ class WSDModel(object):
     @property
     def x(self):
         return self._x
+
+    @property
+    def subvocab(self):
+        return self._subvocab
 
     @property
     def y(self):
@@ -140,19 +147,19 @@ class TestConfig(object):
   vocab_size = None # to be assigned
 
 
-def train_epoch(session, model, data, target_id, verbose=False):
+def train_epoch(session, model, data, verbose=False):
     """Runs the model on the given data."""
     total_cost = 0.0
     total_rows = 0
 
     fetches = { "cost": model.cost, "eval_op": model.train_op }
-    for batch_no, x in enumerate(data):
+    for batch_no, (x, subvocab, target_id) in enumerate(data):
         i =  np.random.randint(x.shape[1])
         y = x[:,i].copy() # copy content
         x[:,i] = target_id
 
-        state = session.run(model.initial_state, {model.x: x})
-        feed_dict = {model.x: x, model.y: y}
+        feed_dict = {model.x: x, model.y: y, model.subvocab: subvocab}
+        state = session.run(model.initial_state, feed_dict)
         c, h = model.initial_state
         feed_dict[c] = state.c
         feed_dict[h] = state.h
@@ -183,14 +190,17 @@ def get_config():
 
 def print_device_placement(model):
     with tf.Session(config=tf.ConfigProto(log_device_placement=True)) as sess:
-        print("******** Start of device placement ********")
-        sess.run(tf.initialize_all_variables())
-        x, y = np.zeros((100, 10)), np.zeros(100)
+        sys.stderr.write("******** Start of device placement ********\n")
+        sess.run(tf.global_variables_initializer())
+        x = np.random.randint(10, size=(100, 10))
+        y = np.random.randint(10, size=100)
+        subvocab = np.random.randint(100, size=10) 
+        feed_dict = {model.x: x, model.y: y, model.subvocab : subvocab}
+        state = sess.run(model.initial_state, feed_dict)
         c, h = model.initial_state
-        state = sess.run(model.initial_state, {model.x: x})
-        feed_dict = {model.x: x, model.y: y, c: state.c, h: state.h}
-        print(sess.run(model.train_op, feed_dict))
-        print("******** End of device placement ********")
+        feed_dict[c], feed_dict[h] = state.c, state.h
+        sess.run(model.train_op, feed_dict)
+        sys.stderr.write("******** End of device placement ********\n")
 
 def main(_):
     if not FLAGS.data_path:
@@ -199,7 +209,18 @@ def main(_):
     vocab = np.load(FLAGS.data_path + '.index.pkl')
     target_id = vocab['<target>']
     train = np.load(FLAGS.data_path + '.train.npz')
-    train_batches = [train['batch%d' %i] for i in range(len(train.keys()))]
+    train_batches = []
+    for i in range(len(train.keys())):
+        sentences = train['batch%d' %i]
+        batch_vocab, inverse = np.unique(sentences, return_inverse=True)
+        sentences = inverse.reshape(sentences.shape)
+        batch_vocab = np.append(batch_vocab, target_id)
+        local_target_id = batch_vocab.size-1
+        sys.stderr.write('Batch #%d vocab: %d (%.2f%%)\n'
+                         %(i, batch_vocab.size, batch_vocab.size*100.0/len(vocab)))
+        train_batches.append((sentences.astype(np.int32), 
+                              batch_vocab.astype(np.int32),
+                              local_target_id))
     config = get_config()
     config.vocab_size = len(vocab)
     with tf.Graph().as_default():
@@ -211,11 +232,11 @@ def main(_):
     with tf.Session() as session:
         saver = tf.train.Saver()
         start_time = time.time()
-        session.run(tf.initialize_all_variables())
+        session.run(tf.global_variables_initializer())
         for i in range(config.max_epoch):
             print("Epoch: %d" % (i + 1))
             train_cost = 0
-            train_cost = train_epoch(session, m, train_batches, target_id, verbose=True)
+            train_cost = train_epoch(session, m, train_batches, verbose=True)
             print("Epoch: %d -> Train cost: %.3f, elapsed time: %.1f minutes" % 
                   (i + 1, train_cost, (time.time()-start_time)/60))
         if FLAGS.save_path:
