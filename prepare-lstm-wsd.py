@@ -72,10 +72,10 @@ class PadFunc(object):
                 self.pads += 1
         self.total += len(sents)*max_len
         return np.array(sents)
-pad = PadFunc()
 
 def pad_batches(sents):
     sys.stderr.write('Dividing and padding...\n')
+    pad = PadFunc()
     pad_id = word2id['<pad>']
     assert len(sents) > 10000, "This script requires more than 10.000 sentences to run."
     splitting_point = len(sents) - 10000
