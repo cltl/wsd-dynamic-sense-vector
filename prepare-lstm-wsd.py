@@ -107,11 +107,10 @@ def pad_batches(sents):
     return batches, dev
 
 if __name__ == '__main__':
-    inp_path = sys.argv[1]
+    inp_path, out_path = sys.argv[1:]
     assert os.path.isfile(inp_path)
-    assert re.search(r'\.txt$', inp_path)
     
-    index_path = re.sub('.txt$', '.index.pkl', inp_path)
+    index_path = out_path + '.index.pkl'
     if os.path.exists(index_path):
         with open(index_path, 'rb') as f: word2id = pickle.load(f)
         sys.stderr.write('Read vocabulary from %s.\n' %index_path)
@@ -119,7 +118,7 @@ if __name__ == '__main__':
         word2id, words = _build_vocab(inp_path)
         with open(index_path, 'wb') as f: pickle.dump(word2id, f)
 
-    sents_path = re.sub('.txt$', '.sents.pkl', inp_path)
+    sents_path = out_path + '.sents.pkl'
     if os.path.exists(sents_path):
         with open(sents_path, 'rb') as f: sents = pickle.load(f)
         sys.stderr.write('Read sentences from %s.\n' %sents_path)
@@ -127,8 +126,8 @@ if __name__ == '__main__':
         sents = _file_to_sents(inp_path, word2id)
         with open(sents_path, 'wb') as f: pickle.dump(sents, f)
     
-    train_path = re.sub('.txt$', '.train.npz', inp_path)
-    dev_path = re.sub('.txt$', '.dev.pkl', inp_path)
+    train_path = out_path + '.train.npz'
+    dev_path = out_path + '.dev.pkl'
     if os.path.exists(train_path):
         sys.stderr.write('Result already exists: %s. Skipped.\n' %train_path)
     else:
