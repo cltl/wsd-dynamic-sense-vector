@@ -42,6 +42,14 @@ If you get `No module named 'UserString'` while loading a Word2vec model from
 disk, probably it is caused by the difference between compute node and login
 node. You might ssh to one of the compute nodes to continue your work.
 
+### Specific instructions for training sense embeddings
+
+```
+cd data
+wget http://lcl.uniroma1.it/wsdeval/data/WSD_Training_Corpora.zip
+unzip WSD_Training_Corpora.zip
+```
+
 
 ### Specific instructions for Babelfied Wikipedia conversion
 
@@ -55,6 +63,21 @@ node. You might ssh to one of the compute nodes to continue your work.
 
 ## Steps
 
+### Input training sense embeddings
+1.
+2. set the following experiment settings in `scripts/semcor_format2LSTM_input.py`. The current settings are:
+```
+wn_version = '30'
+corpora_to_include = ['semcor', 'mun']  # semcor | mun
+accepted_pos = {'NOUN'}
+entailment_setting = 'any_hdn'  # lemma_hdn | any_hdn`
+```
+3. train by running:
+```
+cd scripts
+python3 semcor_format2LSTM_input.py
+```
+
 ### For LSTM model
 
 1. Pre-process GigaWord into plain text: `python3 process-gigaword.py > output/gigaword.txt`
@@ -64,7 +87,7 @@ node. You might ssh to one of the compute nodes to continue your work.
 ### For word2vec model
 
 1. Pre-process GigaWord into plain text: `python3 process-gigaword.py > output/gigaword.txt`
-1. Create a word2vec model from Gigaword corpus: 
+1. Create a word2vec model from Gigaword corpus:
 `./train-word-embeddings.sh output/gigaword.txt output/gigaword`
 2. Extract BabelNet-to-WordNet mappings: `./extract-bn-wn-mappings.sh`
 3. Convert [Babelfied Wikipedia](http://lcl.uniroma1.it/babelfied-wikipedia/)
