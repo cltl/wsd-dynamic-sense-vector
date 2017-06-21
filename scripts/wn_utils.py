@@ -1,5 +1,41 @@
 import nltk
+import itertools
 from collections import defaultdict
+
+
+def generate_training_instances(sentence_lemmas, annotations):
+    """
+    given the lemmas in a sentence with its annotations (can be more than one)
+    generate all training instances for that sentence
+    
+    e.g. 
+    sentence_lemmas = ['the', 'man',            'meeting', 'woman']
+    annotations =     [[],    ['1', '2' , '3'], ['4'],     ['5', '6']]
+    
+    would result in
+    the man---1 meeting---4 woman---5
+    the man---2 meeting woman---6
+    the man---3 meeting woman
+    
+    :param list sentence_lemmas: see above
+    :param list annotations: see above
+    
+    :rtype: set
+    :return: set of strings (representing annotated sentences)
+    """
+    instances = set()
+    for one_annotated_sent in itertools.zip_longest(*annotations):
+        a_sentence = []
+        for index, annotation in enumerate(one_annotated_sent):
+            lemma = sentence_lemmas[index]
+            if annotation is not None:
+                a_sentence.append(lemma + '---' + annotation)
+            else:
+                a_sentence.append(lemma)
+
+        instances.add(' '.join(a_sentence))
+    
+    return instances
 
 def load_lemma_pos2offsets(path_to_index_sense):
     '''
@@ -137,13 +173,13 @@ def synsets_graph_info(wn_instance, wn_version, lemma, pos):
         for sy2 in synsets:
             if sy1 != sy2:
                 try:
-                    lcs_s = sy1.lowest_common_hypernyms(sy2)
+                    lcs_s = sy1.lowest_common_hypernyms(sy2, simulate_root=True)
                     lcs = lcs_s[0]
                 except:
                     lcs = None
                     print('wordnet error', sy1, sy2)
 
-                path_distance = sy1.shortest_path_distance(lcs)
+                path_distance = sy1.shortest_path_distance(lcs, simulate_root=True)
 
                 if path_distance < min_path_distance:
                     closest_lcs = lcs
