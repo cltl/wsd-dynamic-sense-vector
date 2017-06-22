@@ -62,16 +62,29 @@ def _file_to_sents(filename, word_to_id):
     return sents
 
 class PadFunc(object):
+    
+    dry_run=True
+    
     def __init__(self):
         self.total = 0
         self.pads = 0
     def __call__(self, sents, max_len, pad_id):
-        for s in sents:
-            while len(s) < max_len:
-                s.append(pad_id)
-                self.pads += 1
-        self.total += len(sents)*max_len
-        return np.array(sents)
+        if self.dry_run:
+            arr = np.empty()
+            value_count = sum(1 for s in sents for _ in s)
+            size = len(sents) * max_len
+        else:
+            arr = np.zeros((len(sents), max_len), dtype=np.int32)
+            size = arr.size
+            arr.fill(pad_id)
+            value_count = 0
+            for i, s in enumerate(sents):
+                for j, v in enumerate(s):
+                    arr[i,j] = v
+                    value_count += 1
+        self.pads += (size - value_count) 
+        self.total += size
+        return arr
 
 def pad_batches(sents):
     sys.stderr.write('Dividing and padding...\n')
@@ -104,6 +117,8 @@ def pad_batches(sents):
         sys.stderr.write('Created 1 batch of %d elements.\n' %sizes[0])
     sys.stderr.write('Added %d elements as padding (%.2f%%).\n' 
                      %(pad.pads, pad.pads*100.0/pad.total))
+    sys.stderr.write('Consumed roughly %.2f GiB.\n' 
+                     %(pad.total*4/float(2**30)))
     return batches, dev
 
 if __name__ == '__main__':
@@ -112,16 +127,18 @@ if __name__ == '__main__':
     
     index_path = out_path + '.index.pkl'
     if os.path.exists(index_path):
+        sys.stderr.write('Reading vocabulary from %s... ' %index_path)
         with open(index_path, 'rb') as f: word2id = pickle.load(f)
-        sys.stderr.write('Read vocabulary from %s.\n' %index_path)
+        sys.stderr.write('Done.\n')
     else:
         word2id, words = _build_vocab(inp_path)
         with open(index_path, 'wb') as f: pickle.dump(word2id, f)
 
     sents_path = out_path + '.sents.pkl'
     if os.path.exists(sents_path):
+        sys.stderr.write('Reading sentences from %s... ' %sents_path)
         with open(sents_path, 'rb') as f: sents = pickle.load(f)
-        sys.stderr.write('Read sentences from %s.\n' %sents_path)
+        sys.stderr.write('Done.\n')
     else:
         sents = _file_to_sents(inp_path, word2id)
         with open(sents_path, 'wb') as f: pickle.dump(sents, f)

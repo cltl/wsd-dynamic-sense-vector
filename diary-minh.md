@@ -265,9 +265,43 @@ vocabulary size is smaller).
 Added resampling of training batches so that each token has equal chance to 
 become target and batch order is erased.
 
+## Thu 22 Jun
+
+The batching and padding function runs terribly slow. The last 1m sentences
+took almost 1 hour to complete.
+
+```
+processed 172000000 items, elapsed time: 1037.6 minutes...
+processed 173000000 items, elapsed time: 1079.0 minutes...
+processed 174000000 items, elapsed time: 1119.9 minutes...
+```
+
+Logged in the node and found my script using all RAM, a lot of Swap and only 
+3% CPU. An obvious memory thrashing case. 
+
+```
+%Cpu(s):  0.0 us,  0.1 sy,  0.0 ni, 96.9 id,  2.9 wa,  0.0 hi,  0.0 si,  0.0 st
+KiB Mem : 99.5/65879032 [|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||]
+KiB Swap: 73.3/33554428 [|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||                        ]
+
+  PID USER      PR  NI    VIRT    RES    SHR S  %CPU %MEM     TIME+ COMMAND
+ 4592 minhle    20   0 82.706g 0.057t    824 D   3.3 92.9 208:45.24 python3
+  246 root      20   0       0      0      0 S   0.7  0.0  75:19.89 kswapd0
+  247 root      20   0       0      0      0 S   0.7  0.0   6:33.39 kswapd1
+```
+
+Attempted a dry run and found out that just loaded all sentences into memory
+already cause the memory to overflow to swap. On disk, the pickle file is
+11G. After loading into memory, it becomes 100G. And that was on login node,
+the compute node has even smaller RAM. Probably I need to sort on disk instead
+and convert everything into Numpy arrays as soon as I load it into memory.
+
+
 **References**
 
 Jean, S., Cho, K., Memisevic, R., & Bengio, Y. (2015). On Using Very Large Target Vocabulary for Neural Machine Translation. In Proceedings of the 53rd Annual Meeting of the Association for Computational Linguistics and the 7th International Joint Conference on Natural Language Processing (Volume 1: Long Papers) (pp. 1–10). Beijing, China: Association for Computational Linguistics. Retrieved from http://www.aclweb.org/anthology/P15-1001
+
+TODO: deal with full Gigaword corpus (see note on Thu 22 Jun)
 
 TODO: monitor performance, guide: https://stackoverflow.com/questions/37751739/tensorflow-code-optimization-strategy/37774430#37774430
 
