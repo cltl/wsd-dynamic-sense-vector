@@ -19,6 +19,8 @@ from time import time
 import pickle
 import re
 import numpy as np
+import subprocess
+from tensorflow.contrib.labeled_tensor import batch
 
 batch_size = 128000 # words
 vocab_size = 10**6
@@ -50,17 +52,21 @@ def _build_vocab(filename):
     sys.stderr.write('Building vocabulary... Done.\n')
     return word2id, words
 
-def _file_to_sents(filename, word_to_id):
-    sys.stderr.write('Reading sentences and converting words to indices...\n')
+def sort_sentences(inp_path, out_path):
+    cmd = ('cat %s | python3 scripts/sentlen.py --min 6 --max 100 '
+           '| sort -T output -k1,1g -k2 | uniq > %s'
+           %(inp_path, out_path))
+    sys.stderr.write('%s\n' %cmd)
+    status = subprocess.call(cmd, shell=True)
+    assert status == 0
+
+def lookup_and_iter_sents(filename, word_to_id):
     unkn_id = word2id['<unkn>']
-    sents = []
     with codecs.open(filename, 'r', 'utf-8') as f:
         for line in progress(f):
             words = line.strip().split()
-            sents.append([word_to_id.get(word) or unkn_id for word in words])
-    sys.stderr.write('Reading sentences and converting words to indices... Done.\n')
-    return sents
-
+            yield [word_to_id.get(word) or unkn_id for word in words]
+            
 class PadFunc(object):
     
     dry_run=False
@@ -86,24 +92,26 @@ class PadFunc(object):
         self.total += size
         return arr
 
-def pad_batches(sents):
+def pad_batches(inp_path, word2id):
     sys.stderr.write('Dividing and padding...\n')
     pad = PadFunc()
     pad_id = word2id['<pad>']
-    assert len(sents) > 10000, "This script requires more than 10.000 sentences to run."
-    splitting_point = len(sents) - 10000
-    train, dev = sents[:splitting_point], sents[splitting_point:]
-    train.sort(key=lambda s: len(s))
+    dev = []
+    dev_size = 0
     batches = {}
     last_max_len = 0
     last_batch = []
-    for sents in progress(train):
-        last_max_len = max(last_max_len, len(sents))
-        last_batch.append(sents)
-        if len(last_batch)*last_max_len >= batch_size:
-            batches['batch%d' %len(batches)] = pad(last_batch, last_max_len, pad_id)
-            last_max_len = 0
-            last_batch = []
+    for sent in progress(lookup_and_iter_sents(inp_path, word2id)):
+        if dev_size < batch_size and np.random.rand() < 0.01:
+            dev.append(sent)
+            dev_size += len(sent)
+        else:
+            last_max_len = max(last_max_len, len(sent))
+            last_batch.append(sent)
+            if len(last_batch)*last_max_len >= batch_size:
+                batches['batch%d' %len(batches)] = pad(last_batch, last_max_len, pad_id)
+                last_max_len = 0
+                last_batch = []
     if last_max_len > 0:
         batches['batch%d' %len(batches)] = pad(last_batch, last_max_len, pad_id)
     sys.stderr.write('Dividing and padding... Done.\n')
@@ -134,20 +142,17 @@ if __name__ == '__main__':
         word2id, words = _build_vocab(inp_path)
         with open(index_path, 'wb') as f: pickle.dump(word2id, f)
 
-    sents_path = out_path + '.sents.pkl'
-    if os.path.exists(sents_path):
-        sys.stderr.write('Reading sentences from %s... ' %sents_path)
-        with open(sents_path, 'rb') as f: sents = pickle.load(f)
-        sys.stderr.write('Done.\n')
+    sorted_sents_path = inp_path + '.sorted'
+    if os.path.exists(sorted_sents_path):
+        sys.stderr.write('Sentences are already sorted at %s.\n' %sorted_sents_path)
     else:
-        sents = _file_to_sents(inp_path, word2id)
-        with open(sents_path, 'wb') as f: pickle.dump(sents, f)
+        sort_sentences(inp_path, sorted_sents_path)
     
     train_path = out_path + '.train.npz'
     dev_path = out_path + '.dev.pkl'
     if os.path.exists(train_path):
         sys.stderr.write('Result already exists: %s. Skipped.\n' %train_path)
     else:
-        batches, dev = pad_batches(sents)
+        batches, dev = pad_batches(sorted_sents_path, word2id)
         np.savez(train_path, **batches)
         with open(dev_path, 'wb') as f: pickle.dump(dev, f)

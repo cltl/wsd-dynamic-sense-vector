@@ -9,6 +9,7 @@ python3 -m spacy link en_core_web_md en_default
 pip3 install --user nltk
 printf 'd\nwordnet\nq' | python3 -c 'import nltk; nltk.download()'
 pip3 install --user tensorflow-gpu
+pip3 install --user docopt
 ```
 
 Put a link to your copy of Gigaword 5th edition
