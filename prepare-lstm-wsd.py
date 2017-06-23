@@ -63,14 +63,14 @@ def _file_to_sents(filename, word_to_id):
 
 class PadFunc(object):
     
-    dry_run=True
+    dry_run=False
     
     def __init__(self):
         self.total = 0
         self.pads = 0
     def __call__(self, sents, max_len, pad_id):
         if self.dry_run:
-            arr = np.empty()
+            arr = np.empty(0)
             value_count = sum(1 for s in sents for _ in s)
             size = len(sents) * max_len
         else:

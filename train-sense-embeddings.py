@@ -1,3 +1,7 @@
+'''
+Train sense embeddings from a disambiguated corpus using Word2vec.
+'''
+
 import gensim
 import sys
 import logging 
