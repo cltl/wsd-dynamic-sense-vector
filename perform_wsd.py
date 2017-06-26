@@ -87,6 +87,9 @@ def score_synsets(target_embedding, candidate_synsets, sense_embeddings):
     highest_conf = 0.0
 
     for candidate in candidate_synsets:
+        if candidate not in sense_embeddings:
+            continue 
+
         cand_embedding = sense_embeddings[candidate]
         sim = 1 - spatial.distance.cosine(cand_embedding, target_embedding)
 
@@ -100,7 +103,8 @@ def score_synsets(target_embedding, candidate_synsets, sense_embeddings):
         highest_synset = highest_synsets[0]
     elif len(highest_synsets) == 2:
         highest_synset = highest_synsets[0]
-
+    else:
+        highest_synset = None
     return highest_synset
 
 
@@ -115,6 +119,9 @@ wsd_df['lstm_acc'] = [None for _ in range(len(wsd_df))]
 # load sense embeddings
 with open(args.sense_embeddings_path, 'rb') as infile:
     sense_embeddings = pickle.load(infile)
+
+# num correct
+num_correct = 0
 
 vocab = np.load(args.vocab_path)
 with tf.Session() as sess:  # your session object
@@ -144,6 +151,11 @@ with tf.Session() as sess:  # your session object
         # score it
         lstm_acc = chosen_synset in row['wn30_engs']
         wsd_df.set_value(row_index, col='lstm_acc', value=lstm_acc)
+        
+        if lstm_acc:
+            num_correct += 1
+
+print(num_correct)
 
 # save it
 wsd_df.to_pickle(args.output_path)
