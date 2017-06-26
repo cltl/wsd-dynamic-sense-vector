@@ -114,7 +114,7 @@ def load_instance_id2offset(mapping_path, sensekey2offset, debug=False):
 # experiment settings
 wn_version = '30'
 corpora_to_include = ['semcor',
-                      # 'mun'
+                      'mun'
                       ]  # semcor | mun
 
 accepted_pos = {'NOUN'}
