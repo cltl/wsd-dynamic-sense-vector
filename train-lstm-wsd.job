@@ -11,8 +11,9 @@ module load cuDNN
 echo -n 'Started: ' && date
 
 python3 -u prepare-lstm-wsd.py output/gigaword.txt output/gigaword-lstm-wsd && \
-        python3 -u train-lstm-wsd.py --data_path output/gigaword-lstm-wsd \
-                                     --save_path output/lstm-wsd
+        python3 -u train-lstm-wsd.py --model large \
+                --data_path output/gigaword-lstm-wsd \
+                --save_path output/lstm-wsd
 
 echo -n 'Finished: ' && date
     

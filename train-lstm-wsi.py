@@ -14,7 +14,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.python.client import timeline
 import sys
-from model import WSDModelTrain, WSDModelEvaluate
+from model import WSIModelTrain
 
 flags = tf.flags
 logging = tf.logging
@@ -121,9 +121,9 @@ def main(_):
         initializer = tf.random_uniform_initializer(-config.init_scale,
                                                     config.init_scale)
     with tf.variable_scope("Model", reuse=None, initializer=initializer):
-        m_train = WSDModelTrain(config, data_type())
-    with tf.variable_scope("Model", reuse=True, initializer=initializer):
-        m_evaluate = WSDModelEvaluate(config, data_type())
+        m_train = WSIModelTrain(config, data_type())
+#     with tf.variable_scope("Model", reuse=True, initializer=initializer):
+#         m_evaluate = WSDModelEvaluate(config, data_type())
     m_train.print_device_placement()
     with tf.Session() as session:
         saver = tf.train.Saver()
@@ -138,14 +138,14 @@ def main(_):
             print("Epoch: %d" % (i + 1))
             train_cost = 0
             train_cost = m_train.train_epoch(session, train_batches, verbose=True)
-            dev_cost, hit_at_100 = m_evaluate.measure_dev_cost(session, dev_data, dev_lens, target_id)
+#             dev_cost, hit_at_100 = m_evaluate.measure_dev_cost(session, dev_data, dev_lens, target_id)
             print("Epoch: %d finished, elapsed time: %.1f minutes" % 
                   (i + 1, (time.time()-start_time)/60))
             print("\tTrain cost: %.3f" %train_cost)
-            print("\tDev cost: %.3f, hit@100: %.1f%%" %(dev_cost, hit_at_100))
-            if best_cost is None or dev_cost < best_cost:
-                best_cost = dev_cost
-                print("\tSaved best model to %s" %saver.save(session, FLAGS.save_path))
+#             print("\tDev cost: %.3f, hit@100: %.1f%%" %(dev_cost, hit_at_100))
+#             if best_cost is None or dev_cost < best_cost:
+#                 best_cost = dev_cost
+#                 print("\tSaved best model to %s" %saver.save(session, FLAGS.save_path))
     if FLAGS.trace_timeline:
         tl = timeline.Timeline(m_train.run_metadata.step_stats)
         ctf = tl.generate_chrome_trace_format()

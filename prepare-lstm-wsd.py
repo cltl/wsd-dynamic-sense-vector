@@ -114,6 +114,8 @@ def pad_batches(inp_path, word2id):
                 last_batch = []
     if last_max_len > 0:
         batches['batch%d' %len(batches)] = pad(last_batch, last_max_len, pad_id)
+    dev_lens = np.array([len(s) for s in dev], dtype=np.int32)
+    dev_padded = PadFunc()(dev, max(dev_lens), pad_id)
     sys.stderr.write('Dividing and padding... Done.\n')
     sizes = np.array([b.size for b in batches.values()])
     if len(batches) >= 2:
@@ -127,7 +129,7 @@ def pad_batches(inp_path, word2id):
                      %(pad.pads, pad.pads*100.0/pad.total))
     sys.stderr.write('Consumed roughly %.2f GiB.\n' 
                      %(pad.total*4/float(2**30)))
-    return batches, dev
+    return batches, dev_padded, dev_lens
 
 if __name__ == '__main__':
     inp_path, out_path = sys.argv[1:]
@@ -144,15 +146,15 @@ if __name__ == '__main__':
 
     sorted_sents_path = inp_path + '.sorted'
     if os.path.exists(sorted_sents_path):
-        sys.stderr.write('Sentences are already sorted at %s.\n' %sorted_sents_path)
+        sys.stderr.write('Sentences are already sorted at %s\n' %sorted_sents_path)
     else:
         sort_sentences(inp_path, sorted_sents_path)
     
     train_path = out_path + '.train.npz'
-    dev_path = out_path + '.dev.pkl'
+    dev_path = out_path + '.dev.npz'
     if os.path.exists(train_path):
         sys.stderr.write('Result already exists: %s. Skipped.\n' %train_path)
     else:
-        batches, dev = pad_batches(sorted_sents_path, word2id)
+        batches, dev_data, dev_lens = pad_batches(sorted_sents_path, word2id)
         np.savez(train_path, **batches)
-        with open(dev_path, 'wb') as f: pickle.dump(dev, f)
+        np.savez(dev_path, data=dev_data, lens=dev_lens)

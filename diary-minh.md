@@ -296,19 +296,49 @@ already cause the memory to overflow to swap. On disk, the pickle file is
 the compute node has even smaller RAM. Probably I need to sort on disk instead
 and convert everything into Numpy arrays as soon as I load it into memory.
 
-
 **References**
 
 Jean, S., Cho, K., Memisevic, R., & Bengio, Y. (2015). On Using Very Large Target Vocabulary for Neural Machine Translation. In Proceedings of the 53rd Annual Meeting of the Association for Computational Linguistics and the 7th International Joint Conference on Natural Language Processing (Volume 1: Long Papers) (pp. 1–10). Beijing, China: Association for Computational Linguistics. Retrieved from http://www.aclweb.org/anthology/P15-1001
 
-TODO: deal with full Gigaword corpus (see note on Thu 22 Jun)
+## Sat 24 Jun
+
+The script finished. It's surprisingly quick.
+
+```
+[minhle@fs0 wsd-with-marten]$ wc -l output/gigaword.txt
+175771829 output/gigaword.txt
+[minhle@fs0 wsd-with-marten]$ wc -l output/gigaword.txt.sorted
+122811493 output/gigaword.txt.sorted
+
+[minhle@fs0 wsd-with-marten]$ grep "Train co" slurm-1489807.out
+Epoch: 1 -> Train cost: 7.144, elapsed time: 35.4 minutes
+Epoch: 2 -> Train cost: 6.848, elapsed time: 70.9 minutes
+Epoch: 3 -> Train cost: 6.323, elapsed time: 106.3 minutes
+Epoch: 4 -> Train cost: 5.966, elapsed time: 141.8 minutes
+Epoch: 5 -> Train cost: 5.740, elapsed time: 177.3 minutes
+Epoch: 6 -> Train cost: 5.629, elapsed time: 212.7 minutes
+Epoch: 7 -> Train cost: 5.549, elapsed time: 248.2 minutes
+Epoch: 8 -> Train cost: 5.481, elapsed time: 283.7 minutes
+Epoch: 9 -> Train cost: 5.455, elapsed time: 319.2 minutes
+Epoch: 10 -> Train cost: 5.395, elapsed time: 354.6 minutes
+```
+
+## Mon 26 Jun
+
+[Met Piek](https://docs.google.com/document/d/1yBZDocxE1TVDmC4AGlV-kjmMNho2WzOzNo8EKcgfMg4/edit)
+
+## Tue 27 Jun
+
+Monitor dev cost and use it as a stopping criteria.
+
+Report timeline following [this guide](https://stackoverflow.com/questions/34293714/can-i-measure-the-execution-time-of-individual-operations-with-tensorflow/37774470#37774470).
+Look like the program spends most of its time on GPU indeed. I don't know
+if I can make it any better.
+
+Started a new experiment with big corpus, big model (more embedding dims, more
+hidden nodes).
+
+TODO: try different values of parallel_iterations in tf.nn.dynamic_rnn
 
 TODO: monitor performance, guide: https://stackoverflow.com/questions/37751739/tensorflow-code-optimization-strategy/37774430#37774430
-
-TODO: print dev cost, use it to stop??? or maybe just run as long as you can afford
-
-TODO: reduce output vocabulary size for faster softmax?
-
-TODO: sampling one column from each batch --> words in larger batch has smaller
-chance to be trained. How can I compensate for this? 
 
