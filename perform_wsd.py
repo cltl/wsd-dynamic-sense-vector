@@ -71,7 +71,7 @@ def extract_sentence_wsd_competition(row):
     return target_index, sentence_tokens, lemma, pos
 
 
-def score_synsets(target_embedding, candidate_synsets, sense_embeddings):
+def score_synsets(target_embedding, candidate_synsets, sense_embeddings, instance_id):
     """
     perform wsd
 
@@ -88,6 +88,7 @@ def score_synsets(target_embedding, candidate_synsets, sense_embeddings):
 
     for candidate in candidate_synsets:
         if candidate not in sense_embeddings:
+            print('%s: candidate %s missing in sense embeddings' % (instance_id, candidate))
             continue 
 
         cand_embedding = sense_embeddings[candidate]
@@ -101,10 +102,12 @@ def score_synsets(target_embedding, candidate_synsets, sense_embeddings):
 
     if len(highest_synsets) == 1:
         highest_synset = highest_synsets[0]
-    elif len(highest_synsets) == 2:
+    elif len(highest_synsets) >= 2:
         highest_synset = highest_synsets[0]
+        print('%s: 2> synsets with same conf %s: %s' % (instance_id, highest_conf, highest_synsets))
     else:
         highest_synset = None
+        print('%s: no highest synset' % instance_id)
     return highest_synset
 
 
@@ -132,6 +135,7 @@ with tf.Session() as sess:  # your session object
 
     for row_index, row in wsd_df.iterrows():
         target_index, sentence_tokens, lemma, pos =  extract_sentence_wsd_competition(row)
+        instance_id = row['token_ids'][0]
         target_id = vocab['<target>']
         sentence_as_ids = [vocab.get(w) or vocab['<unkn>'] for w in sentence_tokens]
         sentence_as_ids[target_index] = target_id
@@ -143,7 +147,7 @@ with tf.Session() as sess:  # your session object
                              for synset in synsets}
 
         # perform wsd
-        chosen_synset = score_synsets(target_embedding, candidate_synsets, sense_embeddings)
+        chosen_synset = score_synsets(target_embedding, candidate_synsets, sense_embeddings, instance_id)
 
         # add to dataframe
         wsd_df.set_value(row_index, col='lstm_output', value=chosen_synset)
