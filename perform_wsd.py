@@ -71,7 +71,7 @@ def extract_sentence_wsd_competition(row):
     return target_index, sentence_tokens, lemma, pos
 
 
-def score_synsets(target_embedding, candidate_synsets, sense_embeddings, instance_id):
+def score_synsets(target_embedding, candidate_synsets, sense_embeddings, instance_id, lemma, pos):
     """
     perform wsd
 
@@ -88,7 +88,7 @@ def score_synsets(target_embedding, candidate_synsets, sense_embeddings, instanc
 
     for candidate in candidate_synsets:
         if candidate not in sense_embeddings:
-            print('%s: candidate %s missing in sense embeddings' % (instance_id, candidate))
+            print('%s %s %s: candidate %s missing in sense embeddings' % (instance_id, lemma, pos, candidate))
             continue 
 
         cand_embedding = sense_embeddings[candidate]
@@ -104,7 +104,7 @@ def score_synsets(target_embedding, candidate_synsets, sense_embeddings, instanc
         highest_synset = highest_synsets[0]
     elif len(highest_synsets) >= 2:
         highest_synset = highest_synsets[0]
-        print('%s: 2> synsets with same conf %s: %s' % (instance_id, highest_conf, highest_synsets))
+        print('%s %s %s: 2> synsets with same conf %s: %s' % (instance_id, lemma, pos, highest_conf, highest_synsets))
     else:
         highest_synset = None
         print('%s: no highest synset' % instance_id)
@@ -147,7 +147,10 @@ with tf.Session() as sess:  # your session object
                              for synset in synsets}
 
         # perform wsd
-        chosen_synset = score_synsets(target_embedding, candidate_synsets, sense_embeddings, instance_id)
+        if len(candidate_synsets) >= 2:
+            chosen_synset = score_synsets(target_embedding, candidate_synsets, sense_embeddings, instance_id, lemma, pos)
+        else:
+            chosen_synset = candidate_synsets.pop()
 
         # add to dataframe
         wsd_df.set_value(row_index, col='lstm_output', value=chosen_synset)
