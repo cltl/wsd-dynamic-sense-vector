@@ -1,6 +1,3 @@
-
-# TODO log some extra information
-
 import os
 from nltk.corpus import WordNetCorpusReader
 from nltk.corpus import wordnet as wn
@@ -97,16 +94,15 @@ def load_instance_id2offset(mapping_path, sensekey2offset, debug=False):
 
             elif len(offsets) >= 2:
                 more_than_one_offset += 1
+                print('2> offsets available for %s: %s' % (instance_id, offsets))
 
                 # we just take one of the n possible offsets
                 instance_id2offset[instance_id] = offsets.pop()
 
             elif len(offsets) == 0:
+                print('no offsets available for %s' % instance_id)
                 no_offsets += 1
 
-    if debug:
-        print('more than one offset', more_than_one_offset)
-        print('no offset', no_offsets)
 
     return instance_id2offset
 
@@ -114,7 +110,7 @@ def load_instance_id2offset(mapping_path, sensekey2offset, debug=False):
 # experiment settings
 wn_version = '30'
 corpora_to_include = ['semcor',
-                      'mun'
+                         #'mun'
                       ]  # semcor | mun
 
 accepted_pos = {'NOUN'}
