@@ -98,7 +98,7 @@ def pad_batches(inp_path, word2id):
     pad_id = word2id['<pad>']
     dev = []
     dev_size = 0
-    batches = {}
+    batches = []
     last_max_len = 0
     last_batch = []
     for sent in progress(lookup_and_iter_sents(inp_path, word2id)):
@@ -109,15 +109,15 @@ def pad_batches(inp_path, word2id):
             last_max_len = max(last_max_len, len(sent))
             last_batch.append(sent)
             if len(last_batch)*last_max_len >= batch_size:
-                batches['batch%d' %len(batches)] = pad(last_batch, last_max_len, pad_id)
+                batches.append(pad(last_batch, last_max_len, pad_id))
                 last_max_len = 0
                 last_batch = []
     if last_max_len > 0:
-        batches['batch%d' %len(batches)] = pad(last_batch, last_max_len, pad_id)
+        batches.append(pad(last_batch, last_max_len, pad_id))
     dev_lens = np.array([len(s) for s in dev], dtype=np.int32)
     dev_padded = PadFunc()(dev, max(dev_lens), pad_id)
     sys.stderr.write('Dividing and padding... Done.\n')
-    sizes = np.array([b.size for b in batches.values()])
+    sizes = np.array([b.size for b in batches])
     if len(batches) >= 2:
         sys.stderr.write('Divided into %d batches (%d elements each, std=%d, '
                          'except last batch of %d).\n'
@@ -127,9 +127,45 @@ def pad_batches(inp_path, word2id):
         sys.stderr.write('Created 1 batch of %d elements.\n' %sizes[0])
     sys.stderr.write('Added %d elements as padding (%.2f%%).\n' 
                      %(pad.pads, pad.pads*100.0/pad.total))
-    sys.stderr.write('Consumed roughly %.2f GiB.\n' 
-                     %(pad.total*4/float(2**30)))
     return batches, dev_padded, dev_lens
+
+def reduce_vocab(batches, target_id, full_vocab_size):
+    train_sents = []
+    train_vocabs = []
+    train_targets = []
+    for i, sentences in enumerate(batches):
+        batch_vocab, inverse = np.unique(sentences, return_inverse=True)
+        sentences = inverse.reshape(sentences.shape)
+        batch_vocab = np.append(batch_vocab, target_id)
+        local_target_id = batch_vocab.size-1
+        sys.stderr.write('Batch #%d vocab: %d (%.2f%%)\n'
+                         %(i, batch_vocab.size, batch_vocab.size*100.0/full_vocab_size))
+        train_sents.append(sentences)
+        train_vocabs.append(batch_vocab)
+        train_targets.append(local_target_id)
+    return train_sents, train_vocabs, train_targets
+
+def linearize(train_sents, train_vocabs, train_targets):
+    assert len(train_sents) == len(train_vocabs) == len(train_targets)
+    sys.stderr.write('Flattening... ')
+    flat_sents = np.concatenate([s.ravel() for s in train_sents]).astype(np.int32)
+    flat_vocabs = np.concatenate([v for v in train_vocabs]).astype(np.int32)
+    sent_start = 0
+    vocab_start = 0
+    indices = np.zeros((len(train_sents), 6), dtype=np.int32)
+    for i in range(len(train_sents)):
+        indices[i,0] = sent_start
+        indices[i,1], indices[i,2] = train_sents[i].shape
+        sent_start += train_sents[i].size
+        indices[i,3] = vocab_start
+        indices[i,4], = train_vocabs[i].shape
+        vocab_start += train_vocabs[i].size
+        indices[5] = train_targets[i]
+    total_size = flat_sents.size+flat_vocabs.size+indices.size
+    sys.stderr.write('Done.\n')
+    sys.stderr.write('Training data consumes roughly %.2f GiB.\n' 
+                     %(total_size*4/float(2**30)))
+    return flat_sents, flat_vocabs, indices
 
 if __name__ == '__main__':
     inp_path, out_path = sys.argv[1:]
@@ -156,5 +192,7 @@ if __name__ == '__main__':
         sys.stderr.write('Result already exists: %s. Skipped.\n' %train_path)
     else:
         batches, dev_data, dev_lens = pad_batches(sorted_sents_path, word2id)
-        np.savez(train_path, **batches)
+        sents, vocabs, indices = linearize(
+                *reduce_vocab(batches, word2id['<target>'], len(word2id)))
+        np.savez(train_path, sents=sents, vocabs=vocabs, indices=indices)
         np.savez(dev_path, data=dev_data, lens=dev_lens)
