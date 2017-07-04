@@ -338,6 +338,10 @@ if I can make it any better.
 Started a new experiment with big corpus, big model (more embedding dims, more
 hidden nodes).
 
+## Wed 28 Jun
+
+[Met Jacopo](https://docs.google.com/document/d/1bvERpN0ayxY972qYitBDyAc42w9z7IxcHSaOJ0H4J84/edit)
+
 ## Tue 4 Jul
 
 Does it use GPU? I measured it and it did. Perhaps when Jacopo ran `nvidia-smi`,
@@ -363,7 +367,109 @@ it showed only *his* usage.
 +-----------------------------------------------------------------------------+
 ```
 
-Testing trivial model 
+Testing trivial model (#ce39e02a5d34705a069915e29d51ebd7888ea649). It runs 
+much faster indeed.
+
+```
+Epoch: 10 finished, elapsed time: 0.3 minutes
+    Train cost: 0.123
+    Dev cost: 11.142, hit@100: 0.0%
+```
+
+Compared to the normal model below, the trivial model is 8.67 times faster, i.e.
+CPU operations take roughly 11% running time. This can be improved of course.
+
+```
+Epoch: 10 finished, elapsed time: 2.6 minutes
+    Train cost: 7.148
+    Dev cost: 7.906, hit@100: 0.5%
+```
+
+How to load batches of different shapes into memory and use them in the same
+variable? I tested `tf.assign()` to see if it copies memory around and 
+apparently it does.
+
+```
+import tensorflow as tf
+var = tf.Variable(0.9)
+var2 = tf.Variable(0.0)
+copy_first_variable = var2.assign(var)
+init = tf.initialize_all_variables()
+sess = tf.Session()
+sess.run(init)
+print('Initial value: %f' %sess.run(var2))
+sess.run(copy_first_variable)
+print('After assigning: %f' %sess.run(var2))
+add1 = var2.assign_add(1)
+sess.run(var2)
+print('After adding: %f' %sess.run(add1))
+print('Value of the source: %f' %sess.run(var))
+```
+
+Output:
+
+```
+Initial value: 0.000000
+After assigning: 0.900000
+After adding: 1.900000
+Value of the source: 0.900000
+```
+
+An alternative approach is to store everything in a flattened array + batch
+indices + batch sizes. We can sample the batch info and use it to locate the data.
+
+```
+import tensorflow as tf
+import numpy as np
+data = tf.Variable(np.random.rand(10000))
+batch_info = tf.Variable(np.array([[0, 100, 20], [2000, 30, 30], [2900, 50, 100], [7900, 30, 70]]), dtype=tf.int32)
+i, = tf.train.slice_input_producer([batch_info])
+batch = tf.reshape(data[i[0]:i[0]+i[1]*i[2]], (i[1], i[2]))
+col = tf.random_uniform((1,), maxval=tf.shape(batch)[1], dtype=tf.int32)
+y = batch[:,col[0]]
+sess = tf.Session()
+init = tf.initialize_all_variables()
+sess = tf.Session()
+sess.run(init)
+coord = tf.train.Coordinator()
+threads = tf.train.start_queue_runners(sess=sess, coord=coord)
+for i in range(100):
+    batch_val, y = sess.run([batch, y])
+    print('%s\t%s' %(batch_val.shape, y.shape))
+coord.request_stop()
+coord.join(threads)
+sess.close()
+```
+
+Output:
+
+```
+(30, 30)
+(30, 70)
+(100, 20)
+(50, 100)
+(50, 100)
+...
+```
+
+A problem with this approach is I can't sample batches according to length 
+anymore so the loss will be distorted (shorter sentences are over-represented).
+Let's see how it goes...
+
+Hit a wall: https://github.com/tensorflow/tensorflow/issues/9506
+
+I tested different solution but int32 isn't allowed into GPU and float32
+doesn't work with `tf.nn.embedding_lookup`. 
+
+```
+with tf.device("/gpu:0"):
+    a = tf.Variable([0,1,2], dtype=tf.float32)
+    E = tf.Variable(np.random.rand(1000, 50))
+    embs = tf.nn.embedding_lookup(E, a, validate_indices=False)
+with tf.Session(config=tf.ConfigProto(log_device_placement=True)) as sess:
+    sess.run(tf.global_variables_initializer())
+    sess.run(a)
+```
 
 TODO: try different values of parallel_iterations in tf.nn.dynamic_rnn
 
