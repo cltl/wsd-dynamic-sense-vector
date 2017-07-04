@@ -338,6 +338,33 @@ if I can make it any better.
 Started a new experiment with big corpus, big model (more embedding dims, more
 hidden nodes).
 
+## Tue 4 Jul
+
+Does it use GPU? I measured it and it did. Perhaps when Jacopo ran `nvidia-smi`,
+it showed only *his* usage. 
+
+```
+[minhle@node001 ~]$ nvidia-smi
++-----------------------------------------------------------------------------+
+| NVIDIA-SMI 370.28                 Driver Version: 370.28                    |
+|-------------------------------+----------------------+----------------------+
+| GPU  Name        Persistence-M| Bus-Id        Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp  Perf  Pwr:Usage/Cap|         Memory-Usage | GPU-Util  Compute M. |
+|===============================+======================+======================|
+|   0  GeForce GTX TIT...  On   | 0000:03:00.0     Off |                  N/A |
+| 22%   41C    P2   162W / 250W |  11663MiB / 12206MiB |     66%      Default |
++-------------------------------+----------------------+----------------------+
+
++-----------------------------------------------------------------------------+
+| Processes:                                                       GPU Memory |
+|  GPU       PID  Type  Process name                               Usage      |
+|=============================================================================|
+|    0     19977    C   python3                                      11661MiB |
++-----------------------------------------------------------------------------+
+```
+
+Testing trivial model 
+
 TODO: try different values of parallel_iterations in tf.nn.dynamic_rnn
 
 TODO: monitor performance, guide: https://stackoverflow.com/questions/37751739/tensorflow-code-optimization-strategy/37774430#37774430

@@ -1,6 +1,45 @@
 import numpy as np
 import tensorflow as tf
 
+class DummyModelTrain(object):
+    '''
+    This is for testing GPU usage only. This model runs very trivial operations
+    on GPU therefore its running time is mostly on CPU. Compared to WSDModelTrain,
+    this model should run much faster, otherwise you're spending too much time
+    on CPU.
+    '''
+
+    def __init__(self, config, float_dtype):
+        self._x = tf.placeholder(tf.int32, shape=[None, None], name='x')
+        self._y = tf.placeholder(tf.int32, shape=[None], name='y')
+        self._subvocab = tf.placeholder(tf.int32, shape=[None], name='subvocab')
+        
+        self._cost = tf.reduce_mean(tf.reduce_sum(self._x, axis=1) - self._y) + tf.reduce_mean(self._subvocab)
+        self._train_op = tf.reduce_mean(tf.reduce_sum(self._x, axis=1) - self._y) + tf.reduce_mean(self._subvocab)
+        self._initial_state = tf.reduce_mean(self._x)
+        
+    def trace_timeline(self):
+        pass
+
+    def train_epoch(self, session, data, verbose=False):
+        sentence_lens = np.array([x.shape[1] for x, _, _ in data])
+        samples = np.random.choice(len(data), size=len(data), 
+                                   p=sentence_lens/sentence_lens.sum())
+        for batch_id in samples:
+            x, subvocab, target_id = data[batch_id]
+            i =  np.random.randint(x.shape[1])
+            y = x[:,i].copy() # copy content
+            x[:,i] = target_id
+    
+            feed_dict = {self._x: x, self._y: y, self._subvocab: subvocab}
+            session.run(self._initial_state, feed_dict)
+            session.run([self._cost, self._train_op], feed_dict)
+            x[:,i] = y # restore the data
+        return 0.1234
+    
+    def print_device_placement(self):
+        pass
+
 class WSDModelTrain(object):
     """A LSTM WSD model designed for fast training."""
 
