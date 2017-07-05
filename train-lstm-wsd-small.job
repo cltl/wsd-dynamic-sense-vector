@@ -15,7 +15,7 @@ head -n 1000000 output/gigaword.txt > output/gigaword.1m-sents.txt && \
                                        output/gigaword.1m-sents-lstm-wsd && \
         python3 -u train-lstm-wsd.py --model google \
                                      --data_path output/gigaword.1m-sents-lstm-wsd \
-                                     --save_path output/lstm-wsd-small
+                                     --save_path output/lstm-wsd-gigaword-1m-sents-small
 
 echo -n 'Finished: ' && date
     

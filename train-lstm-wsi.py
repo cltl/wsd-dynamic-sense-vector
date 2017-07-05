@@ -104,8 +104,8 @@ def load_data():
         local_target_id = batch_vocab.size-1
         sys.stderr.write('Batch #%d vocab: %d (%.2f%%)\n'
                          %(i, batch_vocab.size, batch_vocab.size*100.0/len(vocab)))
-        train_batches.append((sentences.astype(np.int32), 
-                              batch_vocab.astype(np.int32),
+        train_batches.append((sentences.astype(np.int64), 
+                              batch_vocab.astype(np.int64),
                               local_target_id))
     dev = np.load(FLAGS.data_path + '.dev.npz')
     return vocab, train_batches, dev['data'], dev['lens'], target_id

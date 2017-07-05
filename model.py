@@ -12,9 +12,9 @@ class DummyModelTrain(object):
     '''
 
     def __init__(self, config, float_dtype):
-        self._x = tf.placeholder(tf.int32, shape=[None, None], name='x')
-        self._y = tf.placeholder(tf.int32, shape=[None], name='y')
-        self._subvocab = tf.placeholder(tf.int32, shape=[None], name='subvocab')
+        self._x = tf.placeholder(tf.int64, shape=[None, None], name='x')
+        self._y = tf.placeholder(tf.int64, shape=[None], name='y')
+        self._subvocab = tf.placeholder(tf.int64, shape=[None], name='subvocab')
         
         self._cost = tf.reduce_mean(tf.reduce_sum(self._x, axis=1) - self._y) + tf.reduce_mean(self._subvocab)
         self._train_op = tf.reduce_mean(tf.reduce_sum(self._x, axis=1) - self._y) + tf.reduce_mean(self._subvocab)
@@ -45,9 +45,9 @@ class WSDModelTrain(object):
     """A LSTM WSD model designed for fast training."""
 
     def __init__(self, config, float_dtype):
-        self._sents_val = tf.placeholder(tf.int32, shape=[None])
-        self._subvocabs_val = tf.placeholder(tf.int32, shape=[None])
-        self._indices_val = tf.placeholder(tf.int32, shape=[None, 6])
+        self._sents_val = tf.placeholder(tf.int64, shape=[None])
+        self._subvocabs_val = tf.placeholder(tf.int64, shape=[None])
+        self._indices_val = tf.placeholder(tf.int64, shape=[None, 6])
 
         self._sents = tf.Variable(self._sents_val, name='data_sents', 
                                   trainable=False, collections=[], validate_shape=False)
@@ -60,9 +60,9 @@ class WSDModelTrain(object):
         data = tf.reshape(self._sents[i[0]:i[0]+i[1]*i[2]], (i[1], i[2]))
         self._subvocab = self._subvocabs[i[3]:i[3]+i[4]]
         target_id = i[5]
-        col = tf.random_uniform((1,), maxval=tf.shape(data)[1], dtype=tf.int32)
+        col = tf.random_uniform((1,), maxval=tf.shape(data)[1], dtype=tf.int64)
         self._y = data[:, col[0]]
-        data_tmp = tf.Variable(0, dtype=tf.int32)
+        data_tmp = tf.Variable(0, dtype=tf.int64)
         data_tmp = tf.assign(data_tmp, tf.transpose(data), validate_shape=False)
         col_of_target_ids = tf.fill((tf.shape(data)[0],), target_id)
         self._x = tf.transpose(tf.scatter_nd_update(data_tmp, [col], [col_of_target_ids]))
@@ -146,9 +146,9 @@ class WSDModelEvaluate(object):
     with @WSDModelTrain."""
 
     def __init__(self, config, float_dtype):
-        self._x = tf.placeholder(tf.int32, shape=[None, None], name='x')
-        self._lens = tf.placeholder(tf.int32, shape=[None], name='lens')
-        self._y = tf.placeholder(tf.int32, shape=[None], name='y')
+        self._x = tf.placeholder(tf.int64, shape=[None, None], name='x')
+        self._lens = tf.placeholder(tf.int64, shape=[None], name='lens')
+        self._y = tf.placeholder(tf.int64, shape=[None], name='y')
         
         E_words = tf.get_variable("word_embedding", 
                 [config.vocab_size, config.emb_dims], dtype=float_dtype)
@@ -200,9 +200,9 @@ class WSIModelTrain(WSDModelTrain):
     """A LSTM word sense induction (WSI) model designed for fast training."""
 
     def __init__(self, config, float_dtype, sense_num=4):
-        self._x = tf.placeholder(tf.int32, shape=[None, None], name='x')
-        self._y = tf.placeholder(tf.int32, shape=[None], name='y')
-        self._subvocab = tf.placeholder(tf.int32, shape=[None], name='subvocab')
+        self._x = tf.placeholder(tf.int64, shape=[None, None], name='x')
+        self._y = tf.placeholder(tf.int64, shape=[None], name='y')
+        self._subvocab = tf.placeholder(tf.int64, shape=[None], name='subvocab')
         
         E_words = tf.get_variable("word_embedding", 
                 [config.vocab_size, config.emb_dims], dtype=float_dtype)

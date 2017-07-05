@@ -80,7 +80,7 @@ class PadFunc(object):
             value_count = sum(1 for s in sents for _ in s)
             size = len(sents) * max_len
         else:
-            arr = np.zeros((len(sents), max_len), dtype=np.int32)
+            arr = np.zeros((len(sents), max_len), dtype=np.int64)
             size = arr.size
             arr.fill(pad_id)
             value_count = 0
@@ -114,7 +114,7 @@ def pad_batches(inp_path, word2id):
                 last_batch = []
     if last_max_len > 0:
         batches.append(pad(last_batch, last_max_len, pad_id))
-    dev_lens = np.array([len(s) for s in dev], dtype=np.int32)
+    dev_lens = np.array([len(s) for s in dev], dtype=np.int64)
     dev_padded = PadFunc()(dev, max(dev_lens), pad_id)
     sys.stderr.write('Dividing and padding... Done.\n')
     sizes = np.array([b.size for b in batches])
@@ -148,11 +148,11 @@ def reduce_vocab(batches, target_id, full_vocab_size):
 def linearize(train_sents, train_vocabs, train_targets):
     assert len(train_sents) == len(train_vocabs) == len(train_targets)
     sys.stderr.write('Flattening... ')
-    flat_sents = np.concatenate([s.ravel() for s in train_sents]).astype(np.int32)
-    flat_vocabs = np.concatenate([v for v in train_vocabs]).astype(np.int32)
+    flat_sents = np.concatenate([s.ravel() for s in train_sents])
+    flat_vocabs = np.concatenate([v for v in train_vocabs])
     sent_start = 0
     vocab_start = 0
-    indices = np.zeros((len(train_sents), 6), dtype=np.int32)
+    indices = np.zeros((len(train_sents), 6), dtype=np.int64)
     for i in range(len(train_sents)):
         indices[i,0] = sent_start
         indices[i,1], indices[i,2] = train_sents[i].shape
@@ -161,10 +161,11 @@ def linearize(train_sents, train_vocabs, train_targets):
         indices[i,4], = train_vocabs[i].shape
         vocab_start += train_vocabs[i].size
         indices[i,5] = train_targets[i]
-    total_size = flat_sents.size+flat_vocabs.size+indices.size
+    assert np.all(indices >= 0) # check for integer overflow
+    total_size = flat_sents.size*4 + flat_vocabs.size*4 + indices.size*8
     sys.stderr.write('Done.\n')
     sys.stderr.write('Training data consumes roughly %.2f GiB.\n' 
-                     %(total_size*4/float(2**30)))
+                     %(total_size/float(2**30)))
     return flat_sents, flat_vocabs, indices
 
 if __name__ == '__main__':

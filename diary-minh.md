@@ -473,7 +473,23 @@ with tf.Session(config=tf.ConfigProto(log_device_placement=True)) as sess:
 
 ## Wed 5 Jun
 
-Meeting with Jacopo
+Met with Jacopo. Looks like computer science department can't solve our issue.
+One solution is to write a short paper (or technical report) on reproducing
+the Google paper. But first Jacopo would like to give it a shot.
+
+Ran things on full data and the program start chunking out NaN. Turns out that
+int32 is not big enough so I get negative indices.
+
+```
+>>> import numpy as np
+>>> train=np.load('output/gigaword-lstm-wsd.train.npz')
+>>> idx = train['indices']
+>>> idx[-1]
+array([-1123920531,         117,         101,   377887591,        3973, 3972], dtype=int32)
+```
+
+I converted everything into int64 and now the preparation script throws 
+MemoryError :-( Now I need to take care of memory usage again.
 
 TODO: prepare a giant zip file, send to Jacopo to run on big GPU
 TODO: run the preloading code anyway
