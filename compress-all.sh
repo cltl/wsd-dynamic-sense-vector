@@ -1,0 +1,1 @@
+tar --exclude *gigaword.txt* --exclude *Worker*.txt.gz -zcvf ../lstm-wsd.zip . | tee ../lstm-wsd.log

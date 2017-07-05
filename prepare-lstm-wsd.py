@@ -3,10 +3,10 @@ Created on 13 Jun 2017
 
 Read a simple text file (one sentence per line) and produce these files:
 
-- <fname>.idx: vocabulary as a dictionary(word -> index)
+- <fname>.index.pkl: vocabulary as a dictionary (word -> index)
 - <fname>.train.npz: training batches (each batch contains roughly the same
 number of tokens but differing number of sentences depends on sentence length)
-- <fname>.dev.pkl: development dataset (10000 sentences)
+- <fname>.dev.npz: development dataset (as big as one epoch)
 
 @author: Minh Le
 '''

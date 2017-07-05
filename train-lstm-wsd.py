@@ -20,7 +20,7 @@ flags = tf.flags
 logging = tf.logging
 
 flags.DEFINE_string("model", "small",
-    "A type of model. Possible options are: small, medium, large.")
+    "A type of model. Possible options are: small, medium, large, google.")
 flags.DEFINE_string("data_path", None,
                     "Where the training/test data is stored.")
 flags.DEFINE_string("save_path", None,
@@ -43,7 +43,6 @@ class SmallConfig(object):
   max_grad_norm = 5
   hidden_size = 100
   max_epoch = 10
-  vocab_size = None # to be assigned
   emb_dims = 10
 
 
@@ -54,7 +53,6 @@ class MediumConfig(object):
   max_grad_norm = 5
   hidden_size = 200
   max_epoch = 39
-  vocab_size = None # to be assigned
   emb_dims = 100
 
 
@@ -65,8 +63,17 @@ class LargeConfig(object):
   max_grad_norm = 10
   hidden_size = 512
   max_epoch = 100
-  vocab_size = None # to be assigned
   emb_dims = 128
+
+
+class GoogleConfig(object):
+  """Large config."""
+  init_scale = 0.04
+  learning_rate = 0.1
+  max_grad_norm = 5
+  hidden_size = 2048
+  max_epoch = 1000
+  emb_dims = 512
 
 
 class TestConfig(object):
@@ -77,7 +84,6 @@ class TestConfig(object):
   hidden_size = 2
   max_epoch = 1
   batch_size = 20
-  vocab_size = None # to be assigned
 
 def get_config():
   if FLAGS.model == "small":
@@ -86,6 +92,8 @@ def get_config():
     return MediumConfig()
   elif FLAGS.model == "large":
     return LargeConfig()
+  elif FLAGS.model == "google":
+    return GoogleConfig()
   elif FLAGS.model == "test":
     return TestConfig()
   else:
@@ -117,8 +125,8 @@ def main(_):
     with tf.Session() as session:
         saver = tf.train.Saver()
         start_time = time.time()
-        sys.stdout.write("Initializing data and variables.... ")
         m_train.init_data(session, train_sents, train_vocabs, train_indices, verbose=True)
+        sys.stdout.write("Initializing variables.... ")
         session.run(tf.global_variables_initializer())
         sys.stdout.write("Done.\n")
         best_cost = None
