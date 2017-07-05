@@ -145,7 +145,9 @@ def main(_):
             print("\tDev cost: %.3f, hit@100: %.1f%%" %(dev_cost, hit_at_100))
             if best_cost is None or dev_cost < best_cost:
                 best_cost = dev_cost
+#                 save_start = time.time()
                 print("\tSaved best model to %s" %saver.save(session, FLAGS.save_path))
+#                 print("\tTime on saving: %f sec" %(time.time()-save_start))
     if FLAGS.trace_timeline:
         tl = timeline.Timeline(m_train.run_metadata.step_stats)
         ctf = tl.generate_chrome_trace_format()

@@ -471,6 +471,13 @@ with tf.Session(config=tf.ConfigProto(log_device_placement=True)) as sess:
     sess.run(a)
 ```
 
+## Wed 5 Jun
+
+Meeting with Jacopo
+
+TODO: prepare a giant zip file, send to Jacopo to run on big GPU
+TODO: run the preloading code anyway
+
 TODO: try different values of parallel_iterations in tf.nn.dynamic_rnn
 
 TODO: monitor performance, guide: https://stackoverflow.com/questions/37751739/tensorflow-code-optimization-strategy/37774430#37774430
