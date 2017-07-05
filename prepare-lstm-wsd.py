@@ -63,7 +63,7 @@ def sort_sentences(inp_path, out_path):
 def lookup_and_iter_sents(filename, word_to_id):
     unkn_id = word2id['<unkn>']
     with codecs.open(filename, 'r', 'utf-8') as f:
-        for line in progress(f):
+        for line in f:
             words = line.strip().split()
             yield [word_to_id.get(word) or unkn_id for word in words]
             
@@ -160,7 +160,7 @@ def linearize(train_sents, train_vocabs, train_targets):
         indices[i,3] = vocab_start
         indices[i,4], = train_vocabs[i].shape
         vocab_start += train_vocabs[i].size
-        indices[5] = train_targets[i]
+        indices[i,5] = train_targets[i]
     total_size = flat_sents.size+flat_vocabs.size+indices.size
     sys.stderr.write('Done.\n')
     sys.stderr.write('Training data consumes roughly %.2f GiB.\n' 

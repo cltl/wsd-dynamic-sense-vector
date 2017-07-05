@@ -55,7 +55,6 @@ class WSDModelTrain(object):
                                       trainable=False, collections=[], validate_shape=False)
         self._indices = tf.Variable(self._indices_val, name='data_indices',
                                     trainable=False, collections=[], validate_shape=False) 
-        self._num_batches = tf.shape(self._indices)[0]
         
         i, = tf.train.slice_input_producer([self._indices])
         data = tf.reshape(self._sents[i[0]:i[0]+i[1]*i[2]], (i[1], i[2]))
@@ -64,9 +63,9 @@ class WSDModelTrain(object):
         col = tf.random_uniform((1,), maxval=tf.shape(data)[1], dtype=tf.int32)
         self._y = data[:, col[0]]
         data_tmp = tf.Variable(0, dtype=tf.int32)
-        data_tmp = tf.assign(data_tmp, data, validate_shape=False)
-        self._x = tf.transpose(tf.scatter_nd_update(data_tmp, [col],
-                         [tf.fill((tf.shape(data)[0],), target_id)]))
+        data_tmp = tf.assign(data_tmp, tf.transpose(data), validate_shape=False)
+        col_of_target_ids = tf.fill((tf.shape(data)[0],), target_id)
+        self._x = tf.transpose(tf.scatter_nd_update(data_tmp, [col], [col_of_target_ids]))
         
         E_words = tf.get_variable("word_embedding", 
                 [config.vocab_size, config.emb_dims], dtype=float_dtype)
@@ -102,6 +101,7 @@ class WSDModelTrain(object):
         sess.run(self._sents.initializer, feed_dict={self._sents_val: sents_val})
         sess.run(self._subvocabs.initializer, feed_dict={self._subvocabs_val: subvocabs_val})
         sess.run(self._indices.initializer, feed_dict={self._indices_val: indices_val})
+        self._num_batches = sess.run(tf.shape(self._indices)[0])
         elapsed_time = (time.time()-start_time)/60
         if verbose: sys.stdout.write('Done (%f min).\n' %elapsed_time)
     
@@ -129,10 +129,15 @@ class WSDModelTrain(object):
             print("******** Start of device placement ********")
             sents = np.random.randint(10, size=100)
             subvocabs = np.random.randint(10, size=90)
-            indices = np.array([[0, 20, 4, 0, 40, 3], [0, 10, 2, 40, 50, 2]])
+            indices = np.array([[0, 4, 20, 0, 40, 3], [0, 2, 10, 40, 50, 2]])
             self.init_data(sess, sents, subvocabs, indices)
             sess.run(tf.global_variables_initializer())
+            
+            coord = tf.train.Coordinator()
+            threads = tf.train.start_queue_runners(sess=sess, coord=coord)
             sess.run(self._train_op)
+            coord.request_stop()
+            coord.join(threads)
             print("******** End of device placement ********")
 
 

@@ -117,16 +117,20 @@ def main(_):
     with tf.Session() as session:
         saver = tf.train.Saver()
         start_time = time.time()
+        sys.stdout.write("Initializing data and variables.... ")
+        m_train.init_data(session, train_sents, train_vocabs, train_indices, verbose=True)
         session.run(tf.global_variables_initializer())
-        m_train.init_data(sess, train_sents, train_vocabs, train_indices, verbose=True)
+        sys.stdout.write("Done.\n")
         best_cost = None
+        coord = tf.train.Coordinator()
+        threads = tf.train.start_queue_runners(sess=session, coord=coord)
         for i in range(config.max_epoch):
             # only turn it on after 5 epochs because first epochs spend time 
             # on GPU initialization routines
             if FLAGS.trace_timeline and i == 5: 
                 m_train.trace_timeline()
             print("Epoch: %d" % (i + 1))
-            train_cost = 0
+#             train_cost = 0 # for debugging
             train_cost = m_train.train_epoch(session, verbose=True)
             dev_cost, hit_at_100 = m_evaluate.measure_dev_cost(session, dev_data, dev_lens, target_id)
             print("Epoch: %d finished, elapsed time: %.1f minutes" % 
@@ -136,6 +140,8 @@ def main(_):
             if best_cost is None or dev_cost < best_cost:
                 best_cost = dev_cost
                 print("\tSaved best model to %s" %saver.save(session, FLAGS.save_path))
+        coord.request_stop()
+        coord.join(threads)
     if FLAGS.trace_timeline:
         tl = timeline.Timeline(m_train.run_metadata.step_stats)
         ctf = tl.generate_chrome_trace_format()
