@@ -122,7 +122,6 @@ def main(_):
                                                     config.init_scale)
     with tf.variable_scope("Model", reuse=None, initializer=initializer):
         m_train = WSDModelTrain(config, data_type())
-        m_train = DummyModelTrain(config, data_type())
     with tf.variable_scope("Model", reuse=True, initializer=initializer):
         m_evaluate = WSDModelEvaluate(config, data_type())
     m_train.print_device_placement()
