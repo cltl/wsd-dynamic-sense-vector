@@ -103,15 +103,26 @@ def load_data():
     vocab = np.load(FLAGS.data_path + '.index.pkl')
     target_id = vocab['<target>']
     train = np.load(FLAGS.data_path + '.train.npz')
+    train_batches = []
+    for i in range(len(train.keys())):
+        sentences = train['batch%d' %i]
+        batch_vocab, inverse = np.unique(sentences, return_inverse=True)
+        sentences = inverse.reshape(sentences.shape)
+        batch_vocab = np.append(batch_vocab, target_id)
+        local_target_id = batch_vocab.size-1
+        sys.stderr.write('Batch #%d vocab: %d (%.2f%%)\n'
+                         %(i, batch_vocab.size, batch_vocab.size*100.0/len(vocab)))
+        train_batches.append((sentences.astype(np.int32), 
+                              batch_vocab.astype(np.int32),
+                              local_target_id))
     dev = np.load(FLAGS.data_path + '.dev.npz')
-    return (vocab, train['sents'], train['vocabs'], train['indices'], 
-            dev['data'], dev['lens'], target_id)
+    return vocab, train_batches, dev['data'], dev['lens'], target_id
 
 def main(_):
     if not FLAGS.data_path:
         raise ValueError("Must set --data_path to the base path of "
                          "prepared input (e.g. output/gigaword)")
-    vocab, train_sents, train_vocabs, train_indices, dev_data, dev_lens, target_id = load_data()
+    vocab, train_batches, dev_data, dev_lens, target_id = load_data()
     config = get_config()
     config.vocab_size = len(vocab)
     with tf.Graph().as_default():
@@ -125,13 +136,10 @@ def main(_):
     with tf.Session() as session:
         saver = tf.train.Saver()
         start_time = time.time()
-        m_train.init_data(session, train_sents, train_vocabs, train_indices, verbose=True)
         sys.stdout.write("Initializing variables.... ")
         session.run(tf.global_variables_initializer())
         sys.stdout.write("Done.\n")
         best_cost = None
-        coord = tf.train.Coordinator()
-        threads = tf.train.start_queue_runners(sess=session, coord=coord)
         for i in range(config.max_epoch):
             # only turn it on after 5 epochs because first epochs spend time 
             # on GPU initialization routines
@@ -139,7 +147,7 @@ def main(_):
                 m_train.trace_timeline()
             print("Epoch: %d" % (i + 1))
 #             train_cost = 0 # for debugging
-            train_cost = m_train.train_epoch(session, verbose=True)
+            train_cost = m_train.train_epoch(session, train_batches, verbose=True)
             dev_cost, hit_at_100 = m_evaluate.measure_dev_cost(session, dev_data, dev_lens, target_id)
             print("Epoch: %d finished, elapsed time: %.1f minutes" % 
                   (i + 1, (time.time()-start_time)/60))
@@ -150,8 +158,6 @@ def main(_):
 #                 save_start = time.time()
                 print("\tSaved best model to %s" %saver.save(session, FLAGS.save_path))
 #                 print("\tTime on saving: %f sec" %(time.time()-save_start))
-        coord.request_stop()
-        coord.join(threads)
     if FLAGS.trace_timeline:
         tl = timeline.Timeline(m_train.run_metadata.step_stats)
         ctf = tl.generate_chrome_trace_format()

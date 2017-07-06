@@ -1,7 +1,5 @@
 import numpy as np
 import tensorflow as tf
-import time
-import sys
 
 class DummyModelTrain(object):
     '''
@@ -12,9 +10,9 @@ class DummyModelTrain(object):
     '''
 
     def __init__(self, config, float_dtype):
-        self._x = tf.placeholder(tf.int64, shape=[None, None], name='x')
-        self._y = tf.placeholder(tf.int64, shape=[None], name='y')
-        self._subvocab = tf.placeholder(tf.int64, shape=[None], name='subvocab')
+        self._x = tf.placeholder(tf.int32, shape=[None, None], name='x')
+        self._y = tf.placeholder(tf.int32, shape=[None], name='y')
+        self._subvocab = tf.placeholder(tf.int32, shape=[None], name='subvocab')
         
         self._cost = tf.reduce_mean(tf.reduce_sum(self._x, axis=1) - self._y) + tf.reduce_mean(self._subvocab)
         self._train_op = tf.reduce_mean(tf.reduce_sum(self._x, axis=1) - self._y) + tf.reduce_mean(self._subvocab)
@@ -45,28 +43,10 @@ class WSDModelTrain(object):
     """A LSTM WSD model designed for fast training."""
 
     def __init__(self, config, float_dtype):
-        self._sents_val = tf.placeholder(tf.int64, shape=[None])
-        self._subvocabs_val = tf.placeholder(tf.int64, shape=[None])
-        self._indices_val = tf.placeholder(tf.int64, shape=[None, 6])
+        self._x = tf.placeholder(tf.int32, shape=[None, None])
+        self._y = tf.placeholder(tf.int32, shape=[None])
+        self._subvocab = tf.placeholder(tf.int32, shape=[None])
 
-        self._sents = tf.Variable(self._sents_val, name='data_sents', 
-                                  trainable=False, collections=[], validate_shape=False)
-        self._subvocabs = tf.Variable(self._subvocabs_val, name='data_subvocabs',
-                                      trainable=False, collections=[], validate_shape=False)
-        self._indices = tf.Variable(self._indices_val, name='data_indices',
-                                    trainable=False, collections=[], validate_shape=False) 
-        
-        i, = tf.train.slice_input_producer([self._indices])
-        data = tf.reshape(self._sents[i[0]:i[0]+i[1]*i[2]], (i[1], i[2]))
-        self._subvocab = self._subvocabs[i[3]:i[3]+i[4]]
-        target_id = i[5]
-        col = tf.random_uniform((1,), maxval=tf.shape(data)[1], dtype=tf.int64)
-        self._y = data[:, col[0]]
-        data_tmp = tf.Variable(0, dtype=tf.int64)
-        data_tmp = tf.assign(data_tmp, tf.transpose(data), validate_shape=False)
-        col_of_target_ids = tf.fill((tf.shape(data)[0],), target_id)
-        self._x = tf.transpose(tf.scatter_nd_update(data_tmp, [col], [col_of_target_ids]))
-        
         E_words = tf.get_variable("word_embedding", 
                 [config.vocab_size, config.emb_dims], dtype=float_dtype)
         word_embs = tf.nn.embedding_lookup(E_words, self._x)
@@ -92,33 +72,43 @@ class WSDModelTrain(object):
         optimizer = tf.train.AdagradOptimizer(config.learning_rate)
         self._train_op = optimizer.apply_gradients(zip(grads, tvars),
                 global_step=tf.contrib.framework.get_or_create_global_step())
+        self._initial_state = cell.zero_state(tf.shape(self._x)[0], float_dtype)
 
         self.run_options = self.run_metadata = None
-        
-    def init_data(self, sess, sents_val, subvocabs_val, indices_val, verbose=False):
-        start_time = time.time()
-        if verbose: sys.stdout.write('Loading data... ')
-        sess.run(self._sents.initializer, feed_dict={self._sents_val: sents_val})
-        sess.run(self._subvocabs.initializer, feed_dict={self._subvocabs_val: subvocabs_val})
-        sess.run(self._indices.initializer, feed_dict={self._indices_val: indices_val})
-        self._num_batches = sess.run(tf.shape(self._indices)[0])
-        elapsed_time = (time.time()-start_time)/60
-        if verbose: sys.stdout.write('Done (%f min).\n' %elapsed_time)
     
     def trace_timeline(self):
         self.run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
         self.run_metadata = tf.RunMetadata()
 
-    def train_epoch(self, session, verbose=False):
+    def train_epoch(self, session, data, verbose=False):
         """Runs the model on the given data."""
         total_cost = 0.0
         total_rows = 0
-        for batch_no in range(self._num_batches):
-            batch_cost, y_val, _ = session.run([self._cost, self._y, self._train_op],
-                                                options=self.run_options, 
-                                                run_metadata=self.run_metadata)
-            total_cost += batch_cost * y_val.shape[0] # because the cost is averaged
-            total_rows += y_val.shape[0]              # over rows in a batch
+        
+        # resample the batches so that each token has equal chance to become target
+        # another effect is to randomize the order of batches
+        sentence_lens = np.array([x.shape[1] for x, _, _ in data])
+        samples = np.random.choice(len(data), size=len(data), 
+                                   p=sentence_lens/sentence_lens.sum())
+        for batch_no, batch_id in enumerate(samples):
+            x, subvocab, target_id = data[batch_id]
+            i =  np.random.randint(x.shape[1])
+            y = x[:,i].copy() # copy content
+            x[:,i] = target_id
+    
+            feed_dict = {self._x: x, self._y: y, self._subvocab: subvocab}
+            state = session.run(self._initial_state, feed_dict)
+            c, h = self._initial_state
+            feed_dict[c] = state.c
+            feed_dict[h] = state.h
+    
+            batch_cost, _ = session.run([self._cost, self._train_op], feed_dict,
+                                        options=self.run_options, 
+                                        run_metadata=self.run_metadata)
+            x[:,i] = y # restore the data
+    
+            total_cost += batch_cost * x.shape[0] # because the cost is averaged
+            total_rows += x.shape[0]              # over rows in a batch
             
             if verbose and (batch_no+1) % 100 == 0:
                 print("\tsample batch cost: %.7f" %batch_cost)
@@ -127,17 +117,15 @@ class WSDModelTrain(object):
     def print_device_placement(self):
         with tf.Session(config=tf.ConfigProto(log_device_placement=True)) as sess:
             print("******** Start of device placement ********")
-            sents = np.random.randint(10, size=100)
-            subvocabs = np.random.randint(10, size=90)
-            indices = np.array([[0, 4, 20, 0, 40, 3], [0, 2, 10, 40, 50, 2]])
-            self.init_data(sess, sents, subvocabs, indices)
             sess.run(tf.global_variables_initializer())
-            
-            coord = tf.train.Coordinator()
-            threads = tf.train.start_queue_runners(sess=sess, coord=coord)
-            sess.run(self._train_op)
-            coord.request_stop()
-            coord.join(threads)
+            x = np.random.randint(10, size=(100, 10))
+            y = np.random.randint(10, size=100)
+            subvocab = np.random.randint(100, size=10) 
+            feed_dict = {self._x: x, self._y: y, self._subvocab : subvocab}
+            state = sess.run(self._initial_state, feed_dict)
+            c, h = self._initial_state
+            feed_dict[c], feed_dict[h] = state.c, state.h
+            sess.run(self._train_op, feed_dict)
             print("******** End of device placement ********")
 
 
@@ -146,9 +134,9 @@ class WSDModelEvaluate(object):
     with @WSDModelTrain."""
 
     def __init__(self, config, float_dtype):
-        self._x = tf.placeholder(tf.int64, shape=[None, None], name='x')
-        self._lens = tf.placeholder(tf.int64, shape=[None], name='lens')
-        self._y = tf.placeholder(tf.int64, shape=[None], name='y')
+        self._x = tf.placeholder(tf.int32, shape=[None, None], name='x')
+        self._lens = tf.placeholder(tf.int32, shape=[None], name='lens')
+        self._y = tf.placeholder(tf.int32, shape=[None], name='y')
         
         E_words = tf.get_variable("word_embedding", 
                 [config.vocab_size, config.emb_dims], dtype=float_dtype)
@@ -200,9 +188,9 @@ class WSIModelTrain(WSDModelTrain):
     """A LSTM word sense induction (WSI) model designed for fast training."""
 
     def __init__(self, config, float_dtype, sense_num=4):
-        self._x = tf.placeholder(tf.int64, shape=[None, None], name='x')
-        self._y = tf.placeholder(tf.int64, shape=[None], name='y')
-        self._subvocab = tf.placeholder(tf.int64, shape=[None], name='subvocab')
+        self._x = tf.placeholder(tf.int32, shape=[None, None], name='x')
+        self._y = tf.placeholder(tf.int32, shape=[None], name='y')
+        self._subvocab = tf.placeholder(tf.int32, shape=[None], name='subvocab')
         
         E_words = tf.get_variable("word_embedding", 
                 [config.vocab_size, config.emb_dims], dtype=float_dtype)
