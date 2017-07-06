@@ -45,27 +45,29 @@ class WSDModelTrain(object):
     """A LSTM WSD model designed for fast training."""
 
     def __init__(self, config, float_dtype):
-        self._sents_val = tf.placeholder(tf.int64, shape=[None])
-        self._subvocabs_val = tf.placeholder(tf.int64, shape=[None])
+        self._data_val = tf.placeholder(tf.int64, shape=[None])
         self._indices_val = tf.placeholder(tf.int64, shape=[None, 6])
 
-        self._sents = tf.Variable(self._sents_val, name='data_sents', 
-                                  trainable=False, collections=[], validate_shape=False)
-        self._subvocabs = tf.Variable(self._subvocabs_val, name='data_subvocabs',
-                                      trainable=False, collections=[], validate_shape=False)
-        self._indices = tf.Variable(self._indices_val, name='data_indices',
+        self._data = tf.Variable(self._data_val, name='data', 
+                                 trainable=False, collections=[], validate_shape=False)
+        self._indices = tf.Variable(self._indices_val, name='indices',
                                     trainable=False, collections=[], validate_shape=False) 
         
         i, = tf.train.slice_input_producer([self._indices])
-        data = tf.reshape(self._sents[i[0]:i[0]+i[1]*i[2]], (i[1], i[2]))
-        self._subvocab = self._subvocabs[i[3]:i[3]+i[4]]
+        print(self._data.dtype)
+        print(i.dtype, i.shape)
+        print(i[0].dtype, i[0].shape, type(i[0]))
+        debug_arr = self._data[i[0]:i[0]+i[1]*i[2]] # error here, why???
+        tf.reshape(debug_arr, (i[1], i[2]))
+        sents = tf.reshape(self._data[i[0]:i[0]+i[1]*i[2]], (i[1], i[2]))
+        self._subvocab = self._data[i[3]:i[3]+i[4]]
         target_id = i[5]
-        col = tf.random_uniform((1,), maxval=tf.shape(data)[1], dtype=tf.int64)
-        self._y = data[:, col[0]]
-        data_tmp = tf.Variable(0, dtype=tf.int64)
-        data_tmp = tf.assign(data_tmp, tf.transpose(data), validate_shape=False)
-        col_of_target_ids = tf.fill((tf.shape(data)[0],), target_id)
-        self._x = tf.transpose(tf.scatter_nd_update(data_tmp, [col], [col_of_target_ids]))
+        col = tf.random_uniform((1,), maxval=tf.shape(sents)[1], dtype=tf.int64)
+        self._y = sents[:, col[0]]
+        sents_tmp = tf.Variable(0, dtype=tf.int64)
+        sents_tmp = tf.assign(sents_tmp, tf.transpose(sents), validate_shape=False)
+        col_of_target_ids = tf.fill((tf.shape(sents)[0],), target_id)
+        self._x = tf.transpose(tf.scatter_nd_update(sents_tmp, [col], [col_of_target_ids]))
         
         E_words = tf.get_variable("word_embedding", 
                 [config.vocab_size, config.emb_dims], dtype=float_dtype)
@@ -95,11 +97,10 @@ class WSDModelTrain(object):
 
         self.run_options = self.run_metadata = None
         
-    def init_data(self, sess, sents_val, subvocabs_val, indices_val, verbose=False):
+    def init_data(self, sess, data_val, indices_val, verbose=False):
         start_time = time.time()
         if verbose: sys.stdout.write('Loading data... ')
-        sess.run(self._sents.initializer, feed_dict={self._sents_val: sents_val})
-        sess.run(self._subvocabs.initializer, feed_dict={self._subvocabs_val: subvocabs_val})
+        sess.run(self._data.initializer, feed_dict={self._data_val: data_val})
         sess.run(self._indices.initializer, feed_dict={self._indices_val: indices_val})
         self._num_batches = sess.run(tf.shape(self._indices)[0])
         elapsed_time = (time.time()-start_time)/60

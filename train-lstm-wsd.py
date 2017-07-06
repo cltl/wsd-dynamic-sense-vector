@@ -102,16 +102,16 @@ def get_config():
 def load_data():
     vocab = np.load(FLAGS.data_path + '.index.pkl')
     target_id = vocab['<target>']
-    train = np.load(FLAGS.data_path + '.train.npz')
+    data = np.memmap(FLAGS.data_path + '.train.data.mmap', mode='r')
+    indices = np.load(FLAGS.data_path + '.train.index.npy')
     dev = np.load(FLAGS.data_path + '.dev.npz')
-    return (vocab, train['sents'], train['vocabs'], train['indices'], 
-            dev['data'], dev['lens'], target_id)
+    return (vocab, data, indices, dev['data'], dev['lens'], target_id)
 
 def main(_):
     if not FLAGS.data_path:
         raise ValueError("Must set --data_path to the base path of "
                          "prepared input (e.g. output/gigaword)")
-    vocab, train_sents, train_vocabs, train_indices, dev_data, dev_lens, target_id = load_data()
+    vocab, train_data, train_indices, dev_data, dev_lens, target_id = load_data()
     config = get_config()
     config.vocab_size = len(vocab)
     with tf.Graph().as_default():
@@ -125,7 +125,7 @@ def main(_):
     with tf.Session() as session:
         saver = tf.train.Saver()
         start_time = time.time()
-        m_train.init_data(session, train_sents, train_vocabs, train_indices, verbose=True)
+        m_train.init_data(session, train_data, train_indices, verbose=True)
         sys.stdout.write("Initializing variables.... ")
         session.run(tf.global_variables_initializer())
         sys.stdout.write("Done.\n")

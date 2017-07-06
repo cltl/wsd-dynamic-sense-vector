@@ -193,7 +193,7 @@ if __name__ == '__main__':
     else:
         sort_sentences(inp_path, sorted_sents_path)
     
-    train_data_path = out_path + '.train.data.npy'
+    train_data_path = out_path + '.train.data.mmap'
     train_index_path = out_path + '.train.index.npy'
     dev_path = out_path + '.dev.npz'
     if os.path.exists(train_data_path):
