@@ -145,28 +145,34 @@ def reduce_vocab(batches, target_id, full_vocab_size):
         train_targets.append(local_target_id)
     return train_sents, train_vocabs, train_targets
 
-def linearize(train_sents, train_vocabs, train_targets):
+def serialize(train_data_path, train_index_path, 
+              train_sents, train_vocabs, train_targets):
     assert len(train_sents) == len(train_vocabs) == len(train_targets)
     sys.stderr.write('Flattening... ')
-    flat_sents = np.concatenate([s.ravel() for s in train_sents])
-    flat_vocabs = np.concatenate([v for v in train_vocabs])
-    sent_start = 0
-    vocab_start = 0
+    total_size = sum(s.size for s in train_sents) + sum(v.size for v in train_vocabs)
+    data = np.memmap(train_data_path, dtype=np.int64, mode='w+', shape=(total_size,))
+    last_index = 0
     indices = np.zeros((len(train_sents), 6), dtype=np.int64)
     for i in range(len(train_sents)):
-        indices[i,0] = sent_start
+        indices[i,0] = last_index
         indices[i,1], indices[i,2] = train_sents[i].shape
-        sent_start += train_sents[i].size
-        indices[i,3] = vocab_start
+        data[last_index:last_index+train_sents[i].size] = np.ravel(train_sents[i])
+        last_index += train_sents[i].size
+        
+        indices[i,3] = last_index
         indices[i,4], = train_vocabs[i].shape
-        vocab_start += train_vocabs[i].size
+        data[last_index:last_index+train_vocabs[i].size] = train_vocabs[i]
+        last_index += train_vocabs[i].size
+        
         indices[i,5] = train_targets[i]
+    assert last_index == data.size
     assert np.all(indices >= 0) # check for integer overflow
-    total_size = flat_sents.size*4 + flat_vocabs.size*4 + indices.size*8
+    total_size = data.size*8 + indices.size*8
     sys.stderr.write('Done.\n')
     sys.stderr.write('Training data consumes roughly %.2f GiB.\n' 
                      %(total_size/float(2**30)))
-    return flat_sents, flat_vocabs, indices
+    del data # write to file
+    np.save(train_index_path, indices)
 
 if __name__ == '__main__':
     inp_path, out_path = sys.argv[1:]
@@ -187,13 +193,13 @@ if __name__ == '__main__':
     else:
         sort_sentences(inp_path, sorted_sents_path)
     
-    train_path = out_path + '.train.npz'
+    train_data_path = out_path + '.train.data.npy'
+    train_index_path = out_path + '.train.index.npy'
     dev_path = out_path + '.dev.npz'
-    if os.path.exists(train_path):
-        sys.stderr.write('Result already exists: %s. Skipped.\n' %train_path)
+    if os.path.exists(train_data_path):
+        sys.stderr.write('Result already exists: %s. Skipped.\n' %train_data_path)
     else:
         batches, dev_data, dev_lens = pad_batches(sorted_sents_path, word2id)
-        sents, vocabs, indices = linearize(
-                *reduce_vocab(batches, word2id['<target>'], len(word2id)))
-        np.savez(train_path, sents=sents, vocabs=vocabs, indices=indices)
         np.savez(dev_path, data=dev_data, lens=dev_lens)
+        serialize(train_data_path, train_index_path,
+                  *reduce_vocab(batches, word2id['<target>'], len(word2id)))
