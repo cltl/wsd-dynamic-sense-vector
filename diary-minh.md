@@ -491,6 +491,39 @@ array([-1123920531,         117,         101,   377887591,        3973, 3972], d
 I converted everything into int64 and now the preparation script throws 
 MemoryError :-( Now I need to take care of memory usage again.
 
+Plan: use mem-map to perform linearization and serialization at the same time.
+Write both sentences and vocabs into one vector (they are flattened anyway),
+indices are written to an 2-D array.
+
+## Thu 6 Jul
+
+I should have realized that int64 is troublesome since I had seen [this 
+discussion on Github](https://github.com/tensorflow/tensorflow/issues/9781) earlier. 
+After solving all problems with saving and loading data, now I get this error:
+
+> Input 'strides' of 'StridedSlice' Op has type int32 that does not match type int64 of argument 'begin'
+
+This is how to reproduce it:
+
+```
+In [35]: import tensorflow as tf
+    ...: a=tf.Variable([0,1,2], dtype=tf.int64)
+    ...: i = tf.constant(1, dtype=tf.int64)
+    ...: a[i]
+    ...:
+[...]
+TypeError: Input 'strides' of 'StridedSlice' Op has type int32 that does not match type int64 of argument 'begin'.
+
+In [36]: import tensorflow as tf
+    ...: a=tf.Variable([0,1,2], dtype=tf.int32)
+    ...: i = tf.constant(1, dtype=tf.int32)
+    ...: a[i]
+    ...:
+Out[36]: <tf.Tensor 'strided_slice_22:0' shape=() dtype=int32>
+```
+
+Submitted an issue ([#11318](https://github.com/tensorflow/tensorflow/issues/11318)).
+
 TODO: prepare a giant zip file, send to Jacopo to run on big GPU
 TODO: run the preloading code anyway
 
