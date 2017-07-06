@@ -524,6 +524,9 @@ Out[36]: <tf.Tensor 'strided_slice_22:0' shape=() dtype=int32>
 
 Submitted an issue ([#11318](https://github.com/tensorflow/tensorflow/issues/11318)).
 
+Rolled back everything related to preloading data. I hate it anyway since
+the code is complex and awkward. Now I'll pack everything and send to Jacopo.
+
 TODO: prepare a giant zip file, send to Jacopo to run on big GPU
 TODO: run the preloading code anyway
 
