@@ -22,6 +22,8 @@ import numpy as np
 import subprocess
 from tensorflow.contrib.labeled_tensor import batch
 
+dev_sents = 20000 # absolute maximum
+dev_portion = 0.01 # relative maximum
 batch_size = 128000 # words
 vocab_size = 10**6
 min_count = 5
@@ -97,14 +99,14 @@ def pad_batches(inp_path, word2id):
     pad = PadFunc()
     pad_id = word2id['<pad>']
     dev = []
-    dev_size = 0
     batches = {}
     last_max_len = 0
     last_batch = []
+    with open(inp_path) as f: total_sents = sum(1 for line in f)
     for sent in progress(lookup_and_iter_sents(inp_path, word2id)):
-        if dev_size < batch_size and np.random.rand() < 0.01:
+        if (len(dev) < dev_sents and len(dev) < dev_portion*total_sents 
+                and np.random.rand() < 0.01):
             dev.append(sent)
-            dev_size += len(sent)
         else:
             last_max_len = max(last_max_len, len(sent))
             last_batch.append(sent)
@@ -133,7 +135,6 @@ def pad_batches(inp_path, word2id):
 
 if __name__ == '__main__':
     inp_path, out_path = sys.argv[1:]
-    assert os.path.isfile(inp_path)
     
     index_path = out_path + '.index.pkl'
     if os.path.exists(index_path):
@@ -141,6 +142,7 @@ if __name__ == '__main__':
         with open(index_path, 'rb') as f: word2id = pickle.load(f)
         sys.stderr.write('Done.\n')
     else:
+        assert os.path.isfile(inp_path)
         word2id, words = _build_vocab(inp_path)
         with open(index_path, 'wb') as f: pickle.dump(word2id, f)
 

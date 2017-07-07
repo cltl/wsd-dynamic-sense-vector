@@ -80,20 +80,21 @@ class WSDModelTrain(object):
         self.run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
         self.run_metadata = tf.RunMetadata()
 
-    def train_epoch(self, session, data, verbose=False):
+    def train_epoch(self, session, data, target_id, verbose=False):
         """Runs the model on the given data."""
         total_cost = 0.0
         total_rows = 0
         
         # resample the batches so that each token has equal chance to become target
         # another effect is to randomize the order of batches
-        sentence_lens = np.array([x.shape[1] for x, _, _ in data])
+        sentence_lens = np.array([x.shape[1] for x, _, _, in data])
         samples = np.random.choice(len(data), size=len(data), 
                                    p=sentence_lens/sentence_lens.sum())
         for batch_no, batch_id in enumerate(samples):
-            x, subvocab, target_id = data[batch_id]
+            x, y_all, subvocab = data[batch_id]
             i =  np.random.randint(x.shape[1])
-            y = x[:,i].copy() # copy content
+            y = y_all[:,i]
+            old_xi = x[:,i].copy()
             x[:,i] = target_id
     
             feed_dict = {self._x: x, self._y: y, self._subvocab: subvocab}
@@ -105,13 +106,14 @@ class WSDModelTrain(object):
             batch_cost, _ = session.run([self._cost, self._train_op], feed_dict,
                                         options=self.run_options, 
                                         run_metadata=self.run_metadata)
-            x[:,i] = y # restore the data
+            x[:,i] = old_xi # restore the data
     
             total_cost += batch_cost * x.shape[0] # because the cost is averaged
             total_rows += x.shape[0]              # over rows in a batch
             
-            if verbose and (batch_no+1) % 100 == 0:
-                print("\tsample batch cost: %.7f" %batch_cost)
+            if verbose and (batch_no+1) % 1000 == 0:
+                print("\tfinished %d of %d batches, sample batch cost: %.7f" 
+                      %(batch_no+1, len(samples), batch_cost))
         return total_cost / total_rows
     
     def print_device_placement(self):
@@ -168,20 +170,35 @@ class WSDModelEvaluate(object):
     def measure_dev_cost(self, session, data, lens, target_id):
         # resample the sentences so that each token has equal chance to become target
         samples = np.random.choice(len(data), size=len(data), p=lens/lens.sum())
-        data2, lens2 = data[samples].copy(), lens[samples]
+        # copying is needed here because one sentence might be chosen multiple times
+        # injecting targets into multiple references of the same sentence will
+        # create a mess
+        x, lens2 = data[samples].copy(), lens[samples] 
         # sample targets
         target_indices = np.mod(np.random.randint(1000000, size=lens2.shape), lens2)
-        targets = data2[np.arange(lens2.size), target_indices]
-        data2[np.arange(lens2.size), target_indices] = target_id
-        # initialize the RNN
-        feed_dict = { self._x: data2, self._y: targets, self._lens: lens2}
-        state = session.run(self._initial_state, feed_dict)
-        c, h = self._initial_state
-        feed_dict[c] = state.c
-        feed_dict[h] = state.h
-        # now it's time to evaluate
-        cost, hit_at_100 = session.run([self._cost, self._hit_at_100], feed_dict)        
-        return cost, hit_at_100
+        one_to_n = np.arange(lens2.size)
+        y = x[one_to_n, target_indices]
+        x[one_to_n, target_indices] = target_id
+        max_batch_size = 1000
+        total_cost = 0.0
+        total_hit = 0.0
+        for batch_start in range(0, len(x), max_batch_size):
+            batch_end = min(len(x), batch_start+max_batch_size)
+            batch_x = x[batch_start:batch_end]
+            batch_y = y[batch_start:batch_end]
+            batch_lens = lens2[batch_start:batch_end]
+            batch_size = batch_end - batch_start
+            # initialize the RNN
+            feed_dict = { self._x: batch_x, self._y: batch_y, self._lens: batch_lens}
+            state = session.run(self._initial_state, feed_dict)
+            c, h = self._initial_state
+            feed_dict[c] = state.c
+            feed_dict[h] = state.h
+            # now it's time to evaluate
+            cost, hit_at_100 = session.run([self._cost, self._hit_at_100], feed_dict)        
+            total_cost += cost * batch_size
+            total_hit += hit_at_100 * batch_size
+        return total_cost / len(x), total_hit / len(x)
 
 
 class WSIModelTrain(WSDModelTrain):

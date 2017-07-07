@@ -42,7 +42,7 @@ class SmallConfig(object):
   learning_rate = 0.1
   max_grad_norm = 5
   hidden_size = 100
-  max_epoch = 10
+  max_epoch = 100
   emb_dims = 10
 
 
@@ -52,7 +52,7 @@ class MediumConfig(object):
   learning_rate = 0.1
   max_grad_norm = 5
   hidden_size = 200
-  max_epoch = 39
+  max_epoch = 500
   emb_dims = 100
 
 
@@ -62,7 +62,7 @@ class LargeConfig(object):
   learning_rate = 0.1
   max_grad_norm = 10
   hidden_size = 512
-  max_epoch = 100
+  max_epoch = 1000
   emb_dims = 128
 
 
@@ -72,7 +72,7 @@ class GoogleConfig(object):
   learning_rate = 0.1
   max_grad_norm = 5
   hidden_size = 2048
-  max_epoch = 1000
+  max_epoch = 2000
   emb_dims = 512
 
 
@@ -100,29 +100,28 @@ def get_config():
     raise ValueError("Invalid model: %s", FLAGS.model)
     
 def load_data():
-    vocab = np.load(FLAGS.data_path + '.index.pkl')
-    target_id = vocab['<target>']
+    sys.stderr.write('Loading data...\n')
+    full_vocab = np.load(FLAGS.data_path + '.index.pkl')
     train = np.load(FLAGS.data_path + '.train.npz')
     train_batches = []
-    for i in range(len(train.keys())):
+    num_batches = len(train.keys())
+    for i in range(num_batches):
         sentences = train['batch%d' %i]
         batch_vocab, inverse = np.unique(sentences, return_inverse=True)
-        sentences = inverse.reshape(sentences.shape)
-        batch_vocab = np.append(batch_vocab, target_id)
-        local_target_id = batch_vocab.size-1
-        sys.stderr.write('Batch #%d vocab: %d (%.2f%%)\n'
-                         %(i, batch_vocab.size, batch_vocab.size*100.0/len(vocab)))
-        train_batches.append((sentences.astype(np.int32), 
-                              batch_vocab.astype(np.int32),
-                              local_target_id))
+        outputs = inverse.reshape(sentences.shape)
+        sys.stderr.write('Batch %d of %d vocab size: %d (%.2f%% of original)\n'
+                         %(i, num_batches, batch_vocab.size, batch_vocab.size*100.0/len(full_vocab)))
+        train_batches.append((sentences, outputs, batch_vocab))
     dev = np.load(FLAGS.data_path + '.dev.npz')
-    return vocab, train_batches, dev['data'], dev['lens'], target_id
+    sys.stderr.write('Loading data... Done.\n')
+    return full_vocab, train_batches, dev['data'], dev['lens']
 
 def main(_):
     if not FLAGS.data_path:
         raise ValueError("Must set --data_path to the base path of "
                          "prepared input (e.g. output/gigaword)")
-    vocab, train_batches, dev_data, dev_lens, target_id = load_data()
+    vocab, train_batches, dev_data, dev_lens = load_data()
+    target_id = vocab['<target>']    
     config = get_config()
     config.vocab_size = len(vocab)
     with tf.Graph().as_default():
@@ -144,13 +143,12 @@ def main(_):
             # only turn it on after 5 epochs because first epochs spend time 
             # on GPU initialization routines
             if FLAGS.trace_timeline and i == 5: 
-                m_train.trace_timeline()
-            print("Epoch: %d" % (i + 1))
+                m_train.trace_timeline() # start tracing timeline
+            print("Epoch #%d:" % (i + 1))
 #             train_cost = 0 # for debugging
-            train_cost = m_train.train_epoch(session, train_batches, verbose=True)
+            train_cost = m_train.train_epoch(session, train_batches, target_id, verbose=True)
             dev_cost, hit_at_100 = m_evaluate.measure_dev_cost(session, dev_data, dev_lens, target_id)
-            print("Epoch: %d finished, elapsed time: %.1f minutes" % 
-                  (i + 1, (time.time()-start_time)/60))
+            print("Epoch #%d finished:" %(i + 1))
             print("\tTrain cost: %.3f" %train_cost)
             print("\tDev cost: %.3f, hit@100: %.1f%%" %(dev_cost, hit_at_100))
             if best_cost is None or dev_cost < best_cost:
@@ -158,6 +156,7 @@ def main(_):
 #                 save_start = time.time()
                 print("\tSaved best model to %s" %saver.save(session, FLAGS.save_path))
 #                 print("\tTime on saving: %f sec" %(time.time()-save_start))
+            print("\tElapsed time: %.1f minutes" %((time.time()-start_time)/60))
     if FLAGS.trace_timeline:
         tl = timeline.Timeline(m_train.run_metadata.step_stats)
         ctf = tl.generate_chrome_trace_format()

@@ -81,7 +81,7 @@ python3 semcor_format2LSTM_input.py
 
 ### For LSTM model
 
-1. Pre-process GigaWord into plain text: `python3 process-gigaword.py > output/gigaword.txt`
+1. Pre-process GigaWord into plain text: `sbatch process-gigaword.job`
 2. Train a small LSTM model: `sbatch train-lstm-wsd-small.job`
 3. Use the LSTM model: `python3 test-lstm.py`
 
