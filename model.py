@@ -43,9 +43,10 @@ class WSDModelTrain(object):
     """A LSTM WSD model designed for fast training."""
 
     def __init__(self, config, float_dtype):
-        self._x = tf.placeholder(tf.int32, shape=[None, None])
-        self._y = tf.placeholder(tf.int32, shape=[None])
-        self._subvocab = tf.placeholder(tf.int32, shape=[None])
+        # the names are for later reference when the model is loaded
+        self._x = tf.placeholder(tf.int32, shape=[None, None], name='x')
+        self._y = tf.placeholder(tf.int32, shape=[None], name='y')
+        self._subvocab = tf.placeholder(tf.int32, shape=[None], name='subvocab')
 
         E_words = tf.get_variable("word_embedding", 
                 [config.vocab_size, config.emb_dims], dtype=float_dtype)
@@ -136,6 +137,7 @@ class WSDModelEvaluate(object):
     with @WSDModelTrain."""
 
     def __init__(self, config, float_dtype):
+        # the names are for later reference when the model is loaded
         self._x = tf.placeholder(tf.int32, shape=[None, None], name='x')
         self._lens = tf.placeholder(tf.int32, shape=[None], name='lens')
         self._y = tf.placeholder(tf.int32, shape=[None], name='y')
