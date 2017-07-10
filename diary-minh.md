@@ -527,6 +527,16 @@ Submitted an issue ([#11318](https://github.com/tensorflow/tensorflow/issues/113
 Rolled back everything related to preloading data. I hate it anyway since
 the code is complex and awkward. Now I'll pack everything and send to Jacopo.
 
+## Fri 7 Jul
+
+The thing is running! Sent to Marten, Jacopo and Rutger. Next week I won't 
+work on WSD to spend more time on coreference.
+
+## Sat 8 Jul
+
+The issue turns out to be solved 2 months ago. But I ran into 
+[another issue](https://github.com/tensorflow/tensorflow/issues/11380). 
+
 TODO: prepare a giant zip file, send to Jacopo to run on big GPU
 TODO: run the preloading code anyway
 

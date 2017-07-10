@@ -24,7 +24,7 @@ from tensorflow.contrib.labeled_tensor import batch
 
 dev_sents = 20000 # absolute maximum
 dev_portion = 0.01 # relative maximum
-batch_size = 128000 # words
+batch_size = 64000 # words
 vocab_size = 10**6
 min_count = 5
 

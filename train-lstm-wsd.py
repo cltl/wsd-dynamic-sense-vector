@@ -25,15 +25,13 @@ flags.DEFINE_string("data_path", None,
                     "Where the training/test data is stored.")
 flags.DEFINE_string("save_path", None,
                     "Model output directory.")
-flags.DEFINE_bool("use_fp16", False,
-                  "Train using 16-bit floats instead of 32bit floats")
 flags.DEFINE_bool("trace_timeline", False,
                   "Trace execution time to find out bottlenecks.")
 FLAGS = flags.FLAGS
 
 
 def data_type():
-  return tf.float16 if FLAGS.use_fp16 else tf.float32
+  return tf.float32
 
 
 class SmallConfig(object):
