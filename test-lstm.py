@@ -6,9 +6,9 @@ import pickle
 
 parser = argparse.ArgumentParser(description='Trains meaning embeddings based on precomputed LSTM model')
 parser.add_argument('-m', dest='model_path', required=True, help='path to model trained LSTM model')
-# model_path = '/var/scratch/mcpostma/wsd-dynamic-sense-vector/output/lstm-wsd-small'
+# model_path = 'output/lstm-wsd-small'
 parser.add_argument('-v', dest='vocab_path', required=True, help='path to LSTM vocabulary')
-#vocab_path = '/var/scratch/mcpostma/wsd-dynamic-sense-vector/output/gigaword.1m-sents-lstm-wsd.index.pkl'
+#vocab_path = 'gigaword.1m-sents-lstm-wsd.index.pkl'
 parser.add_argument('-i', dest='input_path', required=True, help='input path with sense annotated sentences')
 parser.add_argument('-o',dest='output_path', required=True, help='path where sense embeddings will be stored')
 parser.add_argument('-t', dest='max_lines', required=True, help='maximum number of lines you want to train on')

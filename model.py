@@ -1,5 +1,7 @@
 import numpy as np
 import tensorflow as tf
+import time
+import sys
 
 class DummyModelTrain(object):
     '''
@@ -43,39 +45,56 @@ class WSDModelTrain(object):
     """A LSTM WSD model designed for fast training."""
 
     def __init__(self, config, float_dtype):
+        self._build_inputs()
+        self._build_word_embeddings(config, float_dtype)
+        self._build_lstm_output(config, float_dtype)
+        self._build_context_embs(config, float_dtype)
+        self._build_logits(config, float_dtype)
+        self._build_cost(config, float_dtype)
+        self.run_options = self.run_metadata = None
+
+    def _build_inputs(self):
         # the names are for later reference when the model is loaded
         self._x = tf.placeholder(tf.int32, shape=[None, None], name='x')
         self._y = tf.placeholder(tf.int32, shape=[None], name='y')
         self._subvocab = tf.placeholder(tf.int32, shape=[None], name='subvocab')
 
+    def _build_word_embeddings(self, config, float_dtype):
         E_words = tf.get_variable("word_embedding", 
                 [config.vocab_size, config.emb_dims], dtype=float_dtype)
-        word_embs = tf.nn.embedding_lookup(E_words, self._x)
+        self._word_embs = tf.nn.embedding_lookup(E_words, self._x)
+
+    def _build_lstm_output(self, config, float_dtype):
         cell = tf.contrib.rnn.LSTMCell(num_units=config.hidden_size,
                                        state_is_tuple=True)
-        outputs, _ = tf.nn.dynamic_rnn(cell, word_embs, dtype=float_dtype)
+        outputs, _ = tf.nn.dynamic_rnn(cell, self._word_embs, dtype=float_dtype)
+        self._lstm_output = outputs[:,-1]
+        self._initial_state = cell.zero_state(tf.shape(self._x)[0], float_dtype)
+
+    def _build_context_embs(self, config, float_dtype):
         context_layer_weights = tf.get_variable("context_layer_weights",
                 [config.hidden_size, config.emb_dims], dtype=float_dtype)
-        self._predicted_context_embs = tf.matmul(outputs[:,-1], context_layer_weights, 
+        self._predicted_context_embs = tf.matmul(self._lstm_output, context_layer_weights, 
                                                  name='predicted_context_embs')
+    
+    def _build_logits(self, config, float_dtype):
         E_contexts = tf.get_variable("context_embedding", 
                 [config.vocab_size, config.emb_dims], dtype=float_dtype)
         subcontexts = tf.nn.embedding_lookup(E_contexts, self._subvocab)
-        pre_probs = tf.matmul(self._predicted_context_embs, tf.transpose(subcontexts))
-        
+        self._logits = tf.matmul(self._predicted_context_embs, tf.transpose(subcontexts))
+    
+    def _build_cost(self, config, float_dtype):
         self._cost = tf.reduce_mean(
                 tf.nn.sparse_softmax_cross_entropy_with_logits(
-                logits=pre_probs, labels=self._y))
-
+                logits=self._logits, labels=self._y))
+        self._hit_at_100 = tf.reduce_mean(tf.cast(
+                tf.nn.in_top_k(self._logits, self._y, 100), float_dtype))
         tvars = tf.trainable_variables()
         grads, _ = tf.clip_by_global_norm(tf.gradients(self._cost, tvars),
                                           config.max_grad_norm)
         optimizer = tf.train.AdagradOptimizer(config.learning_rate)
         self._train_op = optimizer.apply_gradients(zip(grads, tvars),
                 global_step=tf.contrib.framework.get_or_create_global_step())
-        self._initial_state = cell.zero_state(tf.shape(self._x)[0], float_dtype)
-
-        self.run_options = self.run_metadata = None
     
     def trace_timeline(self):
         self.run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
@@ -132,43 +151,31 @@ class WSDModelTrain(object):
             print("******** End of device placement ********")
 
 
-class WSDModelEvaluate(object):
+class WSDModelEvaluate(WSDModelTrain):
     """A LSTM WSD model designed for accurate evaluation, sharing parameters
     with @WSDModelTrain."""
-
-    def __init__(self, config, float_dtype):
-        # the names are for later reference when the model is loaded
+    
+    max_batch_size = 1000
+    
+    def _build_inputs(self):
         self._x = tf.placeholder(tf.int32, shape=[None, None], name='x')
-        self._lens = tf.placeholder(tf.int32, shape=[None], name='lens')
         self._y = tf.placeholder(tf.int32, shape=[None], name='y')
+        self._lens = tf.placeholder(tf.int32, shape=[None], name='lens')
         
-        E_words = tf.get_variable("word_embedding", 
-                [config.vocab_size, config.emb_dims], dtype=float_dtype)
-        word_embs = tf.nn.embedding_lookup(E_words, self._x)
+    def _build_lstm_output(self, config, float_dtype):
         cell = tf.contrib.rnn.LSTMCell(num_units=config.hidden_size,
                                        state_is_tuple=True, reuse=True)
-        outputs, _ = tf.nn.dynamic_rnn(cell, word_embs, 
+        outputs, _ = tf.nn.dynamic_rnn(cell, self._word_embs, 
                                        sequence_length=self._lens,
                                        dtype=float_dtype)
-        context_layer_weights = tf.get_variable("context_layer_weights",
-                [config.hidden_size, config.emb_dims], dtype=float_dtype)
         last_output_indices = tf.stack([tf.range(tf.shape(self._x)[0]), self._lens-1], axis=1)
-        last_outputs = tf.gather_nd(outputs, last_output_indices)
-        self._predicted_context_embs = tf.matmul(last_outputs, context_layer_weights, 
-                                                 name='predicted_context_embs')
-        E_contexts = tf.get_variable("context_embedding", 
-                [config.vocab_size, config.emb_dims], dtype=float_dtype)
-        pre_probs = tf.matmul(self._predicted_context_embs, tf.transpose(E_contexts))
-        
-        pre_probs_32 = (tf.cast(pre_probs, tf.float32) if float_dtype != tf.float32 
-                        else pre_probs)
-        self._hit_at_100 = tf.reduce_mean(tf.cast(
-                tf.nn.in_top_k(pre_probs_32, self._y, 100), float_dtype))
-        self._cost = tf.reduce_mean(
-                tf.nn.sparse_softmax_cross_entropy_with_logits(
-                logits=pre_probs, labels=self._y))
+        self._lstm_output = tf.gather_nd(outputs, last_output_indices)
         self._initial_state = cell.zero_state(tf.shape(self._x)[0], float_dtype)
-        
+
+    def _build_logits(self, config, float_dtype):
+        E_contexts = tf.get_variable("context_embedding")
+        self._logits = tf.matmul(self._predicted_context_embs, tf.transpose(E_contexts))
+
     def measure_dev_cost(self, session, data, lens, target_id):
         # resample the sentences so that each token has equal chance to become target
         samples = np.random.choice(len(data), size=len(data), p=lens/lens.sum())
@@ -181,11 +188,10 @@ class WSDModelEvaluate(object):
         one_to_n = np.arange(lens2.size)
         y = x[one_to_n, target_indices]
         x[one_to_n, target_indices] = target_id
-        max_batch_size = 1000
         total_cost = 0.0
         total_hit = 0.0
-        for batch_start in range(0, len(x), max_batch_size):
-            batch_end = min(len(x), batch_start+max_batch_size)
+        for batch_start in range(0, len(x), self.max_batch_size):
+            batch_end = min(len(x), batch_start + self.max_batch_size)
             batch_x = x[batch_start:batch_end]
             batch_y = y[batch_start:batch_end]
             batch_lens = lens2[batch_start:batch_end]
@@ -202,44 +208,83 @@ class WSDModelEvaluate(object):
             total_hit += hit_at_100 * batch_size
         return total_cost / len(x), total_hit / len(x)
 
-
 class WSIModelTrain(WSDModelTrain):
     """A LSTM word sense induction (WSI) model designed for fast training."""
 
-    def __init__(self, config, float_dtype, sense_num=4):
-        self._x = tf.placeholder(tf.int32, shape=[None, None], name='x')
-        self._y = tf.placeholder(tf.int32, shape=[None], name='y')
-        self._subvocab = tf.placeholder(tf.int32, shape=[None], name='subvocab')
-        
-        E_words = tf.get_variable("word_embedding", 
-                [config.vocab_size, config.emb_dims], dtype=float_dtype)
-        word_embs = tf.nn.embedding_lookup(E_words, self._x)
-        cell = tf.contrib.rnn.LSTMCell(num_units=config.hidden_size,
-                                       state_is_tuple=True)
-        outputs, _ = tf.nn.dynamic_rnn(cell, word_embs, dtype=float_dtype)
-        context_layer_weights = tf.get_variable("context_layer_weights",
-                [config.hidden_size, config.emb_dims], dtype=float_dtype)
-        self._predicted_context_embs = tf.matmul(outputs[:,-1], context_layer_weights, 
-                                                 name='predicted_context_embs')
+    def _build_logits(self, config, float_dtype):
         E_contexts = tf.get_variable("context_embedding", 
-                [config.vocab_size, sense_num, config.emb_dims], dtype=float_dtype)
+                [config.vocab_size, config.num_senses, config.emb_dims], dtype=float_dtype)
         subcontexts = tf.nn.embedding_lookup(E_contexts, self._subvocab)
         subvocab_size = tf.shape(self._subvocab)[0]
-        pre_probs_senses = tf.matmul(self._predicted_context_embs, 
-                tf.transpose(tf.reshape(subcontexts, (subvocab_size*sense_num, config.emb_dims))))
-        pre_probs = tf.reduce_max(tf.reshape(pre_probs_senses, (-1, subvocab_size, sense_num)), axis=2)
-        
-        self._cost = tf.reduce_mean(
-                tf.nn.sparse_softmax_cross_entropy_with_logits(
-                logits=pre_probs, labels=self._y))
+        sense_logits = tf.matmul(self._predicted_context_embs, tf.transpose(
+                tf.reshape(subcontexts, (-1, config.emb_dims))))
+        self._logits = tf.reduce_max(tf.reshape(sense_logits, 
+                (-1, subvocab_size, config.num_senses)), axis=2)
 
-        tvars = tf.trainable_variables()
-        grads, _ = tf.clip_by_global_norm(tf.gradients(self._cost, tvars),
-                                          config.max_grad_norm)
-        optimizer = tf.train.AdagradOptimizer(config.learning_rate)
-        self._train_op = optimizer.apply_gradients(zip(grads, tvars),
-                global_step=tf.contrib.framework.get_or_create_global_step())
+class WSIModelEvaluate(WSDModelEvaluate):
+    """A LSTM word sense induction (WSI) model designed for fast training."""
 
-        self._initial_state = cell.zero_state(tf.shape(self._x)[0], float_dtype)
-        self.run_options = self.run_metadata = None
-        
+    max_batch_size = 100 # to fit in memory
+
+    def _build_logits(self, config, float_dtype):
+        E_contexts = tf.get_variable("context_embedding")
+        sense_logits = tf.matmul(self._predicted_context_embs, tf.transpose(
+            tf.reshape(E_contexts, (-1, config.emb_dims))))
+        self._logits = tf.reduce_max(tf.reshape(sense_logits,
+                (-1, config.vocab_size, config.num_senses)), axis=2)
+
+def load_data(FLAGS):
+    sys.stderr.write('Loading data...\n')
+    full_vocab = np.load(FLAGS.data_path + '.index.pkl')
+    train = np.load(FLAGS.data_path + '.train.npz')
+    train_batches = []
+    num_batches = len(train.keys())
+    for i in range(num_batches):
+        sentences = train['batch%d' %i]
+        batch_vocab, inverse = np.unique(sentences, return_inverse=True)
+        outputs = inverse.reshape(sentences.shape)
+        sys.stderr.write('Batch %d of %d vocab size: %d (%.2f%% of original)\n'
+                         %(i, num_batches, batch_vocab.size, batch_vocab.size*100.0/len(full_vocab)))
+        train_batches.append((sentences, outputs, batch_vocab))
+    dev = np.load(FLAGS.data_path + '.dev.npz')
+    sys.stderr.write('Loading data... Done.\n')
+    return full_vocab, train_batches, dev['data'], dev['lens']
+
+def train_model(m_train, m_evaluate, FLAGS, config):
+    vocab, train_batches, dev_data, dev_lens = load_data(FLAGS)
+    target_id = vocab['<target>']
+    
+    with tf.Session() as session:
+        saver = tf.train.Saver()
+        start_time = time.time()
+        sys.stdout.write("Initializing variables.... ")
+        session.run(tf.global_variables_initializer())
+        sys.stdout.write("Done.\n")
+        best_cost = None
+        stagnant_count = 0
+        for i in range(config.max_epoch):
+            # only turn it on after 5 epochs because first epochs spend time 
+            # on GPU initialization routines
+            if FLAGS.trace_timeline and i == 5: 
+                m_train.trace_timeline() # start tracing timeline
+            print("Epoch #%d:" % (i + 1))
+#             train_cost = 0 # for debugging
+            train_cost = m_train.train_epoch(session, train_batches, target_id, verbose=True)
+            dev_cost, hit_at_100 = m_evaluate.measure_dev_cost(session, dev_data, dev_lens, target_id)
+            print("Epoch #%d finished:" %(i + 1))
+            print("\tTrain cost: %.3f" %train_cost)
+            print("\tDev cost: %.3f, hit@100: %.1f%%" %(dev_cost, hit_at_100))
+            if best_cost is None or dev_cost < best_cost:
+                best_cost = dev_cost
+#                 save_start = time.time()
+                print("\tSaved best model to %s" %saver.save(session, FLAGS.save_path))
+#                 print("\tTime on saving: %f sec" %(time.time()-save_start))
+                stagnant_count = 0
+            else:
+                stagnant_count += 1
+                if config.max_stagnant_count > 0 and stagnant_count >= config.max_stagnant_count:
+                    print("Stopped early because development cost "
+                          "didn't decrease for %d consecutive epochs." 
+                          %config.max_stagnant_count)
+                    break
+            print("\tElapsed time: %.1f minutes" %((time.time()-start_time)/60))
