@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --time=72:00:00
+#SBATCH --time=336:00:00
 #SBATCH -C TitanX
 #SBATCH --gres=gpu:1
 
@@ -11,9 +11,9 @@ module load cuDNN
 echo -n 'Started: ' && date
 
 python3 -u prepare-lstm-wsd.py output/gigaword.txt output/gigaword-lstm-wsd && \
-        python3 -u train-lstm-wsi.py --model google \
+        python3 -u train-lstm-wsi.py --model large \
                 --data_path output/gigaword-lstm-wsd \
-                --save_path output/lstm-wsi
+                --save_path output/lstm-wsi-model-large
 
 echo -n 'Finished: ' && date
     

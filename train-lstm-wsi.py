@@ -15,7 +15,7 @@ import tensorflow as tf
 from tensorflow.python.client import timeline
 import sys
 from model import WSIModelTrain, WSIModelEvaluate, train_model
-from configs import get_config, data_type
+from configs import get_config
 
 flags = tf.flags
 logging = tf.logging
@@ -41,9 +41,9 @@ def main(_):
         initializer = tf.random_uniform_initializer(-config.init_scale,
                                                     config.init_scale)
     with tf.variable_scope("Model", reuse=None, initializer=initializer):
-        m_train = WSIModelTrain(config, data_type())
+        m_train = WSIModelTrain(config)
     with tf.variable_scope("Model", reuse=True):
-        m_evaluate = WSIModelEvaluate(config, data_type())
+        m_evaluate = WSIModelEvaluate(config)
     m_train.print_device_placement()
     train_model(m_train, m_evaluate, FLAGS, config)
     

@@ -563,6 +563,20 @@ Submitted batch job 1529915
 Submitted batch job 1529916
 ```
 
+## Wed 2 Aug
+
+Started training WSI on DAS-5 (large model). Scheduled to run for 2 weeks.
+
+```
+[minhle@fs0 wsd-with-marten]$ sbatch train-lstm-wsi.job
+Submitted batch job 1532704
+```
+
+## Thu 3 Aug
+
+All jobs died because of disk space :(( I should have used TensorFlow support 
+for restarting training.
+
 TODO: prepare a giant zip file, send to Jacopo to run on big GPU
 TODO: run the preloading code anyway
 

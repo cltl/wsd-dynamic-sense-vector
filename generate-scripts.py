@@ -16,7 +16,7 @@ def count_lines_fast(path, block_size=65536):
 def generate_data_size_experiments():
     name_template = 'train-lstm-wsd-{percent:02d}pc-data-google-model.job'
     content_template = '''#!/bin/bash
-#SBATCH --time=72:00:00
+#SBATCH --time=720:00:00
 #SBATCH -C TitanX
 #SBATCH --gres=gpu:1
 

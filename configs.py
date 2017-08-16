@@ -1,12 +1,10 @@
 import tensorflow as tf
 
-def data_type():
-    return tf.float32
-
 class DefaultConfig(object):
     vocab_size = 10**6 + 3
     max_grad_norm = 5
     num_senses = 4
+    float_dtype = tf.float32
 
 class SmallConfig(DefaultConfig):
     """Small config."""
