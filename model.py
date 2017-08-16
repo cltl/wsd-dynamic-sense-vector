@@ -264,8 +264,7 @@ def train_model(m_train, m_evaluate, FLAGS, config):
     inc_epoch = tf.assign_add(epoch, 1)
     
     saver = tf.train.Saver()
-    sv = tf.train.Supervisor(logdir=FLAGS.save_path, saver=saver, 
-                             save_model_secs=60) # for testing
+    sv = tf.train.Supervisor(logdir=FLAGS.save_path, saver=saver) #, save_model_secs=60) # for testing
     with sv.managed_session() as sess:
         start_time = time.time()
         for i in range(sess.run(epoch), config.max_epoch):

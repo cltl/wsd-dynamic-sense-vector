@@ -577,10 +577,19 @@ Submitted batch job 1532704
 All jobs died because of disk space :(( I should have used TensorFlow support 
 for restarting training.
 
-TODO: prepare a giant zip file, send to Jacopo to run on big GPU
+## Wed 16 Aug
+
+Implemented managed session. Started training again. (I couldn't restore ) 
+
+```
+[minhle@fs0 wsd-with-marten]$ sbatch train-lstm-wsd-01pc-data-google-model.job
+Submitted batch job 1538265
+[minhle@fs0 wsd-with-marten]$ sbatch train-lstm-wsd-10pc-data-google-model.job
+Submitted batch job 1538275
+```
+
 TODO: run the preloading code anyway
 
 TODO: try different values of parallel_iterations in tf.nn.dynamic_rnn
 
 TODO: monitor performance, guide: https://stackoverflow.com/questions/37751739/tensorflow-code-optimization-strategy/37774430#37774430
-
