@@ -4,6 +4,8 @@ from collections import defaultdict
 import argparse
 import pickle
 from datetime import datetime
+from itertools import islice
+
 
 parser = argparse.ArgumentParser(description='Trains meaning embeddings based on precomputed LSTM model')
 parser.add_argument('-m', dest='model_path', required=True, help='path to model trained LSTM model')
@@ -66,7 +68,9 @@ with tf.Session() as sess:  # your session object
     sentence_lens = [] # list of ints
 
     with open(args.input_path) as infile:
-        for counter, line in enumerate(infile):
+        with open(path, 'rb') as f:
+            for n_lines in iter(lambda: tuple(islice(f, batch_size)), ()):
+            
 
             if counter >= int(args.max_lines):
                 break
@@ -95,8 +99,13 @@ with tf.Session() as sess:  # your session object
                 sentence_lens.append(len(sentence_as_ids))
 
                 if len(annotated_sentences) == batch_size:
-                    target_embeddings = sess.run(predicted_context_embs, {x: [sentence_as_ids],
-                                                                         lens: sentence_lens})
+                    max_length  = max([len(_list) for _list in annotated_sentences])
+                    for _list in annotated_sentences:
+                        length_diff = max_length - len(_list)
+                        [_list.append(vocab['<unkn>']) for _ in range(length_diff)]
+
+                    target_embeddings = sess.run(predicted_context_embs, {x: annotated_sentences,
+                                                                          lens: sentence_lens})
 
                     for synset_id, target_embedding in zip(identifiers, target_embeddings):
                         synset2context_embds[synset_id].append(target_embedding)
