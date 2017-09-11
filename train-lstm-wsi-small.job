@@ -18,4 +18,3 @@ head -n 1000000 output/gigaword.txt > output/gigaword.1m-sents.txt && \
                                      --save_path output/lstm-wsi-small
 
 echo -n 'Finished: ' && date
-    

@@ -537,10 +537,59 @@ work on WSD to spend more time on coreference.
 The issue turns out to be solved 2 months ago. But I ran into 
 [another issue](https://github.com/tensorflow/tensorflow/issues/11380). 
 
-TODO: prepare a giant zip file, send to Jacopo to run on big GPU
+## Week of Mon 17 Jul
+
+Got results from Marten. The "Google" model at ~10 epochs got 61% (WSD). This is
+still lower than the baseline but better than the "large" model.
+
+Jacopo suggested that we should write up a report.
+
+I suggested that we train the "google" model on different sizes of the data
+to make the case that we need 100B corpus to get Google's results.
+
+## Tue 25 Jul
+
+Fixed miscelleneous problems. Generalize the code. Fixed WSI.
+
+## Wed 26 Jul
+
+Submitted training on 1% and 10% of Gigaword. Scheduled to run for
+maximally 2 weeks.
+
+```
+[minhle@fs0 wsd-with-marten]$ sbatch train-lstm-wsd-01pc-data-google-model.job
+Submitted batch job 1529915
+[minhle@fs0 wsd-with-marten]$ sbatch train-lstm-wsd-10pc-data-google-model.job
+Submitted batch job 1529916
+```
+
+## Wed 2 Aug
+
+Started training WSI on DAS-5 (large model). Scheduled to run for 2 weeks.
+
+```
+[minhle@fs0 wsd-with-marten]$ sbatch train-lstm-wsi.job
+Submitted batch job 1532704
+```
+
+## Thu 3 Aug
+
+All jobs died because of disk space :(( I should have used TensorFlow support 
+for restarting training.
+
+## Wed 16 Aug
+
+Implemented managed session. Started training again. (I couldn't restore ) 
+
+```
+[minhle@fs0 wsd-with-marten]$ sbatch train-lstm-wsd-01pc-data-google-model.job
+Submitted batch job 1538265
+[minhle@fs0 wsd-with-marten]$ sbatch train-lstm-wsd-10pc-data-google-model.job
+Submitted batch job 1538275
+```
+
 TODO: run the preloading code anyway
 
 TODO: try different values of parallel_iterations in tf.nn.dynamic_rnn
 
 TODO: monitor performance, guide: https://stackoverflow.com/questions/37751739/tensorflow-code-optimization-strategy/37774430#37774430
-
