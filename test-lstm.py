@@ -3,6 +3,7 @@ import tensorflow as tf
 from collections import defaultdict 
 import argparse
 import pickle
+from datetime import datetime
 
 parser = argparse.ArgumentParser(description='Trains meaning embeddings based on precomputed LSTM model')
 parser.add_argument('-m', dest='model_path', required=True, help='path to model trained LSTM model')
@@ -13,6 +14,8 @@ parser.add_argument('-i', dest='input_path', required=True, help='input path wit
 parser.add_argument('-o',dest='output_path', required=True, help='path where sense embeddings will be stored')
 parser.add_argument('-t', dest='max_lines', required=True, help='maximum number of lines you want to train on')
 args = parser.parse_args()
+
+print('loaded arguments for training meaning embeddings')
 
 def ctx_embd_input(sentence):
     """
@@ -39,21 +42,31 @@ def ctx_embd_input(sentence):
     return tokens, annotation_indices    
     
 vocab = np.load(args.vocab_path)
+print('loaded vocab')
+
 synset2context_embds = defaultdict(list)
-  
+meaning_freqs = defaultdict(int)
+
 with tf.Session() as sess:  # your session object
     saver = tf.train.import_meta_graph(args.model_path + '.meta', clear_devices=True)
     saver.restore(sess, args.model_path)
     predicted_context_embs = sess.graph.get_tensor_by_name('Model/predicted_context_embs:0')
-    x = sess.graph.get_tensor_by_name('Model/x:0')
+    x = sess.graph.get_tensor_by_name('Model/Placeholder:0') 
 
     with open(args.input_path) as infile:
         for counter, line in enumerate(infile):
             if counter >= int(args.max_lines):
                 break
+            if counter % 1000 == 0:
+                print(counter, datetime.now())
             sentence = line.strip()
             tokens, annotation_indices = ctx_embd_input(sentence)
             for index, synset_id in annotation_indices:
+                
+                #if '_' in synset_id:
+                #    base_synset, synset_id = synset_id.split('_')
+
+                meaning_freqs[synset_id] += 1
                 target_id = vocab['<target>']
                 sentence_as_ids = [vocab.get(w) or vocab['<unkn>'] for w in tokens]
                 sentence_as_ids[index] = target_id
@@ -68,3 +81,6 @@ for synset, embeddings in synset2context_embds.items():
 
 with open(args.output_path, 'wb') as outfile:
     pickle.dump(synset2avg_embedding, outfile)
+
+with open(args.output_path + '.freq', 'wb') as outfile:
+    pickle.dump(meaning_freqs, outfile)
