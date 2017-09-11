@@ -54,6 +54,7 @@ print('loaded vocab')
 synset2context_embds = defaultdict(list)
 meaning_freqs = defaultdict(int)
 batch_size = int(args.batch_size)
+counter = 0
 
 
 with tf.Session() as sess:  # your session object
@@ -63,56 +64,57 @@ with tf.Session() as sess:  # your session object
     predicted_context_embs = sess.graph.get_tensor_by_name('Model_1/predicted_context_embs:0')
     lens = sess.graph.get_tensor_by_name('Model_1/lens:0')
 
-    identifiers = [] # list of sy_ids
-    annotated_sentences = []
-    sentence_lens = [] # list of ints
 
     with open(args.input_path) as infile:
-        with open(path, 'rb') as f:
-            for n_lines in iter(lambda: tuple(islice(f, batch_size)), ()):
-            
-
-            if counter >= int(args.max_lines):
-                break
-
-            if counter % 1000 == 0:
-                print(counter, datetime.now())
+        for n_lines in iter(lambda: tuple(islice(infile, batch_size)), ()):
 
 
-            sentence = line.strip()
-            tokens, annotation_indices = ctx_embd_input(sentence)
+            identifiers = []  # list of sy_ids
+            annotated_sentences = []
+            sentence_lens = []  # list of ints
 
-            for index, synset_id in annotation_indices:
+            for line in n_lines:
 
-                if args.setting == 'hdn':
-                    base_synset, synset_id = synset_id.split('_')
+                counter += 1
 
-                sentence_as_ids = [vocab.get(w) or vocab['<unkn>'] for w in tokens]
-                target_id = vocab['<target>']
-                sentence_as_ids[index] = target_id
+                if counter >= int(args.max_lines):
+                    break
 
-                meaning_freqs[synset_id] += 1
+                if counter % 1000 == 0:
+                    print(counter, datetime.now())
 
-                # update batch information
-                identifiers.append(synset_id)
-                annotated_sentences.append(sentence_as_ids)
-                sentence_lens.append(len(sentence_as_ids))
 
-                if len(annotated_sentences) == batch_size:
-                    max_length  = max([len(_list) for _list in annotated_sentences])
-                    for _list in annotated_sentences:
-                        length_diff = max_length - len(_list)
-                        [_list.append(vocab['<unkn>']) for _ in range(length_diff)]
+                sentence = line.strip()
+                tokens, annotation_indices = ctx_embd_input(sentence)
 
-                    target_embeddings = sess.run(predicted_context_embs, {x: annotated_sentences,
-                                                                          lens: sentence_lens})
+                for index, synset_id in annotation_indices:
 
-                    for synset_id, target_embedding in zip(identifiers, target_embeddings):
-                        synset2context_embds[synset_id].append(target_embedding)
+                    if args.setting == 'hdn':
+                        base_synset, synset_id = synset_id.split('_')
 
-                    identifiers = []
-                    annotated_sentences = []
-                    sentence_lens = []
+                    sentence_as_ids = [vocab.get(w) or vocab['<unkn>'] for w in tokens]
+                    target_id = vocab['<target>']
+                    sentence_as_ids[index] = target_id
+
+                    meaning_freqs[synset_id] += 1
+
+                    # update batch information
+                    identifiers.append(synset_id)
+                    annotated_sentences.append(sentence_as_ids)
+                    sentence_lens.append(len(sentence_as_ids))
+
+            # compute embeddings for batch
+            max_length  = max([len(_list) for _list in annotated_sentences])
+            for _list in annotated_sentences:
+                length_diff = max_length - len(_list)
+                [_list.append(vocab['<unkn>']) for _ in range(length_diff)]
+
+            target_embeddings = sess.run(predicted_context_embs, {x: annotated_sentences,
+                                                                  lens: sentence_lens})
+
+            for synset_id, target_embedding in zip(identifiers, target_embeddings):
+                synset2context_embds[synset_id].append(target_embedding)
+
 
 
 synset2avg_embedding = dict()
