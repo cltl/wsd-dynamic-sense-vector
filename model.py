@@ -275,22 +275,23 @@ def train_model(m_train, m_evaluate, FLAGS, config):
             print("Epoch #%d:" % (i + 1))
 #             train_cost = 0 # for debugging
             train_cost = m_train.train_epoch(sess, train_batches, target_id, verbose=True)
-            dev_cost, hit_at_100 = m_evaluate.measure_dev_cost(sess, dev_data, dev_lens, target_id)
             print("Epoch #%d finished:" %(i + 1))
             print("\tTrain cost: %.3f" %train_cost)
-            print("\tDev cost: %.3f, hit@100: %.1f%%" %(dev_cost, hit_at_100))
-            if best_cost is None or dev_cost < best_cost:
-                best_cost = dev_cost
-                save_path = saver.save(sess, FLAGS.save_path + '-best-model')
-                print("\tSaved best model to %s" %save_path)
-                sess.run(reset_stag)
-            else:
-                sess.run(inc_stag)
-                if (config.max_stagnant_count > 0 and 
-                    sess.run(stagnant_count) >= config.max_stagnant_count):
-                    print("Stopped early because development cost "
-                          "didn't decrease for %d consecutive epochs." 
-                          %config.max_stagnant_count)
-                    break
+            if m_evaluate:
+                dev_cost, hit_at_100 = m_evaluate.measure_dev_cost(sess, dev_data, dev_lens, target_id)
+                print("\tDev cost: %.3f, hit@100: %.1f%%" %(dev_cost, hit_at_100))
+                if best_cost is None or dev_cost < best_cost:
+                    best_cost = dev_cost
+                    save_path = saver.save(sess, FLAGS.save_path + '-best-model')
+                    print("\tSaved best model to %s" %save_path)
+                    sess.run(reset_stag)
+                else:
+                    sess.run(inc_stag)
+                    if (config.max_stagnant_count > 0 and 
+                        sess.run(stagnant_count) >= config.max_stagnant_count):
+                        print("Stopped early because development cost "
+                              "didn't decrease for %d consecutive epochs." 
+                              %config.max_stagnant_count)
+                        break
             print("\tElapsed time: %.1f minutes" %((time.time()-start_time)/60))
             sess.run(inc_epoch)

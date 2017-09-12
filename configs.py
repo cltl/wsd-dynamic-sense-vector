@@ -1,10 +1,21 @@
 import tensorflow as tf
+import os
+
+preprocessing_script_revision = '694cb4d'
+preprocessed_data_dir = os.path.join('preprocessed-data', preprocessing_script_revision)
+os.makedirs(preprocessed_data_dir, exist_ok=True)
+
+gigaword_path = 'data/gigaword'
+preprocessed_gigaword_path = os.path.join(preprocessed_data_dir, 'gigaword.txt')
 
 class DefaultConfig(object):
     vocab_size = 10**6 + 3
     max_grad_norm = 5
     num_senses = 4
     float_dtype = tf.float32
+    training_on_same_length_sentences = True
+    sampled_softmax = True
+    optimized_batches = True
 
 class SmallConfig(DefaultConfig):
     """Small config."""
@@ -19,9 +30,9 @@ class MediumConfig(DefaultConfig):
     """Medium config."""
     init_scale = 0.05
     learning_rate = 0.1
-    hidden_size = 200
+    hidden_size = 256
     max_epoch = 500
-    emb_dims = 100
+    emb_dims = 64
     max_stagnant_count = 10
 
 class LargeConfig(DefaultConfig):

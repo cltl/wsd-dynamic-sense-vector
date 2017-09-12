@@ -21,6 +21,10 @@ import re
 import numpy as np
 import subprocess
 from tensorflow.contrib.labeled_tensor import batch
+from random import Random
+from collections import Counter
+from utils import progress
+from configs import preprocessed_gigaword_path, preprocessed_data_dir
 
 dev_sents = 20000 # absolute maximum
 dev_portion = 0.01 # relative maximum
@@ -30,13 +34,8 @@ min_count = 5
 
 special_symbols = ['<target>', '<unkn>', '<pad>']
 
-def progress(it):
-    start = time()
-    for i, val in enumerate(it):
-        yield(val)
-        if (i+1) % 1000000 == 0:
-            sys.stderr.write('processed %d items, elapsed time: %.1f minutes...\n' 
-                             %(i+1, (time()-start)/60))
+rng = Random(2958207520)
+
 
 def _build_vocab(filename):
     sys.stderr.write('Building vocabulary...\n')
@@ -105,16 +104,17 @@ def pad_batches(inp_path, word2id):
     with open(inp_path) as f: total_sents = sum(1 for line in f)
     for sent in progress(lookup_and_iter_sents(inp_path, word2id)):
         if (len(dev) < dev_sents and len(dev) < dev_portion*total_sents 
-                and np.random.rand() < 0.01):
+                and rng.random() < 0.01):
             dev.append(sent)
         else:
-            last_max_len = max(last_max_len, len(sent))
-            last_batch.append(sent)
-            if len(last_batch)*last_max_len >= batch_size:
+            new_size = (len(last_batch)+1) * max(last_max_len,len(sent))
+            if new_size > batch_size:
                 batches['batch%d' %len(batches)] = pad(last_batch, last_max_len, pad_id)
                 last_max_len = 0
                 last_batch = []
-    if last_max_len > 0:
+            last_max_len = max(last_max_len, len(sent))
+            last_batch.append(sent)
+    if last_batch:
         batches['batch%d' %len(batches)] = pad(last_batch, last_max_len, pad_id)
     dev_lens = np.array([len(s) for s in dev], dtype=np.int32)
     dev_padded = PadFunc()(dev, max(dev_lens), pad_id)
@@ -133,8 +133,82 @@ def pad_batches(inp_path, word2id):
                      %(pad.total*4/float(2**30)))
     return batches, dev_padded, dev_lens
 
+
+
+def shuffle_and_pad_batches(inp_path, word2id):
+    sys.stderr.write('Reading lengths...\n')
+    lens = []
+    with codecs.open(inp_path, 'r', 'utf-8') as f:
+        for line in progress(f):
+            lens.append(line.count(' ') + 1)
+    sys.stderr.write('Reading lengths... Done.\n')
+    
+    sys.stderr.write('Calculating batch shapes... ')
+    indices = list(range(len(lens)))
+    rng.shuffle(indices)
+    total_sents = len(lens)
+    batches = {}
+    dev_lens = []
+    last_max_len = 0
+    last_batch = []
+    sent2batch = {}
+    for sent_id in indices:
+        l = lens[sent_id]
+        if (len(dev_lens) < dev_sents and len(dev_lens) < dev_portion*total_sents 
+                and rng.random() < 0.01):
+            dev_lens.append(l)
+            sent2batch[sent_id] = 'dev'
+        else:
+            new_size = (len(last_batch)+1) * max(last_max_len,l)
+            if new_size >= batch_size:
+                batches['batch%d' %len(batches)] = np.empty((len(last_batch), last_max_len))
+                last_max_len = 0
+                last_batch = []
+            last_max_len = max(last_max_len, l)
+            last_batch.append(l)
+            sent2batch[sent_id] = 'batch%d' %len(batches)
+    if last_batch:
+        batches['batch%d' %len(batches)] = np.empty((len(last_batch), last_max_len))
+    dev = np.empty((len(dev_lens), max(dev_lens)))
+    sys.stderr.write('Done.\n')
+    
+    sys.stderr.write('Dividing and padding...\n')
+    pad_id = word2id['<pad>']
+    for b in batches.values(): b.fill(pad_id)
+    dev.fill(pad_id)
+    nonpad_count = 0
+    counter = Counter()
+    for sent_id, sent in progress(enumerate(lookup_and_iter_sents(inp_path, word2id))):
+        batch_name = sent2batch[sent_id]
+        arr = dev if batch_name == 'dev' else batches[batch_name]
+        arr[counter[batch_name],:len(sent)] = sent
+        if batch_name != 'dev': nonpad_count += len(sent)
+        counter[batch_name] += 1
+    assert counter['dev'] == dev.shape[0]
+    for batch_name, b in batches.items():
+        assert counter[batch_name] == b.shape[0]
+    sys.stderr.write('Dividing and padding... Done.\n')
+    
+    sizes = np.array([b.size for b in batches.values()])
+    if len(batches) >= 2:
+        sys.stderr.write('Divided into %d batches (%d elements each, std=%d, '
+                         'except last batch of %d).\n'
+                         %(len(batches), sizes[:-1].mean(), sizes[:-1].std(), sizes[-1]))
+    else:
+        assert len(batches) == 1
+        sys.stderr.write('Created 1 batch of %d elements.\n' %sizes[0])
+    total = sum(sizes)
+    pad_count = total - nonpad_count
+    sys.stderr.write('Added %d elements as padding (%.2f%%).\n' 
+                     %(pad_count, pad_count*100.0/total))
+    sys.stderr.write('Consumed roughly %.2f GiB.\n' 
+                     %(total*4/float(2**30)))
+    return batches, dev, dev_lens
+
+
 if __name__ == '__main__':
-    inp_path, out_path = sys.argv[1:]
+    inp_path = preprocessed_gigaword_path
+    out_path = os.path.join(preprocessed_data_dir, 'gigaword-for-lstm-wsd')
     
     index_path = out_path + '.index.pkl'
     if os.path.exists(index_path):
@@ -154,9 +228,15 @@ if __name__ == '__main__':
     
     train_path = out_path + '.train.npz'
     dev_path = out_path + '.dev.npz'
+    shuffled_train_path = out_path + '.train-shuffled.npz'
+    shuffled_dev_path = out_path + '.dev-shuffled.npz'
     if os.path.exists(train_path):
         sys.stderr.write('Result already exists: %s. Skipped.\n' %train_path)
     else:
         batches, dev_data, dev_lens = pad_batches(sorted_sents_path, word2id)
         np.savez(train_path, **batches)
         np.savez(dev_path, data=dev_data, lens=dev_lens)
+        
+        batches, dev_data, dev_lens = shuffle_and_pad_batches(sorted_sents_path, word2id)
+        np.savez(shuffled_train_path, **batches)
+        np.savez(shuffled_dev_path, data=dev_data, lens=dev_lens)

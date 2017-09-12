@@ -588,6 +588,35 @@ Submitted batch job 1538265
 Submitted batch job 1538275
 ```
 
+## Wed 6 Sep
+
+Met Jacopo about my [WSI idea](https://www.overleaf.com/10943156fjxfxfpydpvn).
+He liked it and, since me and Marten are both super busy, suggested that we 
+can hire a student assistant or supervise a master thesis on this topic.
+
+## Fri 8 Sep
+
+Make an outline of the reimplementation paper. There are some numbers we need to
+fill in.
+
+## Mon 11 Sep
+
+Help Marten to improve performance of his evaluation code.
+
+Now I need to measure speedups.
+ 
+Out of space. The prepared training data was removed a while ago (to get more
+space apparently). I need to move `EvEn` to Cartesius and prepare the data
+again... 
+
+```
+[minhle@fs0 wsd-with-marten]$ nohup python3 -u prepare-lstm-wsd.py output/gigaword.txt output/gigaword-lstm-wsd &
+[1] 29077
+$ zip EvEn.zip -r Even
+```
+
+Now just wait and wait and wait...
+
 TODO: run the preloading code anyway
 
 TODO: try different values of parallel_iterations in tf.nn.dynamic_rnn

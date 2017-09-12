@@ -1,5 +1,5 @@
 #!/bin/bash
 #SBATCH --time=24:00:00
 
-python3 process-gigaword.py > output/gigaword.txt
-python3 -u prepare-lstm-wsd.py output/gigaword.txt output/gigaword-lstm-wsd
+python3 -u process-gigaword.py
+python3 -u prepare-lstm-wsd.py
