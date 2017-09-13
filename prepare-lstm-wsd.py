@@ -20,7 +20,6 @@ import pickle
 import re
 import numpy as np
 import subprocess
-from tensorflow.contrib.labeled_tensor import batch
 from random import Random
 from collections import Counter
 from utils import progress

@@ -1,7 +1,8 @@
 import tensorflow as tf
 import os
 
-preprocessing_script_revision = '694cb4d'
+# preprocessing_script_revision = '694cb4d'
+preprocessing_script_revision = '40e2c1f'
 preprocessed_data_dir = os.path.join('preprocessed-data', preprocessing_script_revision)
 os.makedirs(preprocessed_data_dir, exist_ok=True)
 

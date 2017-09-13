@@ -617,8 +617,58 @@ $ zip EvEn.zip -r Even
 
 Now just wait and wait and wait...
 
-TODO: run the preloading code anyway
+## Tue 12 Sep
+
+Moved EvEn to Cartesius, got a little more space.
+
+Strengthen reproducibility by versioning preprocessed data.
+
+Started preprocessing data to measure speedups. I will need an unoptimized
+version of the batches so it will take some time. 
+
+```
+[minhle@fs0 wsd-with-marten]$ ls -l preprocessed-data/40e2c1f
+total 0
+lrwxrwxrwx 1 minhle minhle 75 Sep 12 16:52 gigaword.txt -> /home/minhle/scratch/wsd-with-marten/preprocessed-data/694cb4d/gigaword.txt
+lrwxrwxrwx 1 minhle minhle 82 Sep 12 16:52 gigaword.txt.sorted -> /home/minhle/scratch/wsd-with-marten/preprocessed-data/694cb4d/gigaword.txt.sorted
+[minhle@fs0 wsd-with-marten]$ nohup python3 -u prepare-lstm-wsd.py > preprocessed-data/40e2c1f/prepare-lstm-wsd.py.out 2>&1 &
+[1] 12220
+[minhle@fs0 wsd-with-marten]$ tail -f preprocessed-data/40e2c1f/prepare-lstm-wsd.py.out
+nohup: ignoring input
+Building vocabulary...
+processed 1000000 items, elapsed time: 0.3 minutes...
+processed 2000000 items, elapsed time: 0.7 minutes...
+processed 3000000 items, elapsed time: 1.0 minutes...
+processed 4000000 items, elapsed time: 1.3 minutes...
+```
+
+Crashed due to disk space limit. Mailed Kees asking for more space.
+
+## Wed 13 Sep
+
+Kees increased my quota to 400G! Now I have enough to run my experiment.
+
+Wasted another morning wrestling with TensorFlow. I had known that deleting
+packages is a bad idea. Now my TensorFlow installation doesn't work anymore.
+Emailed Kees asking about installing cuDNN v6.
+
+Managed to run the preprocessing script anyway:
+
+```
+[minhle@fs0 wsd-with-marten]$ nohup python3 -u prepare-lstm-wsd.py > preprocessed-data/40e2c1f/prepare-lstm-wsd.py.out 2>&1 &
+[1] 22530
+[minhle@fs0 wsd-with-marten]$ tail -f preprocessed-data/40e2c1f/prepare-lstm-wsd.py.out
+nohup: ignoring input
+Reading vocabulary from preprocessed-data/40e2c1f/gigaword-for-lstm-wsd.index.pkl... Done.
+Sentences are already sorted at preprocessed-data/40e2c1f/gigaword.txt.sorted
+Dividing and padding...
+processed 1000000 items, elapsed time: 0.2 minutes...
+processed 2000000 items, elapsed time: 0.4 minutes...
+processed 3000000 items, elapsed time: 0.6 minutes...
+processed 4000000 items, elapsed time: 0.8 minutes...
+processed 5000000 items, elapsed time: 1.0 minutes...
+```
+
 
 TODO: try different values of parallel_iterations in tf.nn.dynamic_rnn
 
-TODO: monitor performance, guide: https://stackoverflow.com/questions/37751739/tensorflow-code-optimization-strategy/37774430#37774430
