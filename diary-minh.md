@@ -669,6 +669,23 @@ processed 4000000 items, elapsed time: 0.8 minutes...
 processed 5000000 items, elapsed time: 1.0 minutes...
 ```
 
+## Tue 17 Oct
+
+Label propagation:
+
+* http://scikit-learn.org/stable/modules/label_propagation.html
+* https://github.com/yamaguchiyuto/label_propagation
 
 TODO: try different values of parallel_iterations in tf.nn.dynamic_rnn
+
+
+Steps to implement label propagation:
+
+5. [x] Try out scikit implementation 
+4. [x] Implement custom kernel ("We found that the graph has about the right density for common senses when ... between 85 to 98.")1. [ ] Input and output for SemCor and OMSTI
+3. [x] measure running time
+2. [ ] Query UkWaC??? for sentences that contain a certain lemma
+3. [ ] Build graph and run Scikit label propagation
+4. [ ] for 25 Oct: label prop. Semcor + OMSTI
+5. [ ] for 25 Oct: list of all experiments for the reproduction paper
 

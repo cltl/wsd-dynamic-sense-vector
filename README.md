@@ -2,7 +2,7 @@
 ## Setup
 
 ```
-pip3 install --user beautifulsoup4 sklearn testfixtures unittest2 pyemd morfessor
+pip3 install --user beautifulsoup4 sklearn testfixtures unittest2 pyemd morfessor pandas
 pip3 install --user spacy
 pip3 install --user https://github.com/explosion/spacy-models/releases/download/en_core_web_md-1.2.1/en_core_web_md-1.2.1.tar.gz
 python3 -m spacy link en_core_web_md en_default
