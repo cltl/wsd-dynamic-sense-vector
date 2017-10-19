@@ -676,6 +676,19 @@ Label propagation:
 * http://scikit-learn.org/stable/modules/label_propagation.html
 * https://github.com/yamaguchiyuto/label_propagation
 
+Implemented a test script
+
+## Thu 19 Oct
+
+Turned the test script into a class for performing label propagation.
+
+When I tested it with tiny data, one of labeled instance changes and the 
+unlabeled instance gets its label. Isn't it strange?
+
+    input: {'horse': array([0, 1, -1]), 'dog': array([0, 1, -1])}
+    output: {'horse': array([1, 1, 0]), 'dog': array([1, 1, 0])}
+
+
 TODO: try different values of parallel_iterations in tf.nn.dynamic_rnn
 
 
@@ -688,4 +701,4 @@ Steps to implement label propagation:
 3. [ ] Build graph and run Scikit label propagation
 4. [ ] for 25 Oct: label prop. Semcor + OMSTI
 5. [ ] for 25 Oct: list of all experiments for the reproduction paper
-
+6. [ ] Read more about label propagation (Zhou et al. 2004)
