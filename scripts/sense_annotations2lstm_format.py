@@ -7,6 +7,7 @@ import mapping_utils
 import wn_utils
 from collections import defaultdict
 import pandas
+from random import sample
 
 parser = argparse.ArgumentParser(description='Map sensekey annotations to higher levels')
 parser.add_argument('-i', dest='input_folder', required=True, help='path to WSD_Training_Corpora (http://lcl.uniroma1.it/wsdeval/data/WSD_Training_Corpora.zip)')
@@ -21,6 +22,9 @@ args = parser.parse_args()
 """
 python3 sense_annotations2lstm_format.py -i ../data/WSD_Training_Corpora -c semcor -l sensekey -d sem2013-aw.p -p NOUN -w 30 -o higher_level_annotations
 """
+
+print('start postprocessing command line args', datetime.now())
+
 
 # postprocess arguments
 corpora_to_include = args.corpora.split('_')
@@ -58,6 +62,10 @@ output_path = os.path.join(args.output_folder, 'sensekey-' + '_'.join(corpora_to
 log_path = os.path.join(args.output_folder, 'sensekey-' + '_'.join(corpora_to_include) + '.log')
 stats_path = os.path.join(args.output_folder, 'sensekey-' + '_'.join(corpora_to_include) + '.stats')
 
+print('end postprocessing command line args', datetime.now())
+
+
+print('start loading instance_id mappings', datetime.now())
 
 corpora_to_include = set(corpora_to_include)
 
@@ -74,6 +82,11 @@ if args.abstraction_level == 'sensekey':
 
     the_mapping = instance_id2sensekeys
     the_mapping_function = mapping_utils.map_sensekey_to_sensekey
+
+print('end loading instance_id mappings', datetime.now())
+
+
+print('start updating df', datetime.now())
 
 
 ## load competition df and add column to it mapping to different semantic level
@@ -93,6 +106,8 @@ for index, row in df.iterrows():
     target_lemmas_pos.add((row['target_lemma'], row['pos']))
 
 df.to_pickle(df_output_path)
+
+print('finished updating df', datetime.now())
 
 
 # load html
@@ -194,7 +209,7 @@ lp_input = dict()
 
 with open(log_path, 'w') as outfile:
 
-    headers = ['lemma', 'pos', '#_semcor', '#_omsti']
+    headers = ['lemma', 'pos', '#_semcor', '#_omsti', '#_omsti_sample']
     outfile.write('\t'.join(headers) + '\n')
 
     for target_lemma, target_pos in target_lemmas_pos:
@@ -202,11 +217,18 @@ with open(log_path, 'w') as outfile:
         sc_info = sc_lemma_pos2label_sent_index[(target_lemma, target_pos)]
         omsti_info = omsti_lemma_pos2label_sent_index[(target_lemma, target_pos)]
 
+        num_sc = len(sc_info)
+
+        num_omsti_before = len(omsti_info)
+        if len(omsti_info) > 1000:
+            omsti_info = sample(omsti_info, 1000)
+        num_omsti_after = len(omsti_info)
 
         outfile.write('\t'.join([target_lemma,
                                  target_pos,
-                                 str(len(sc_info)),
-                                 str(len(omsti_info))]) + '\n')
+                                 str(num_sc),
+                                 str(num_omsti_before),
+                                 str(num_omsti_after)]) + '\n')
 
 # add test instances to it
 
