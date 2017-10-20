@@ -23,7 +23,8 @@ import subprocess
 from random import Random
 from collections import Counter
 from utils import progress
-from configs import preprocessed_gigaword_path, preprocessed_data_dir
+from configs import preprocessed_gigaword_path, preprocessed_data_dir,\
+    gigaword_for_lstm_wsd_path
 
 dev_sents = 20000 # absolute maximum
 dev_portion = 0.01 # relative maximum
@@ -207,7 +208,7 @@ def shuffle_and_pad_batches(inp_path, word2id):
 
 if __name__ == '__main__':
     inp_path = preprocessed_gigaword_path
-    out_path = os.path.join(preprocessed_data_dir, 'gigaword-for-lstm-wsd')
+    out_path = gigaword_for_lstm_wsd_path
     
     index_path = out_path + '.index.pkl'
     if os.path.exists(index_path):

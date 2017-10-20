@@ -9,6 +9,8 @@ os.makedirs(preprocessed_data_dir, exist_ok=True)
 gigaword_path = 'data/gigaword'
 preprocessed_gigaword_path = os.path.join(preprocessed_data_dir, 'gigaword.txt')
 
+gigaword_for_lstm_wsd_path = os.path.join(preprocessed_data_dir, 'gigaword-for-lstm-wsd')
+
 class DefaultConfig(object):
     vocab_size = 10**6 + 3
     max_grad_norm = 5
