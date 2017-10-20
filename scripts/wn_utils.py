@@ -3,6 +3,49 @@ import itertools
 from collections import defaultdict
 
 
+def get_synset2domain(path_wn20_to_domain,
+                      path_wn20_to_wn30):
+    """
+    create mapping between wn30 and domain and vice versa
+
+    :param str path_wn20_to_domain: wn-domains-3.2-20070223 file
+    :param str path_wn20_to_wn30: wn20-30.noun file from upc mappings
+
+    :rtype: tuple
+    :return: (wn30_domain, domain_wn30)
+    """
+    wn30_domain = dict()
+    domain_wn30 = defaultdict(set)
+
+    wn20_wn30 = dict()
+    with open(path_wn20_to_wn30) as infile:
+        for line in infile:
+            split = line.strip().split()
+            if len(split) == 3:
+                offset_20, *values = line.strip().split()
+                offset_30 = ''
+                conf = 0.0
+                for index in range(0, len(values), 2):
+                    an_offset = values[index]
+                    a_conf = float(values[index + 1])
+                    if a_conf > conf:
+                        offset_30 = an_offset
+                        conf = a_conf
+                wn20_wn30[offset_20 + '-n'] = offset_30 + '-n'
+
+    with open(path_wn20_to_domain) as infile:
+        for line in infile:
+            sy_id, domain = line.strip().split('\t')
+            if all([sy_id in wn20_wn30,
+                    sy_id.endswith('n')]):
+                wn30 = wn20_wn30[sy_id]
+
+                wn30_domain['eng-30-' + wn30] = domain
+                domain_wn30[domain].add('eng-30-' + wn30)
+
+    return wn30_domain, domain_wn30
+
+
 def generate_training_instances(sentence_lemmas, annotations):
     """
     given the lemmas in a sentence with its annotations (can be more than one)
@@ -36,6 +79,65 @@ def generate_training_instances(sentence_lemmas, annotations):
         instances.add(' '.join(a_sentence))
     
     return instances
+
+
+def generate_training_instances_v2(sentence_tokens,
+                                   sentence_lemmas,
+                                   sentence_pos,
+                                   annotations):
+    """
+    given the lemmas in a sentence with its annotations (can be more than one)
+    generate all training instances for that sentence
+
+    e.g. 
+    sentence_tokens = ['the', 'man',            'meets',   'women']
+    sentence_lemmas = ['the', 'man',            'meet',    'woman']
+    sentence_pos    = ['',    'n',              'v',       'n']
+    annotations =     [[],    ['1', '2' ],      ['4'],     ['5', '6']]
+
+    would result in
+    ('man', 'n', '1', ['the', 'man', 'meets', 'women'], 'the man---1 meets women', 1)
+    ('man', 'n', '2', ['the', 'man', 'meets', 'women'], 'the man---2 meets women', 1)
+    ('meet', 'v', '4', ['the', 'man', 'meets', 'women'], 'the man meets---4 women', 2)
+    ('woman', 'n', '5', ['the', 'man', 'meets', 'women'], 'the man meets women---5', 3)
+    ('woman', 'n', '6', ['the', 'man', 'meets', 'women'], 'the man meets women---6', 3)
+
+    :param list sentence_tokens: see above
+    :param list sentence_lemmas: see above
+    :param list sentence_pos: see above
+    :param list annotations: see above
+
+    :rtype: generator
+    :return: generator of (target_lemma, 
+                           target_pos, 
+                           token_annotation, 
+                           sentence_tokens, 
+                           training_example, 
+                           target_index)
+    """
+    for target_index, token_annotations in enumerate(annotations):
+
+        target_lemma = sentence_lemmas[target_index]
+        target_pos = sentence_pos[target_index]
+
+        for token_annotation in token_annotations:
+
+            a_sentence = []
+            for index, token in enumerate(sentence_tokens):
+
+                if index == target_index:
+                    a_sentence.append(token + '---' + token_annotation)
+                else:
+                    a_sentence.append(token)
+
+            training_example = ' '.join(a_sentence)
+
+            yield (target_lemma,
+                   target_pos,
+                   token_annotation,
+                   sentence_tokens,
+                   training_example,
+                   target_index)
 
 def load_lemma_pos2offsets(path_to_index_sense):
     '''
@@ -157,8 +259,11 @@ def synsets_graph_info(wn_instance, wn_version, lemma, pos):
     synsets = set(synsets)
 
     if len(synsets) == 1:
-        target_sy_iden = synset2identifier(synsets.pop(), wn_version)
+        sy_obj = synsets.pop()
+        target_sy_iden = synset2identifier(sy_obj, wn_version)
         sy_id2under_lcs_info[target_sy_iden] = {'under_lcs': None,
+                                                'under_lcs_obj': None,
+                                                'sy_obj' : sy_obj,
                                                 'path_to_under_lcs': []}
         return sy_id2under_lcs_info
 
@@ -199,6 +304,28 @@ def synsets_graph_info(wn_instance, wn_version, lemma, pos):
                                                for synset in path_to_under_lcs]
 
                     sy_id2under_lcs_info[target_sy_iden] = {'under_lcs': under_lcs_iden,
+                                                            'under_lcs_obj': under_lcs,
+                                                            'sy_obj' : sy1,
                                                             'path_to_under_lcs': path_to_under_lcs_idens}
 
     return sy_id2under_lcs_info
+
+
+def get_synset2sensekeys(wn, target_lemma, pos):
+    """
+
+    :param str target_lemma: e.g. cat
+    :param str pos: n v a r
+
+    :rtype: dict
+    :return: mapping from synset identifier -> sensekey
+
+    """
+    synset2sensekeys = dict()
+    for synset in wn.synsets(target_lemma, pos):
+        sy_id = synset2identifier(synset, '30')
+        for lemma in synset.lemmas():
+            if lemma.key().startswith(target_lemma + '%'):
+                synset2sensekeys[sy_id] = lemma.key()
+
+    return synset2sensekeys

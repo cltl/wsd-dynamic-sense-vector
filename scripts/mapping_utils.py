@@ -94,13 +94,13 @@ def load_instance_id2offset(mapping_path, sensekey2offset, debug=False):
 
             elif len(offsets) >= 2:
                 more_than_one_offset += 1
-                print('2> offsets available for %s: %s' % (instance_id, offsets))
+                #print('2> offsets available for %s: %s' % (instance_id, offsets))
 
                 # we just take one of the n possible offsets
                 instance_id2offset[instance_id] = offsets.pop()
 
             elif len(offsets) == 0:
-                print('no offsets available for %s' % instance_id)
+                #print('no offsets available for %s' % instance_id)
                 no_offsets += 1
 
 
