@@ -19,7 +19,7 @@ parser.add_argument('-o', dest='output_folder', required=True, help='path where 
 args = parser.parse_args()
 
 """
-python sense_annotations2lstm_format.py -i ../data/WSD_Training_Corpora -c semcor -l sensekey -d sem2013-aw.p -p NOUN -w 30 -o higher_level_annotations
+python3 sense_annotations2lstm_format.py -i ../data/WSD_Training_Corpora -c semcor -l sensekey -d sem2013-aw.p -p NOUN -w 30 -o higher_level_annotations
 """
 
 # postprocess arguments
