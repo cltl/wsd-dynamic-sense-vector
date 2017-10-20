@@ -2,6 +2,7 @@ import argparse
 import os
 from lxml import html
 from datetime import datetime
+import pickle
 
 import mapping_utils
 import wn_utils
@@ -61,6 +62,7 @@ if args.wn_version == '30':
 output_path = os.path.join(args.output_folder, 'sensekey-' + '_'.join(corpora_to_include) + '.txt')
 log_path = os.path.join(args.output_folder, 'sensekey-' + '_'.join(corpora_to_include) + '.log')
 stats_path = os.path.join(args.output_folder, 'sensekey-' + '_'.join(corpora_to_include) + '.stats')
+lp_path = os.path.join(args.output_folder, 'sensekey-' + '_'.join(corpora_to_include) + '.lp')
 
 print('end postprocessing command line args', datetime.now())
 
@@ -105,7 +107,6 @@ for index, row in df.iterrows():
     target_lemmas.add(row['target_lemma'])
     target_lemmas_pos.add((row['target_lemma'], row['pos']))
 
-df.to_pickle(df_output_path)
 
 print('finished updating df', datetime.now())
 
@@ -224,18 +225,50 @@ with open(log_path, 'w') as outfile:
             omsti_info = sample(omsti_info, 1000)
         num_omsti_after = len(omsti_info)
 
+        lp_input[(target_lemma, target_pos)] = sc_info + omsti_info
+
         outfile.write('\t'.join([target_lemma,
                                  target_pos,
                                  str(num_sc),
                                  str(num_omsti_before),
                                  str(num_omsti_after)]) + '\n')
 
-# add test instances to it
+# add test instances to it and save identifiers to df
+df['lp_index'] = [None for index, row in df.iterrows()]
 
+for index, row in df.iterrows():
 
+    lemma = row['target_lemma']
+    pos = row['pos']
+    target_id = row['token_ids'][0]
+    target_index = None
+    sentence = []
+    for index, sentence_token in enumerate(row['sentence_tokens']):
 
+        if sentence_token.token_id == target_id:
+            target_index = index
+
+        sentence.append(sentence_token.text)
+
+    assert target_index is not None
+
+    sc_and_omsti_info = lp_input[(lemma, pos)]
+    len_before = len(sc_and_omsti_info)
+
+    lp_index = len(sc_and_omsti_info)
+
+    lp_input[(lemma, pos)].append((-1, sentence, target_index))
+    df.set_value(index, 'lp_index', lp_index)
+
+    len_after = len(lp_input[(lemma, pos)])
+
+    assert len_before != len_after
+
+df.to_pickle(df_output_path)
 
 # save one dictionary for input label propagation
+with open(lp_path, 'wb') as outfile:
+    pickle.dump(lp_input, outfile)
 
 
 
