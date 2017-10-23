@@ -13,7 +13,7 @@ from random import sample
 parser = argparse.ArgumentParser(description='Map sensekey annotations to higher levels')
 parser.add_argument('-i', dest='input_folder', required=True, help='path to WSD_Training_Corpora (http://lcl.uniroma1.it/wsdeval/data/WSD_Training_Corpora.zip)')
 parser.add_argument('-c', dest='corpora', required=True, help='supported: semcor | mun | semcor_mun')
-parser.add_argument('-l', dest='abstraction_level', required=True, help='supported: sensekey')
+parser.add_argument('-l', dest='abstraction_level', required=True, help='supported: sensekey | synset')
 parser.add_argument('-d', dest='competition_df', required=True, help='dataframe of the competition used')
 parser.add_argument('-p', dest='accepted_pos', required=True, help='supported: NOUN')
 parser.add_argument('-w', dest='wn_version', required=True, help='supported: 30')
@@ -31,7 +31,7 @@ print('start postprocessing command line args', datetime.now())
 corpora_to_include = args.corpora.split('_')
 
 # abstraction level
-assert args.abstraction_level in {'sensekey'}, 'abstraction level %s is not supported (only: sensekey)' % args.abstraction_level
+assert args.abstraction_level in {'sensekey', 'synset'}, 'abstraction level %s is not supported (only: sensekey)' % args.abstraction_level
 
 # pos
 accepted_pos = set(args.accepted_pos.split('_'))
@@ -59,10 +59,12 @@ if args.wn_version == '30':
     path_to_wn_index_sense = os.path.join(path_to_wn_dict_folder, 'index.sense')  # change this for other wn versions
 
 # output path
-output_path = os.path.join(args.output_folder, 'sensekey-' + '_'.join(corpora_to_include) + '.txt')
-log_path = os.path.join(args.output_folder, 'sensekey-' + '_'.join(corpora_to_include) + '.log')
-stats_path = os.path.join(args.output_folder, 'sensekey-' + '_'.join(corpora_to_include) + '.stats')
-lp_path = os.path.join(args.output_folder, 'sensekey-' + '_'.join(corpora_to_include) + '.lp')
+base_output_path = os.path.join(args.output_folder, args.abstraction_level + '-' + '_'.join(corpora_to_include))
+output_path = base_output_path + '.txt'
+log_path = base_output_path + '.log'
+stats_path = base_output_path + '.stats'
+lp_path = base_output_path + '.lp'
+df_output_path = base_output_path + '.bin'
 
 print('end postprocessing command line args', datetime.now())
 
@@ -72,7 +74,7 @@ print('start loading instance_id mappings', datetime.now())
 corpora_to_include = set(corpora_to_include)
 
 # load mapping dictionary and function
-if args.abstraction_level == 'sensekey':
+if args.abstraction_level in {'sensekey', 'synset'}:
 
     # load instance_id to offset(s) from .key.txt file
     sensekey2offset = mapping_utils.load_mapping_sensekey2offset(path_to_wn_index_sense,
@@ -82,8 +84,13 @@ if args.abstraction_level == 'sensekey':
                                                                                       sensekey2offset,
                                                                                       debug=False)
 
-    the_mapping = instance_id2sensekeys
-    the_mapping_function = mapping_utils.map_sensekey_to_sensekey
+    if args.abstraction_level == 'sensekey':
+        the_mapping = instance_id2sensekeys
+        the_mapping_function = mapping_utils.map_sensekey_to_sensekey
+    elif args.abstraction_level == 'synset':
+        the_mapping = instance_id2offset
+        the_mapping_function = mapping_utils.map_instance_id2synset
+
 
 print('end loading instance_id mappings', datetime.now())
 
@@ -93,7 +100,6 @@ print('start updating df', datetime.now())
 
 ## load competition df and add column to it mapping to different semantic level
 df = pandas.read_pickle(args.competition_df)
-df_output_path = os.path.join(args.output_folder, 'sensekey-' + '_'.join(corpora_to_include) + '.bin')
 
 column_name = 'synset2%s' % args.abstraction_level
 df[column_name] = [None for index, row in df.iterrows()]
