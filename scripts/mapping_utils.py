@@ -3,6 +3,10 @@
 def map_sensekey_to_sensekey(instance_id, mapping):
     return mapping[instance_id]
 
+def map_instance_id2synset(instance_id, mapping):
+    return mapping[instance_id]
+
+
 def get_lemma_pos_of_sensekey(sense_key):
     """
     lemma and pos are determined for a wordnet sense key
