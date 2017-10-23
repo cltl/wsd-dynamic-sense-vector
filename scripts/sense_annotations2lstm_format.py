@@ -3,6 +3,8 @@ import os
 from lxml import html
 from datetime import datetime
 import pickle
+from semantic_class_manager import BLC
+
 
 import mapping_utils
 import wn_utils
@@ -13,7 +15,7 @@ from random import sample
 parser = argparse.ArgumentParser(description='Map sensekey annotations to higher levels')
 parser.add_argument('-i', dest='input_folder', required=True, help='path to WSD_Training_Corpora (http://lcl.uniroma1.it/wsdeval/data/WSD_Training_Corpora.zip)')
 parser.add_argument('-c', dest='corpora', required=True, help='supported: semcor | mun | semcor_mun')
-parser.add_argument('-l', dest='abstraction_level', required=True, help='supported: sensekey | synset')
+parser.add_argument('-l', dest='abstraction_level', required=True, help='supported: sensekey | synset | direct_hypernym | blc20')
 parser.add_argument('-d', dest='competition_df', required=True, help='dataframe of the competition used')
 parser.add_argument('-p', dest='accepted_pos', required=True, help='supported: NOUN')
 parser.add_argument('-w', dest='wn_version', required=True, help='supported: 30')
@@ -21,7 +23,7 @@ parser.add_argument('-o', dest='output_folder', required=True, help='path where 
 args = parser.parse_args()
 
 """
-python3 sense_annotations2lstm_format.py -i ../data/WSD_Training_Corpora -c semcor -l sensekey -d sem2013-aw.p -p NOUN -w 30 -o higher_level_annotations
+python3 sense_annotations2lstm_format.py -i ../data/WSD_Training_Corpora -c semcor -l blc20 -d sem2013-aw.p -p NOUN -w 30 -o higher_level_annotations
 """
 
 print('start postprocessing command line args', datetime.now())
@@ -31,7 +33,7 @@ print('start postprocessing command line args', datetime.now())
 corpora_to_include = args.corpora.split('_')
 
 # abstraction level
-assert args.abstraction_level in {'sensekey', 'synset'}, 'abstraction level %s is not supported (only: sensekey)' % args.abstraction_level
+assert args.abstraction_level in {'direct_hypernym', 'sensekey', 'synset', 'blc20'}, 'abstraction level %s is not supported (only: sensekey | synset | direct_hypernym | blc20)' % args.abstraction_level
 
 # pos
 accepted_pos = set(args.accepted_pos.split('_'))
@@ -73,16 +75,19 @@ print('start loading instance_id mappings', datetime.now())
 
 corpora_to_include = set(corpora_to_include)
 
+
 # load mapping dictionary and function
+
+# load instance_id to offset(s) from .key.txt file
+sensekey2offset = mapping_utils.load_mapping_sensekey2offset(path_to_wn_index_sense,
+                                                             args.wn_version)
+
+instance_id2offset, instance_id2sensekeys = mapping_utils.load_instance_id2offset(input_mapping_path,
+                                                                                  sensekey2offset,
+                                                                                  debug=False)
+
 if args.abstraction_level in {'sensekey', 'synset'}:
 
-    # load instance_id to offset(s) from .key.txt file
-    sensekey2offset = mapping_utils.load_mapping_sensekey2offset(path_to_wn_index_sense,
-                                                                 args.wn_version)
-
-    instance_id2offset, instance_id2sensekeys = mapping_utils.load_instance_id2offset(input_mapping_path,
-                                                                                      sensekey2offset,
-                                                                                      debug=False)
 
     if args.abstraction_level == 'sensekey':
         the_mapping = instance_id2sensekeys
@@ -90,6 +95,13 @@ if args.abstraction_level in {'sensekey', 'synset'}:
     elif args.abstraction_level == 'synset':
         the_mapping = instance_id2offset
         the_mapping_function = mapping_utils.map_instance_id2synset
+
+elif args.abstraction_level == 'direct_hypernym':
+    the_mapping = mapping_utils.get_synset2hypernym(wn)
+    the_mapping_function = mapping_utils.map_instance_id2direct_hypernym
+elif args.abstraction_level == 'blc20':
+    the_mapping = mapping_utils.get_synset2blc20(wn)
+    the_mapping_function = mapping_utils.map_instance_id2blc20
 
 
 print('end loading instance_id mappings', datetime.now())
@@ -107,9 +119,36 @@ df[column_name] = [None for index, row in df.iterrows()]
 target_lemmas = set()
 target_lemmas_pos = set()
 
+if args.abstraction_level == 'blc20':
+    blc_20_obj = BLC(20, 'all')
+
+
 for index, row in df.iterrows():
-    sy2sensekeys = wn_utils.get_synset2sensekeys(wn, row['target_lemma'], row['pos'])
-    df.set_value(index, column_name, sy2sensekeys)
+
+    if args.abstraction_level == 'sensekey':
+        sy2sensekeys = wn_utils.get_synset2sensekeys(wn, row['target_lemma'], row['pos'])
+        df.set_value(index, column_name, sy2sensekeys)
+
+    elif args.abstraction_level == 'direct_hypernym':
+        synsets = wn.synsets(row['target_lemma'], row['pos'])
+
+        sy2hypernyms = dict()
+        for synset in synsets:
+            synset_id = mapping_utils.synset2identifier(synset, '30')
+            hypernym_id = the_mapping[synset_id]
+            sy2hypernyms[synset_id] = hypernym_id
+        df.set_value(index, column_name, sy2hypernyms)
+
+    elif args.abstraction_level == 'blc20':
+        synsets = wn.synsets(row['target_lemma'], row['pos'])
+
+        sy2blc20 = dict()
+        for synset in synsets:
+            synset_id = mapping_utils.synset2identifier(synset, '30')
+            blc20_id = the_mapping[synset_id]
+            sy2blc20[synset_id] = blc20_id
+        df.set_value(index, column_name, sy2blc20)
+
     target_lemmas.add(row['target_lemma'])
     target_lemmas_pos.add((row['target_lemma'], row['pos']))
 
@@ -149,8 +188,6 @@ for corpus_node in my_html_tree.xpath('body/corpus'):
 
             for child_el in sent_node.getchildren():
 
-
-
                 lemma = child_el.get('lemma')
                 token = child_el.text
                 pos = child_el.get('pos')
@@ -170,10 +207,17 @@ for corpus_node in my_html_tree.xpath('body/corpus'):
 
 
                     instance_id = child_el.get('id')
+                    synset_id = instance_id2offset[instance_id]
 
-                    mapped_sensekey = the_mapping_function(instance_id, the_mapping)
+                    # determine key for mapping
+                    if args.abstraction_level in {'direct_hypernym', 'blc20'}:
+                        key = synset_id
+                    else:
+                        key = instance_id
 
-                    for a_mapping in mapped_sensekey:
+                    mappings = the_mapping_function(key, the_mapping)
+
+                    for a_mapping in mappings:
                         sent_annotations.append(a_mapping)
 
                         stats[lemma] += 1

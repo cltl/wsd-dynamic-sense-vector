@@ -1,11 +1,77 @@
+from semantic_class_manager import BLC
 
 
 def map_sensekey_to_sensekey(instance_id, mapping):
     return mapping[instance_id]
 
 def map_instance_id2synset(instance_id, mapping):
-    return mapping[instance_id]
+    return {mapping[instance_id]}
 
+def map_instance_id2direct_hypernym(synset_id, mapping):
+    return {mapping[synset_id]}
+
+def map_instance_id2blc20(synset_id, mapping):
+    return {mapping[synset_id]}
+
+
+def get_synset2hypernym(wn):
+    """
+    """
+    synset2hypernym = dict()
+    for synset in wn.all_synsets(pos='n'):
+
+        synset_id = synset2identifier(synset, '30')
+        hypernym_id = None
+
+        hypernyms = synset.hypernyms()
+        if hypernyms:
+            hypernym_id = synset2identifier(hypernyms[0], '30')
+
+        synset2hypernym[synset_id] = hypernym_id
+
+    return synset2hypernym
+
+def get_synset2blc20(wn):
+    """
+    
+    :param wn: 
+    :return: 
+    """
+    blc_20_obj = BLC(20, 'all')
+    synset2blc20 = dict()
+
+    for synset in wn.all_synsets(pos='n'):
+        synset_id = synset2identifier(synset, '30')
+
+        offset = str(synset.offset()).zfill(8)
+        results = blc_20_obj.get_classes_for_synset_pos(offset, 'n', '30')
+
+        synset2blc20[synset_id] = results[0]
+
+    return synset2blc20
+
+def synset2identifier(synset, wn_version):
+    """
+    return synset identifier of
+    nltk.corpus.reader.wordnet.Synset instance
+
+    :param nltk.corpus.reader.wordnet.Synset synset: a wordnet synset
+    :param str wn_version: supported: '171 | 21 | 30'
+
+    :rtype: str
+    :return: eng-VERSION-OFFSET-POS (n | v | r | a)
+    e.g.
+    """
+    offset = str(synset.offset())
+    offset_8_char = offset.zfill(8)
+
+    pos = synset.pos()
+    if pos == 'j':
+        pos = 'a'
+
+    identifier = 'eng-{wn_version}-{offset_8_char}-{pos}'.format_map(locals())
+
+    return identifier
 
 def get_lemma_pos_of_sensekey(sense_key):
     """
