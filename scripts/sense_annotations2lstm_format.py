@@ -23,7 +23,7 @@ parser.add_argument('-o', dest='output_folder', required=True, help='path where 
 args = parser.parse_args()
 
 """
-python3 sense_annotations2lstm_format.py -i ../data/WSD_Training_Corpora -c semcor -l blc20 -d sem2013-aw.p -p NOUN -w 30 -o higher_level_annotations
+python3 sense_annotations2lstm_format.py -i ../data/WSD_Training_Corpora -c semcor -l sensekey -d sem2013-aw.p -p NOUN -w 30 -o higher_level_annotations
 """
 
 print('start postprocessing command line args', datetime.now())
@@ -293,10 +293,10 @@ for index, row in df.iterrows():
     target_id = row['token_ids'][0]
     target_index = None
     sentence = []
-    for index, sentence_token in enumerate(row['sentence_tokens']):
+    for an_index, sentence_token in enumerate(row['sentence_tokens']):
 
         if sentence_token.token_id == target_id:
-            target_index = index
+            target_index = an_index
 
         sentence.append(sentence_token.text)
 
