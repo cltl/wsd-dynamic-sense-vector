@@ -5,6 +5,7 @@ import pickle
 import pandas
 from nltk.corpus import wordnet as wn
 from scipy import spatial
+import wn_utils
 
 parser = argparse.ArgumentParser(description='Perform WSD using LSTM model')
 parser.add_argument('-m', dest='model_path', required=True, help='path to model trained LSTM model')
@@ -17,10 +18,22 @@ parser.add_argument('-o', dest='output_path', required=True, help='path where ou
 parser.add_argument('-r', dest='results', required=True, help='path where accuracy will be reported')
 parser.add_argument('-g', dest='gran', required=True, help='sensekey | synset')
 parser.add_argument('-f', dest='mfs_fallback', required=True, help='True or False')
+parser.add_argument('-t', dest='path_case_freq', help='path to pickle with case freq')
+parser.add_argument('-p', dest='path_plural_freq', help='path to pickle with plural freq')
 
 args = parser.parse_args()
 args.mfs_fallback = args.mfs_fallback == 'True'
 
+case_strategy = False
+number_strategy = False
+
+if args.path_case_freq is not None:
+    case_freq = pickle.load(open(args.path_case_freq, 'rb'))
+    case_strategy = True
+
+if args.path_plural_freq is not None;
+    plural_freq = pickle.load(open(args.path_case_freq, 'rb'))
+    number_strategy = True
 
 with open(args.sense_embeddings_path + '.freq', 'rb') as infile:
     meaning_freqs = pickle.load(infile)
@@ -95,6 +108,7 @@ def score_synsets(target_embedding, candidate_synsets, sense_embeddings, instanc
     highest_synsets = []
     highest_conf = 0.0
     candidate_freq = dict()
+    strategy = 'lstm'
 
     for synset in candidate_synsets:
         if gran == 'synset':
@@ -129,9 +143,10 @@ def score_synsets(target_embedding, candidate_synsets, sense_embeddings, instanc
         if args.mfs_fallback:
             highest_synset = candidate_synsets[0]
             print('%s: no highest synset -> mfs' % instance_id)
+            strategy = 'mfs_fallback'
         else:
             highest_synset = None
-    return highest_synset, candidate_freq
+    return highest_synset, candidate_freq, strategy
 
 
 # load wsd competition dataframe
@@ -141,6 +156,10 @@ wsd_df = pandas.read_pickle(args.wsd_df_path)
 wsd_df['lstm_output'] = [None for _ in range(len(wsd_df))]
 wsd_df['lstm_acc'] = [None for _ in range(len(wsd_df))]
 wsd_df['emb_freq'] = [None for _ in range(len(wsd_df))]
+wsd_df['#_cand_synsets'] = [None for _ in range(len(wsd_df))]
+wsd_df['#_new_cand_synsets'] = [None for _ in range(len(wsd_df))]
+wsd_df['gold_in_new_cand_synsets'] = [None for _ in range(len(wsd_df))]
+wsd_df['wsd_strategy'] = [None for _ in range(len(wsd_df))]
 
 # load sense embeddings
 with open(args.sense_embeddings_path, 'rb') as infile:
@@ -165,9 +184,34 @@ with tf.Session() as sess:  # your session object
         target_embedding = sess.run(predicted_context_embs, {x: [sentence_as_ids]})[0]
 
         # load candidate synsets
-        synsets = wn.synsets(lemma, pos=pos)
-        candidate_synsets = [synset2identifier(synset, wn_version='30')
-                             for synset in synsets]
+        token_obj = row['tokens'][0]
+        the_token = token_obj.text
+
+        use_case = False
+        if all([case_strategy,
+                the_token.istitle()]):
+            use_case = True
+
+        use_number = False
+        if all([number_strategy,
+                token_obj.morphofeat in {'NNS', 'NNPS'}]):
+            use_number = True
+
+        # morphology reduced polysemy
+        candidate_synsets, \
+        new_candidate_synsets, \
+        gold_in_candidates = wn_utils.candidate_selection(token=the_token,
+                                                          target_lemma=row['target_lemma'],
+                                                          pos=row['pos'],
+                                                          use_case=use_case,
+                                                          use_number=use_number,
+                                                          gold_lexkeys=row['lexkeys'],
+                                                          case_freq=case_freq,
+                                                          plural_freq=plural_freq,
+                                                          debug=False)
+
+        the_chosen_candidates = [synset2identifier(synset, wn_version='30')
+                                 for synset in new_candidate_synsets]
 
         # get mapping to higher abstraction level
         synset2higher_level = dict()
@@ -175,15 +219,42 @@ with tf.Session() as sess:  # your session object
             label = 'synset2%s' % args.gran
             synset2higher_level = row[label]
 
+        # determine wsd strategy used
+        if len(candidate_synsets) == 1:
+            wsd_strategy = 'monosemous'
+        elif len(new_candidate_synsets) == 1:
+            wsd_strategy = 'morphology_solved'
+        elif len(candidate_synsets) == len(new_candidate_synsets):
+            wsd_strategy = 'lstm'
+        elif len(new_candidate_synsets) < len(candidate_synsets):
+            wsd_strategy = 'morphology+lstm'
+
         # perform wsd
-        if len(candidate_synsets) >= 2:
-            chosen_synset, candidate_freq = score_synsets(target_embedding, candidate_synsets, sense_embeddings, instance_id, lemma, pos, args.gran, synset2higher_level)
+        if len(the_chosen_candidates) >= 2:
+            chosen_synset, \
+            candidate_freq\
+            strategy = score_synsets(target_embedding,
+                                     the_chosen_candidates,
+                                     sense_embeddings,
+                                     instance_id,
+                                     lemma,
+                                     pos,
+                                     args.gran,
+                                     synset2higher_level)
+
+            if strategy == 'mfs_fallback':
+                wsd_strategy = 'mfs_fallback'
+
         else:
-            chosen_synset = candidate_synsets[0]
+            chosen_synset = the_chosen_candidates[0]
             candidate_freq = dict()
 
         # add to dataframe
         wsd_df.set_value(row_index, col='lstm_output', value=chosen_synset)
+        wsd_df.set_value(row_index, col='#_cand_synsets', value=len(candidate_synsets))
+        wsd_df.set_value(row_index, col='#_new_cand_synsets', value=len(new_candidate_synsets))
+        wsd_df.set_value(row_index, col='gold_in_new_cand_synsets', value=gold_in_candidates)
+        wsd_df.set_value(row_index, col='wsd_strategy', value=wsd_strategy)
 
         # score it
         lstm_acc = chosen_synset in row['wn30_engs']

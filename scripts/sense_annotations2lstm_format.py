@@ -5,6 +5,9 @@ from datetime import datetime
 import pickle
 from semantic_class_manager import BLC
 
+from spacy.en import English
+nlp = English()
+
 
 import mapping_utils
 import wn_utils
@@ -67,6 +70,9 @@ log_path = base_output_path + '.log'
 stats_path = base_output_path + '.stats'
 lp_path = base_output_path + '.lp'
 df_output_path = base_output_path + '.bin'
+case_freq_path = base_output_path + '.case_freq'
+plural_freq_path = base_output_path + '.plural_freq'
+
 
 print('end postprocessing command line args', datetime.now())
 
@@ -168,6 +174,9 @@ stats = defaultdict(int)
 sc_lemma_pos2label_sent_index = defaultdict(list)
 omsti_lemma_pos2label_sent_index = defaultdict(list)
 
+lemma_lower_pos2meaning2freq_uppercase = dict()
+lemma_lower_pos2meaning2freq_plural = dict()
+
 
 for corpus_node in my_html_tree.xpath('body/corpus'):
 
@@ -222,6 +231,23 @@ for corpus_node in my_html_tree.xpath('body/corpus'):
 
                         stats[lemma] += 1
 
+
+                        # case sensitive information
+                        if all([token.istitle(),                    # startswith capital letter
+                                not instance_id.endswith('t000')]): # not first token in sentence
+                            freq_key = (lemma.lower(), mapped_pos)
+                            if freq_key not in lemma_lower_pos2meaning2freq_uppercase:
+                                lemma_lower_pos2meaning2freq_uppercase[freq_key] = defaultdict(int)
+                            lemma_lower_pos2meaning2freq_uppercase[freq_key][a_mapping] += 1
+
+                        # plural information
+                        doc = nlp(token)
+                        if doc[0].tag_ in {'NNS', 'NNPS'}:
+                            freq_key = (lemma.lower(), mapped_pos)
+                            if freq_key not in lemma_lower_pos2meaning2freq_plural:
+                                lemma_lower_pos2meaning2freq_plural[freq_key] = defaultdict(int)
+                                lemma_lower_pos2meaning2freq_plural[freq_key][a_mapping] += 1
+
                 annotations.append(sent_annotations)
 
 
@@ -247,6 +273,14 @@ for corpus_node in my_html_tree.xpath('body/corpus'):
                     omsti_lemma_pos2label_sent_index[(target_lemma, target_pos)].append((-1, sentence_tokens, target_index))
 
 outfile.close()
+
+# save case freq
+with open(case_freq_path, 'wb') as outfile:
+    pickle.dump(lemma_lower_pos2meaning2freq_uppercase, outfile)
+
+with open(plural_freq_path, 'wb') as outfile:
+    pickle.dump(lemma_lower_pos2meaning2freq_plural, outfile)
+
 
 # postprocess for stats
 with open(stats_path, 'w') as outfile:
