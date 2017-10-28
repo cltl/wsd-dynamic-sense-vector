@@ -1,42 +1,44 @@
 import numpy as np
 import tensorflow as tf
+import json
 import argparse
 import pickle
 import pandas
 from nltk.corpus import wordnet as wn
 from scipy import spatial
-import wn_utils
+import morpho_utils
 
 parser = argparse.ArgumentParser(description='Perform WSD using LSTM model')
 parser.add_argument('-m', dest='model_path', required=True, help='path to model trained LSTM model')
-# model_path = '/var/scratch/mcpostma/wsd-dynamic-sense-vector/output/lstm-wsd-small'
 parser.add_argument('-v', dest='vocab_path', required=True, help='path to LSTM vocabulary')
-# vocab_path = '/var/scratch/mcpostma/wsd-dynamic-sense-vector/output/gigaword.1m-sents-lstm-wsd.index.pkl'
 parser.add_argument('-c', dest='wsd_df_path', required=True, help='input path to dataframe wsd competition')
+parser.add_argument('-l', dest='log_path', required=True, help='path where exp settings are stored')
 parser.add_argument('-s', dest='sense_embeddings_path', required=True, help='path where sense embeddings are stored')
 parser.add_argument('-o', dest='output_path', required=True, help='path where output wsd will be stored')
 parser.add_argument('-r', dest='results', required=True, help='path where accuracy will be reported')
 parser.add_argument('-g', dest='gran', required=True, help='sensekey | synset')
 parser.add_argument('-f', dest='mfs_fallback', required=True, help='True or False')
 parser.add_argument('-t', dest='path_case_freq', help='path to pickle with case freq')
+parser.add_argument('-a', dest='use_case_strategy', help='set to True to use morphological strategy case')
 parser.add_argument('-p', dest='path_plural_freq', help='path to pickle with plural freq')
+parser.add_argument('-b', dest='use_number_strategy', help='set to True to use morphological strategy number')
 
 args = parser.parse_args()
 args.mfs_fallback = args.mfs_fallback == 'True'
+case_strategy = args.use_case_strategy == 'True'
+number_strategy = args.use_number_strategy == 'True'
 
-case_strategy = False
-number_strategy = False
-
-if args.path_case_freq is not None:
+if case_strategy:
     case_freq = pickle.load(open(args.path_case_freq, 'rb'))
-    case_strategy = True
 
-if args.path_plural_freq is not None;
+if number_strategy;
     plural_freq = pickle.load(open(args.path_case_freq, 'rb'))
-    number_strategy = True
 
 with open(args.sense_embeddings_path + '.freq', 'rb') as infile:
     meaning_freqs = pickle.load(infile)
+
+with open(args.log_path, 'w') as outfile:
+    json.dump(args.__dict__, outfile)
 
 
 def synset2identifier(synset, wn_version):
@@ -183,32 +185,22 @@ with tf.Session() as sess:  # your session object
         sentence_as_ids[target_index] = target_id
         target_embedding = sess.run(predicted_context_embs, {x: [sentence_as_ids]})[0]
 
-        # load candidate synsets
+        # load token object
         token_obj = row['tokens'][0]
-        the_token = token_obj.text
-
-        use_case = False
-        if all([case_strategy,
-                the_token.istitle()]):
-            use_case = True
-
-        use_number = False
-        if all([number_strategy,
-                token_obj.morphofeat in {'NNS', 'NNPS'}]):
-            use_number = True
 
         # morphology reduced polysemy
         candidate_synsets, \
         new_candidate_synsets, \
-        gold_in_candidates = wn_utils.candidate_selection(token=the_token,
-                                                          target_lemma=row['target_lemma'],
-                                                          pos=row['pos'],
-                                                          use_case=use_case,
-                                                          use_number=use_number,
-                                                          gold_lexkeys=row['lexkeys'],
-                                                          case_freq=case_freq,
-                                                          plural_freq=plural_freq,
-                                                          debug=False)
+        gold_in_candidates = morpho_utils.candidate_selection(token=token_obj.text,
+                                                              target_lemma=row['target_lemma'],
+                                                              pos=row['pos'],
+                                                              morphofeat=token_obj.morphofeat,
+                                                              use_case=case_strategy,
+                                                              use_number=number_strategy,
+                                                              gold_lexkeys=row['lexkeys'],
+                                                              case_freq=case_freq,
+                                                              plural_freq=plural_freq,
+                                                              debug=False)
 
         the_chosen_candidates = [synset2identifier(synset, wn_version='30')
                                  for synset in new_candidate_synsets]
