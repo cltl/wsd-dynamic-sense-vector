@@ -10,8 +10,9 @@ import sys
 
 class LabelPropagation(object):
     
-    def __init__(self, sess, vocab_path, model_path):
+    def __init__(self, sess, vocab_path, model_path, batch_size):
         self.sess = sess
+        self.batch_size = batch_size
         self.vocab = np.load(vocab_path)
         saver = tf.train.import_meta_graph(model_path + '.meta', clear_devices=True)
         start_sec = time()
@@ -46,6 +47,8 @@ class LabelPropagation(object):
         '''
         input data format: dict(lemma -> list((sense_id[str], sentence_tokens, target_index)))
         set sense_id to None for unlabeled instances 
+
+        batch_size: number of sentences in a batch to be used as input for LSTM
         
         output format: dict(lemma -> list(sense_id)), the order in each list corresponds to the input
         '''
@@ -68,8 +71,15 @@ class LabelPropagation(object):
         for s in lstm_input:
             while len(s) < max_len:
                 s.append(pad_id)
-        lstm_output = self.sess.run(self.predicted_context_embs, 
-                                    {self.x: lstm_input, self.lens: lens})
+        lens = np.array(lens)
+        lstm_input = np.array(lstm_input)
+        lstm_output = []
+        for batch_start in range(0, len(lstm_input), self.batch_size):
+            batch_end = min(len(lstm_input), batch_start+self.batch_size)
+            lstm_output.append(self.sess.run(self.predicted_context_embs, 
+                                             {self.x: lstm_input[batch_start:batch_end], 
+                                              self.lens: lens[batch_start:batch_end]}))
+        lstm_output = np.vstack(lstm_output)
         
         output = {}
         start_index = 0
@@ -126,7 +136,7 @@ if __name__ == '__main__':
     model_path = '/home/minhle/scratch/wsd-with-marten/output/lstm-wsd-google_trained_on_gigaword_10pc'
     assert os.path.exists(vocab_path) and os.path.exists(model_path + '.meta'), 'Please update the paths hard-coded in this file (for testing only)'
     with tf.Session() as sess:
-        lp = LabelPropagation(sess, vocab_path, model_path)
+        lp = LabelPropagation(sess, vocab_path, model_path, 2)
         senses = lp.predict({'dog': [('dog.01', 'The dog runs through the yard'.split(), 1),
                                      ('dog.02', 'He ate a hot dog'.split(), 4),
                                      (None, 'Dogs are friends of human'.split(), 0)],
