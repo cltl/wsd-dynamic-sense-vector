@@ -26,9 +26,27 @@ class LabelPropagation(object):
         self.similarity_threshold = 0.95
         self.minimum_vertex_degree = 10
         
+    def _convert_sense_ids(self, data):
+        str2id = {}
+        ids = []
+        for lemma in data:
+            for i in range(len(data[lemma])):
+                sense_id, sentence_tokens, target_index = data[lemma][i]
+                if sense_id is None:
+                    sense_id = -1
+                else:
+                    if sense_id not in str2id:
+                        str2id[sense_id] = len(str2id)
+                        ids.append(sense_id)
+                    sense_id = str2id[sense_id]
+                data[lemma][i] = (sense_id, sentence_tokens, target_index)
+        return ids
+        
     def predict(self, data):
         '''
-        input data format: dict(lemma -> list((sense_id[int], sentence_tokens, target_index)))
+        input data format: dict(lemma -> list((sense_id[str], sentence_tokens, target_index)))
+        set sense_id to None for unlabeled instances 
+        
         output format: dict(lemma -> list(sense_id)), the order in each list corresponds to the input
         '''
         start_sec = time()
@@ -38,6 +56,7 @@ class LabelPropagation(object):
         lstm_input = []
         target_id = self.vocab['<target>']
         pad_id = self.vocab['<pad>']
+        sense_ids = self._convert_sense_ids(data)
         for lemma in data:
             for _, sentence_tokens, target_index in data[lemma]:
                 sentence_as_ids = [self.vocab.get(w) or self.vocab['<unkn>'] 
@@ -91,7 +110,7 @@ class LabelPropagation(object):
             # predict
             label_prop_model = LabelSpreading(kernel=lambda a, b: affinity)
             label_prop_model.fit(contexts, labels)
-            output[lemma] = label_prop_model.transduction_
+            output[lemma] = [sense_ids[index] for index in label_prop_model.transduction_]
             
         elapsed_sec = (time()-start_sec)
         print('Elapsed time: %.2f min' %(elapsed_sec/60.0))
@@ -108,11 +127,11 @@ if __name__ == '__main__':
     assert os.path.exists(vocab_path) and os.path.exists(model_path + '.meta'), 'Please update the paths hard-coded in this file (for testing only)'
     with tf.Session() as sess:
         lp = LabelPropagation(sess, vocab_path, model_path)
-        senses = lp.predict({'dog': [(0, 'The dog runs through the yard'.split(), 1),
-                                     (1, 'He ate a hot dog'.split(), 4),
-                                     (-1, 'Dogs are friends of human'.split(), 0)],
-                             'horse': [(0, 'She enjoys watching horse races', 3),
-                                       (1, 'He plays with only one horse against two bishops', 5),
-                                       [-1, 'Horses, horses, horses', 0]]})
+        senses = lp.predict({'dog': [('dog.01', 'The dog runs through the yard'.split(), 1),
+                                     ('dog.02', 'He ate a hot dog'.split(), 4),
+                                     (None, 'Dogs are friends of human'.split(), 0)],
+                             'horse': [('horse.01', 'She enjoys watching horse races', 3),
+                                       ('horse.01', 'He plays with only one horse against two bishops', 5),
+                                       [None, 'Horses, horses, horses', 0]]})
         print(senses)
         
