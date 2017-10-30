@@ -246,7 +246,8 @@ for corpus_node in my_html_tree.xpath('body/corpus'):
                             freq_key = (lemma.lower(), mapped_pos)
                             if freq_key not in lemma_lower_pos2meaning2freq_plural:
                                 lemma_lower_pos2meaning2freq_plural[freq_key] = defaultdict(int)
-                                lemma_lower_pos2meaning2freq_plural[freq_key][a_mapping] += 1
+                            lemma_lower_pos2meaning2freq_plural[freq_key][a_mapping] += 1
+
 
                 annotations.append(sent_annotations)
 
@@ -299,6 +300,8 @@ with open(log_path, 'w') as outfile:
 
     for target_lemma, target_pos in target_lemmas_pos:
 
+
+
         sc_info = sc_lemma_pos2label_sent_index[(target_lemma, target_pos)]
         omsti_info = omsti_lemma_pos2label_sent_index[(target_lemma, target_pos)]
 
@@ -324,29 +327,40 @@ for index, row in df.iterrows():
 
     lemma = row['target_lemma']
     pos = row['pos']
-    target_id = row['token_ids'][0]
-    target_index = None
-    sentence = []
-    for an_index, sentence_token in enumerate(row['sentence_tokens']):
 
-        if sentence_token.token_id == target_id:
-            target_index = an_index
+    # check polysemy
+    synsets = wn.synsets(lemma, pos)
 
-        sentence.append(sentence_token.text)
+    if len(synsets) >= 2:
 
-    assert target_index is not None
+        target_id = row['token_ids'][0]
+        target_index = None
+        sentence = []
+        for an_index, sentence_token in enumerate(row['sentence_tokens']):
 
-    sc_and_omsti_info = lp_input[(lemma, pos)]
-    len_before = len(sc_and_omsti_info)
+            if sentence_token.token_id == target_id:
+                target_index = an_index
 
-    lp_index = len(sc_and_omsti_info)
+            sentence.append(sentence_token.text)
 
-    lp_input[(lemma, pos)].append((-1, sentence, target_index))
+        assert target_index is not None
+
+        sc_and_omsti_info = lp_input[(lemma, pos)]
+        len_before = len(sc_and_omsti_info)
+
+        lp_index = len(sc_and_omsti_info)
+
+        lp_input[(lemma, pos)].append((-1, sentence, target_index))
+
+        len_after = len(lp_input[(lemma, pos)])
+
+        assert len_before != len_after
+
+    else: # monosemous
+        lp_index = None
+
     df.set_value(index, 'lp_index', lp_index)
 
-    len_after = len(lp_input[(lemma, pos)])
-
-    assert len_before != len_after
 
 df.to_pickle(df_output_path)
 
