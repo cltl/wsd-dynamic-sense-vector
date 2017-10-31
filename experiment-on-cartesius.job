@@ -1,0 +1,28 @@
+#!/bin/bash
+#SBATCH --time=72:00:00
+#SBATCH -C TitanX
+#SBATCH --gres=gpu:1
+
+module load cuda80/toolkit
+module load cuda80/blas
+module load cuda80
+module load cuDNN
+
+echo -n 'Started: ' && date
+
+preprocess_version=40e2c1f
+
+git checkout $preprocess_version && ./process-gigaword.job
+git checkout HEAD
+
+for seed in 124 261 9165 261 1005 16651 91 172 961 651
+do
+    python3 -u train-lstm-wsd.py --seed $seed --model small \
+            --data_path preprocessed-data/$preprocess_version/gigaword-lstm-wsd \
+            --save_path output/`version`/lstm-wsd-gigaword-small_seed-$seed &
+end
+
+wait
+
+echo -n 'Finished: ' && date
+    

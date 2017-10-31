@@ -20,8 +20,10 @@ from configs import get_config
 flags = tf.flags
 logging = tf.logging
 
+flags.DEFINE_integer("seed", 192, 
+                     "A random seed to make sure the experiment is repeatable")
 flags.DEFINE_string("model", "small",
-    "A type of model. Possible options are: small, medium, large, google.")
+                    "A type of model. Possible options are: small, medium, large, google.")
 flags.DEFINE_string("data_path", None,
                     "Where the training/test data is stored.")
 flags.DEFINE_string("save_path", None,
@@ -31,6 +33,7 @@ flags.DEFINE_bool("trace_timeline", False,
 FLAGS = flags.FLAGS
 
 def main(_):
+    tf.set_random_seed(FLAGS.seed)
     if not FLAGS.data_path:
         raise ValueError("Must set --data_path to the base path of "
                          "prepared input (e.g. output/gigaword)")

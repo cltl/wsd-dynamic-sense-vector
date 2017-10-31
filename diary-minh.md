@@ -691,14 +691,19 @@ unlabeled instance gets its label. Isn't it strange?
 
 TODO: try different values of parallel_iterations in tf.nn.dynamic_rnn
 
+## Tue 21 Oct
 
-Steps to implement label propagation:
+Started working on experiments that would run on Cartesius: 
+save all models, put results into
+versioned directories, vary the random seed.
+
 
 5. [x] Try out scikit implementation 
 4. [x] Implement custom kernel ("We found that the graph has about the right density for common senses when ... between 85 to 98.")1. [ ] Input and output for SemCor and OMSTI
 3. [x] measure running time
 2. [ ] Query UkWaC??? for sentences that contain a certain lemma
-3. [ ] Build graph and run Scikit label propagation
-4. [ ] for 25 Oct: label prop. Semcor + OMSTI
+3. [x] Build graph and run Scikit label propagation
+4. [x] for 25 Oct: label prop. Semcor + OMSTI
 5. [ ] for 25 Oct: list of all experiments for the reproduction paper
+6. [x] save models of every epoch (instead of only the best one)
 6. [ ] Read more about label propagation (Zhou et al. 2004)

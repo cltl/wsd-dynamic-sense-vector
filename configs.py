@@ -34,7 +34,7 @@ class MediumConfig(DefaultConfig):
     init_scale = 0.05
     learning_rate = 0.1
     hidden_size = 256
-    max_epoch = 500
+    max_epoch = 100
     emb_dims = 64
     max_stagnant_count = 10
 
@@ -43,7 +43,7 @@ class LargeConfig(DefaultConfig):
     init_scale = 0.04
     learning_rate = 0.1
     hidden_size = 512
-    max_epoch = 1000
+    max_epoch = 100
     emb_dims = 128
     max_stagnant_count = 20
 
@@ -52,7 +52,7 @@ class GoogleConfig(DefaultConfig):
     init_scale = 0.04
     learning_rate = 0.1
     hidden_size = 2048
-    max_epoch = 2000
+    max_epoch = 100
     emb_dims = 512
     max_stagnant_count = 50
 
