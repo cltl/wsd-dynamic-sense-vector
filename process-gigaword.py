@@ -5,6 +5,7 @@ import spacy
 from configs import gigaword_path, preprocessed_gigaword_path
 import codecs
 from utils import progress
+from version import version
 nlp = spacy.load('en_default')
 import sys
 
@@ -33,6 +34,9 @@ def iter_sents(paragraphs):
 # example_file = 'data/gigaword/gigaword_eng_5_d1/data/afp_eng/afp_eng_200112.gz'
 
 if __name__ == '__main__':
+    dir_ = os.path.join('preprocessed-data', version)
+    os.makedirs(dir_, exist_ok=True)
+    preprocessed_gigaword_path = os.path.join(dir_, 'gigaword.txt')
     with codecs.open(preprocessed_gigaword_path, 'w', 'utf-8') as f:
         for sent in progress(iter_sents(iter_paragraphs(iter_files(gigaword_path))),
                              ticks=10000):
