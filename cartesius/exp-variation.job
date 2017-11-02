@@ -1,0 +1,26 @@
+#!/bin/bash
+#SBATCH --time 5-00:00:00
+#SBATCH --partition gpu
+
+module load cuda/8.0.61
+module load cudnn/8.0-v6.0
+
+echo -n 'Started: ' && date
+
+preprocess_version=40e2c1f
+
+git checkout $preprocess_version && ./process-gigaword.job
+git checkout HEAD
+
+for seed in 124 261 9165 261 1005 16651 91 172 961 651
+do
+    base_path = output/`version`/lstm-wsd-gigaword-small_seed-$seed
+    python3 -u train-lstm-wsd.py --seed $seed --model small \
+            --data_path preprocessed-data/$preprocess_version/gigaword-lstm-wsd \
+            --save_path $base_path > $base_path.log 2>&1 &
+end
+
+wait
+
+echo -n 'Finished: ' && date
+    

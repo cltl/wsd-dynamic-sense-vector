@@ -277,6 +277,7 @@ def train_model(m_train, m_evaluate, FLAGS, config):
             train_cost = m_train.train_epoch(sess, train_batches, target_id, verbose=True)
             print("Epoch #%d finished:" %(i + 1))
             print("\tTrain cost: %.3f" %train_cost)
+            saver.save(sess, FLAGS.save_path + '-epoch-%03d' %i)
             if m_evaluate:
                 dev_cost, hit_at_100 = m_evaluate.measure_dev_cost(sess, dev_data, dev_lens, target_id)
                 print("\tDev cost: %.3f, hit@100: %.1f%%" %(dev_cost, hit_at_100))

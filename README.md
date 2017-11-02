@@ -1,28 +1,22 @@
 
 ## Setup
 
-```
-pip3 install --user beautifulsoup4 sklearn testfixtures unittest2 pyemd morfessor pandas
-pip3 install --user spacy
-pip3 install --user https://github.com/explosion/spacy-models/releases/download/en_core_web_md-1.2.1/en_core_web_md-1.2.1.tar.gz
-python3 -m spacy link en_core_web_md en_default
-pip3 install --user nltk
-printf 'd\nwordnet\nq' | python3 -c 'import nltk; nltk.download()'
-pip3 install --user tensorflow-gpu
-pip3 install --user docopt
-```
+    pip3 install --user beautifulsoup4 sklearn testfixtures unittest2 pyemd morfessor pandas
+    pip3 install --user spacy
+    pip3 install --user https://github.com/explosion/spacy-models/releases/download/en_core_web_md-1.2.1/en_core_web_md-1.2.1.tar.gz
+    python3 -m spacy link en_core_web_md en_default
+    pip3 install --user nltk
+    printf 'import nltk; nltk.download("wordnet")' | python3
+    pip3 install --user tensorflow-gpu
+    pip3 install --user docopt
 
 Put a link to your copy of Gigaword 5th edition
 
-```
-ln -s /path/to/gigaword/5ed data/gigaword
-```
+    ln -s /path/to/gigaword/5ed data/gigaword
 
 Install the modified version of gensim in order to train sense embeddings.
 
-```
-./install-gensim-modified.sh
-```
+    ./install-gensim-modified.sh
 
 Make sure you have a Java JDK installed.
 
@@ -32,12 +26,10 @@ If you get error `No module named 'pip'` while importing spacy, you might want
 to log in to one of the compute nodes and install pip.
 For example:
 
-```
-ssh node057
-easy_install-3.4 --user pip
-python3 -c 'import pip'
-exit
-```
+    ssh node057
+    easy_install-3.4 --user pip
+    python3 -c 'import pip'
+    exit
 
 If you get `No module named 'UserString'` while loading a Word2vec model from
 disk, probably it is caused by the difference between compute node and login
@@ -45,11 +37,9 @@ node. You might ssh to one of the compute nodes to continue your work.
 
 ### Specific instructions for training sense embeddings
 
-```
-cd data
-wget http://lcl.uniroma1.it/wsdeval/data/WSD_Training_Corpora.zip
-unzip WSD_Training_Corpora.zip
-```
+    cd data
+    wget http://lcl.uniroma1.it/wsdeval/data/WSD_Training_Corpora.zip
+    unzip WSD_Training_Corpora.zip
 
 
 ### Specific instructions for Babelfied Wikipedia conversion
@@ -65,19 +55,18 @@ unzip WSD_Training_Corpora.zip
 ## Steps
 
 ### Input training sense embeddings
-1.
-2. set the following experiment settings in `scripts/semcor_format2LSTM_input.py`. The current settings are:
-```
-wn_version = '30'
-corpora_to_include = ['semcor', 'mun']  # semcor | mun
-accepted_pos = {'NOUN'}
-entailment_setting = 'any_hdn'  # lemma_hdn | any_hdn`
-```
-3. train by running:
-```
-cd scripts
-python3 semcor_format2LSTM_input.py
-```
+
+Set the following experiment settings in `scripts/semcor_format2LSTM_input.py`. The current settings are:
+
+    wn_version = '30'
+    corpora_to_include = ['semcor', 'mun']  # semcor | mun
+    accepted_pos = {'NOUN'}
+    entailment_setting = 'any_hdn'  # lemma_hdn | any_hdn`
+
+Train by running:
+
+    cd scripts
+    python3 semcor_format2LSTM_input.py
 
 ### For LSTM model
 
