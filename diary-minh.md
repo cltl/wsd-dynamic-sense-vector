@@ -704,6 +704,27 @@ Took me a morning to setup Cartesius. Started the first step: preprocessing Giga
     Submitted batch job 3718227
     [minhle@int1 wsd-dynamic-sense-vector]$ tail -f slurm-3718227.out
 
+## Thu 2 Nov
+
+Tried parallel training on Cartesius. It could only run one training script
+at a time, all the rest failed and reported 4 different errors (!):
+"Blas GEMM launch failed", "OOM when allocating tensor",
+"failed initializing StreamExecutor for CUDA device", and
+"Failed to create session".
+
+Comparing the preprocessed version of Gigaword in DAS-5 and a (uncompleted)
+preprocessed version of Gigaword in Cartesius and found that they are different.
+ 
+Tried to parallelize BeautifulSoup, have negative effect: processing 10 documents
+used to take 1.2 mins now increases to 1.6 mins. Moreover, processing the full 
+737 files doesn't take up so much time anyway. The bottleneck turns out to be
+spacy. Running its models The current version use threads instead of processes so the purported
+parallelization actually does nothing. 
+
+Why did I get bogged down to this optimization hell? The preprocessing runs for 
+more than a day but so what? It also creates unstable output but I didn't find
+any evidence of that leading to incorrect result. I wasted a day and now I wonder
+if I created a new bug. Really, I shouldn't have gone down this road.
 
 
 5. [x] Try out scikit implementation 

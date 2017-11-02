@@ -6,7 +6,7 @@ output_dir = os.path.join('output', version)
 os.makedirs(output_dir, exist_ok=True)
 
 gigaword_path = 'data/gigaword'
-preprocessed_gigaword_path = os.path.join('preprocessed-data', '2017-11-01-d209688', 'gigaword.txt')
+preprocessed_gigaword_path = os.path.join('preprocessed-data', 'gigaword.txt')
 gigaword_for_lstm_wsd_path = os.path.join('preprocessed-data', 'todo', 'gigaword-for-lstm-wsd')
 
 class DefaultConfig(object):

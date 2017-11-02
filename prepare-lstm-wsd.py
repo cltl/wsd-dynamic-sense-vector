@@ -58,12 +58,12 @@ def sort_sentences(inp_path, out_path):
     status = subprocess.call(cmd, shell=True)
     assert status == 0
 
-def lookup_and_iter_sents(filename, word_to_id):
+def lookup_and_iter_sents(filename, word2id):
     unkn_id = word2id['<unkn>']
     with codecs.open(filename, 'r', 'utf-8') as f:
         for line in f:
             words = line.strip().split()
-            yield [word_to_id.get(word) or unkn_id for word in words]
+            yield [word2id.get(word) or unkn_id for word in words]
             
 class PadFunc(object):
     
@@ -218,14 +218,7 @@ def shuffle_and_pad_batches(inp_path, word2id, dev_sent_ids):
                      %(dev_lens.mean(), dev_lens.std()))
     return batches, dev, dev_lens
 
-
-if __name__ == '__main__':
-    inp_path = preprocessed_gigaword_path
-#     inp_path = 'preprocessed-data/gigaword_1m-sents.txt' # for debugging    
-    out_dir = os.path.join('preprocessed-data', version)
-    os.makedirs(out_dir, exist_ok=True)
-    out_path = os.path.join(out_dir, 'gigaword-for-lstm-wsd')
-    
+def run(inp_path, out_path, shuffle=True):
     index_path = out_path + '.index.pkl'
     if os.path.exists(index_path):
         sys.stderr.write('Reading vocabulary from %s... ' %index_path)
@@ -236,7 +229,7 @@ if __name__ == '__main__':
         word2id, words = _build_vocab(inp_path)
         with open(index_path, 'wb') as f: pickle.dump(word2id, f)
 
-    sorted_sents_path = inp_path + '.sorted'
+    sorted_sents_path = out_path + '.sorted'
     if os.path.exists(sorted_sents_path):
         sys.stderr.write('Sentences are already sorted at %s\n' %sorted_sents_path)
     else:
@@ -246,17 +239,42 @@ if __name__ == '__main__':
     dev_path = out_path + '.dev.npz'
     shuffled_train_path = out_path + '.train-shuffled.npz'
     shuffled_dev_path = out_path + '.dev-shuffled.npz'
-    if os.path.exists(shuffled_dev_path):
+    if os.path.exists(dev_path):
         sys.stderr.write('Result already exists: %s. Skipped.\n' %shuffled_dev_path)
     else:
         total_sents = count_lines_fast(sorted_sents_path)
         real_num_dev_sents = int(min(dev_sents, dev_portion*total_sents))
+        np.random.seed(918)
         dev_sent_ids = set(np.random.choice(total_sents, size=real_num_dev_sents, replace=False))
         
         batches, dev_data, dev_lens = pad_batches(sorted_sents_path, word2id, dev_sent_ids)
         np.savez(train_path, **batches)
         np.savez(dev_path, data=dev_data, lens=dev_lens)
         
-        batches, dev_data, dev_lens = shuffle_and_pad_batches(sorted_sents_path, word2id, dev_sent_ids)
-        np.savez(shuffled_train_path, **batches)
-        np.savez(shuffled_dev_path, data=dev_data, lens=dev_lens)
+        if shuffle:
+            batches, dev_data, dev_lens = shuffle_and_pad_batches(sorted_sents_path, word2id, dev_sent_ids)
+            np.savez(shuffled_train_path, **batches)
+            np.savez(shuffled_dev_path, data=dev_data, lens=dev_lens)
+    
+def copy_lines(num_lines, src_path, dest_path):
+    with open(src_path, 'rb') as f_src, open(dest_path, 'wb') as f_dest:
+        for _ in range(num_lines):
+            f_dest.write(f_src.readline())
+
+if __name__ == '__main__':
+    inp_path = preprocessed_gigaword_path
+    inp_path = 'preprocessed-data/gigaword_1m-sents.txt' # for debugging    
+    out_dir = os.path.join('preprocessed-data', version)
+    os.makedirs(out_dir, exist_ok=True)
+    out_path = os.path.join(out_dir, 'gigaword-for-lstm-wsd')
+    run(inp_path, out_path, shuffle=True)
+    
+    total_lines = count_lines_fast(inp_path)
+    for percent in (1, 10, 25, 50, 75):
+        num_lines = int(percent / 100.0 * total_lines)
+        
+        inp_path_pc = os.path.join(out_dir, 'gigaword_%02d-pc.txt' %percent)
+        out_path_pc = os.path.join(out_dir, 'gigaword-for-lstm-wsd_%02d-pc' %percent)
+        
+        copy_lines(num_lines, inp_path, inp_path_pc)
+        run(inp_path_pc, out_path_pc, shuffle=False)
