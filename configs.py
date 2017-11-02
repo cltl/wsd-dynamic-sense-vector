@@ -1,15 +1,13 @@
 import tensorflow as tf
 import os
+from version import version
 
-# preprocessing_script_revision = '694cb4d'
-preprocessing_script_revision = '40e2c1f'
-preprocessed_data_dir = os.path.join('preprocessed-data', preprocessing_script_revision)
-os.makedirs(preprocessed_data_dir, exist_ok=True)
+output_dir = os.path.join('output', version)
+os.makedirs(output_dir, exist_ok=True)
 
 gigaword_path = 'data/gigaword'
-preprocessed_gigaword_path = os.path.join(preprocessed_data_dir, 'gigaword.txt')
-
-gigaword_for_lstm_wsd_path = os.path.join(preprocessed_data_dir, 'gigaword-for-lstm-wsd')
+preprocessed_gigaword_path = os.path.join('preprocessed-data', '2017-11-01-d209688', 'gigaword.txt')
+gigaword_for_lstm_wsd_path = os.path.join('preprocessed-data', 'todo', 'gigaword-for-lstm-wsd')
 
 class DefaultConfig(object):
     vocab_size = 10**6 + 3

@@ -694,8 +694,16 @@ TODO: try different values of parallel_iterations in tf.nn.dynamic_rnn
 ## Tue 21 Oct
 
 Started working on experiments that would run on Cartesius: 
-save all models, put results into
-versioned directories, vary the random seed.
+save all models, put results into versioned directories, vary the random seed.
+
+## Wed 1 Nov
+
+Took me a morning to setup Cartesius. Started the first step: preprocessing Gigaword.
+
+    [minhle@int1 wsd-dynamic-sense-vector]$ sbatch cartesius/process-gigaword.job
+    Submitted batch job 3718227
+    [minhle@int1 wsd-dynamic-sense-vector]$ tail -f slurm-3718227.out
+
 
 
 5. [x] Try out scikit implementation 
