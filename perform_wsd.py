@@ -22,17 +22,24 @@ parser.add_argument('-t', dest='path_case_freq', help='path to pickle with case 
 parser.add_argument('-a', dest='use_case_strategy', help='set to True to use morphological strategy case')
 parser.add_argument('-p', dest='path_plural_freq', help='path to pickle with plural freq')
 parser.add_argument('-b', dest='use_number_strategy', help='set to True to use morphological strategy number')
+parser.add_argument('-z', dest='path_lp', help='if provided, lp output will be used')
+
 
 args = parser.parse_args()
 args.mfs_fallback = args.mfs_fallback == 'True'
 case_strategy = args.use_case_strategy == 'True'
 number_strategy = args.use_number_strategy == 'True'
+lp_strategy = args.path_lp is not None
 
 if case_strategy:
     case_freq = pickle.load(open(args.path_case_freq, 'rb'))
 
-if number_strategy;
+if number_strategy:
     plural_freq = pickle.load(open(args.path_case_freq, 'rb'))
+
+if lp_strategy:
+    lp_info = pickle.load(open(args.path_lp, 'rb'))
+
 
 with open(args.sense_embeddings_path + '.freq', 'rb') as infile:
     meaning_freqs = pickle.load(infile)
@@ -40,6 +47,32 @@ with open(args.sense_embeddings_path + '.freq', 'rb') as infile:
 with open(args.log_path, 'w') as outfile:
     json.dump(args.__dict__, outfile)
 
+
+def lp_output(row, lp_info, candidate_synsets, debug=False):
+    target_lemma = row['target_lemma']
+    target_pos = row['pos']
+
+    key = (target_lemma, target_pos)
+
+    if key not in lp_info:
+        if debug:
+            print(target_lemma, target_pos, 'not in lp_info')
+        return None
+
+    lp_index = row['lp_index']
+    if lp_index is None:
+        print('lp_index is None')
+        return None
+
+    sensekey = lp_info[(target_lemma, target_pos)][lp_index]
+    synset_identifier = None
+
+    for synset in candidate_synsets:
+        if any([lemma.key() == sensekey
+                for lemma in synset.lemmas()]):
+            synset_identifier = synset2identifier(synset, '30')
+
+    return synset_identifier
 
 def synset2identifier(synset, wn_version):
     """
@@ -124,7 +157,7 @@ def score_synsets(target_embedding, candidate_synsets, sense_embeddings, instanc
                 candidate_freq[synset] = meaning_freqs[candidate]
 
         if candidate not in sense_embeddings:
-            print('%s %s %s: candidate %s missing in sense embeddings' % (instance_id, lemma, pos, candidate))
+            #print('%s %s %s: candidate %s missing in sense embeddings' % (instance_id, lemma, pos, candidate))
             continue 
 
         cand_embedding = sense_embeddings[candidate]
@@ -140,11 +173,11 @@ def score_synsets(target_embedding, candidate_synsets, sense_embeddings, instanc
         highest_synset = highest_synsets[0]
     elif len(highest_synsets) >= 2:
         highest_synset = highest_synsets[0]
-        print('%s %s %s: 2> synsets with same conf %s: %s' % (instance_id, lemma, pos, highest_conf, highest_synsets))
+        #print('%s %s %s: 2> synsets with same conf %s: %s' % (instance_id, lemma, pos, highest_conf, highest_synsets))
     else:
         if args.mfs_fallback:
             highest_synset = candidate_synsets[0]
-            print('%s: no highest synset -> mfs' % instance_id)
+            #print('%s: no highest synset -> mfs' % instance_id)
             strategy = 'mfs_fallback'
         else:
             highest_synset = None
@@ -221,6 +254,14 @@ with tf.Session() as sess:  # your session object
         elif len(new_candidate_synsets) < len(candidate_synsets):
             wsd_strategy = 'morphology+lstm'
 
+        # possibly include label propagation strategy
+        if lp_strategy:
+            lp_result = lp_output(row, lp_info, new_candidate_synsets, debug=False)
+
+            if lp_result:
+                the_chosen_candidates = [lp_result]
+                wsd_strategy = 'lp'
+
         # perform wsd
         if len(the_chosen_candidates) >= 2:
             chosen_synset, \
@@ -234,8 +275,8 @@ with tf.Session() as sess:  # your session object
                                      args.gran,
                                      synset2higher_level)
 
-            if strategy == 'mfs_fallback':
-                wsd_strategy = 'mfs_fallback'
+            #if strategy == 'mfs_fallback':
+            #    wsd_strategy = 'mfs_fallback'
 
         else:
             chosen_synset = the_chosen_candidates[0]
