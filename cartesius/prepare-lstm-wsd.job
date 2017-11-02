@@ -5,4 +5,4 @@
 module load cuda/8.0.61
 module load cudnn/8.0-v6.0
 
-python3 -u process-gigaword.py
+python3 -u prepare-lstm-wsd.py

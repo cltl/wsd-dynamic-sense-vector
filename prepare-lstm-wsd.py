@@ -240,7 +240,7 @@ def run(inp_path, out_path, shuffle=True):
     shuffled_train_path = out_path + '.train-shuffled.npz'
     shuffled_dev_path = out_path + '.dev-shuffled.npz'
     if os.path.exists(dev_path):
-        sys.stderr.write('Result already exists: %s. Skipped.\n' %shuffled_dev_path)
+        sys.stderr.write('Result already exists: %s. Skipped.\n' %dev_path)
     else:
         total_sents = count_lines_fast(sorted_sents_path)
         real_num_dev_sents = int(min(dev_sents, dev_portion*total_sents))
@@ -263,7 +263,7 @@ def copy_lines(num_lines, src_path, dest_path):
 
 if __name__ == '__main__':
     inp_path = preprocessed_gigaword_path
-    inp_path = 'preprocessed-data/gigaword_1m-sents.txt' # for debugging    
+#     inp_path = 'preprocessed-data/gigaword_1m-sents.txt' # for debugging    
     out_dir = os.path.join('preprocessed-data', version)
     os.makedirs(out_dir, exist_ok=True)
     out_path = os.path.join(out_dir, 'gigaword-for-lstm-wsd')
