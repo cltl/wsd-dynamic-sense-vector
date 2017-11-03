@@ -726,6 +726,18 @@ more than a day but so what? It also creates unstable output but I didn't find
 any evidence of that leading to incorrect result. I wasted a day and now I wonder
 if I created a new bug. Really, I shouldn't have gone down this road.
 
+Submitted the job on Cartesius. It's pending...
+
+and this is the reason:
+
+> "This e-mail is to inform you that due to a vulnerability in the system software, the Cartesius system has been brought to an unscheduled maintenance mode. The batch system is being drained which means that your jobs, although they can still be committed to the queue, will not be executed. Please note that jobs that were already dispatched and being executed, have not been canceled.
+> 
+> We are currently in contact with our supplier for a solution. Our estimate is that the system will be up and running again by Tuesday morning, next week. Please find the actual system status on https://userinfo.surfsara.nl/systems/status."
+
+## Sat 4 Nov
+
+`prepare-lstm-wsd.job` finished. Now try `exp-variation.job`.
+
 
 5. [x] Try out scikit implementation 
 4. [x] Implement custom kernel ("We found that the graph has about the right density for common senses when ... between 85 to 98.")1. [ ] Input and output for SemCor and OMSTI
