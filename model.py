@@ -245,7 +245,7 @@ def load_data(FLAGS):
         sentences = train['batch%d' %i]
         batch_vocab, inverse = np.unique(sentences, return_inverse=True)
         outputs = inverse.reshape(sentences.shape)
-        sys.stderr.write('Batch %d of %d vocab size: %d (%.2f%% of original)\n'
+        sys.stderr.write('Batch %d of %d, vocab size: %d (%.2f%% of original)\n'
                          %(i, num_batches, batch_vocab.size, batch_vocab.size*100.0/len(full_vocab)))
         train_batches.append((sentences, outputs, batch_vocab))
     dev = np.load(FLAGS.data_path + '.dev.npz')
@@ -263,7 +263,7 @@ def train_model(m_train, m_evaluate, FLAGS, config):
     epoch = tf.get_variable("epoch", initializer=0, dtype=tf.int32, trainable=False)
     inc_epoch = tf.assign_add(epoch, 1)
     
-    saver = tf.train.Saver()
+    saver = tf.train.Saver(max_to_keep=0)
     sv = tf.train.Supervisor(logdir=FLAGS.save_path, saver=saver) #, save_model_secs=60) # for testing
     with sv.managed_session() as sess:
         start_time = time.time()
@@ -277,7 +277,7 @@ def train_model(m_train, m_evaluate, FLAGS, config):
             train_cost = m_train.train_epoch(sess, train_batches, target_id, verbose=True)
             print("Epoch #%d finished:" %(i + 1))
             print("\tTrain cost: %.3f" %train_cost)
-            saver.save(sess, FLAGS.save_path + '-epoch-%03d' %i)
+            saver.save(sess, FLAGS.save_path, global_step=i)
             if m_evaluate:
                 dev_cost, hit_at_100 = m_evaluate.measure_dev_cost(sess, dev_data, dev_lens, target_id)
                 print("\tDev cost: %.3f, hit@100: %.1f%%" %(dev_cost, hit_at_100))

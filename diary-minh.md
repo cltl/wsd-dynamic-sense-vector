@@ -738,6 +738,58 @@ and this is the reason:
 
 `prepare-lstm-wsd.job` finished. Now try `exp-variation.job`.
 
+It started:
+
+    [minhle@int2 wsd-dynamic-sense-vector]$ cat slurm-3725929.out
+    Started: Sat Nov  4 00:37:02 CET 2017
+    Running seed 124. Log is written to output/2017-11-04-a19751e/lstm-wsd-gigaword-small_seed-124.log
+
+    [minhle@int2 wsd-dynamic-sense-vector]$ tail -f output/2017-11-04-a19751e/lstm-wsd-gigaword-small_seed-124.log
+    ...
+    Epoch #1:
+        finished 1000 of 49551 batches, sample batch cost: 7.0678520
+
+    [minhle@gcn42 ~]$ nvidia-smi
+    Sat Nov  4 00:46:51 2017
+    +-----------------------------------------------------------------------------+
+    | NVIDIA-SMI 375.26                 Driver Version: 375.26                    |
+    |-------------------------------+----------------------+----------------------+
+    | GPU  Name        Persistence-M| Bus-Id        Disp.A | Volatile Uncorr. ECC |
+    | Fan  Temp  Perf  Pwr:Usage/Cap|         Memory-Usage | GPU-Util  Compute M. |
+    |===============================+======================+======================|
+    |   0  Tesla K40m          On   | 0000:02:00.0     Off |                    0 |
+    | N/A   45C    P0   119W / 235W |  10916MiB / 11439MiB |     83%      Default |
+    +-------------------------------+----------------------+----------------------+
+    |   1  Tesla K40m          On   | 0000:82:00.0     Off |                    0 |
+    | N/A   36C    P0    62W / 235W |  10873MiB / 11439MiB |      0%      Default |
+    +-------------------------------+----------------------+----------------------+
+    
+    +-----------------------------------------------------------------------------+
+    | Processes:                                                       GPU Memory |
+    |  GPU       PID  Type  Process name                               Usage      |
+    |=============================================================================|
+    |    0     77394    C   python3                                      10912MiB |
+    |    1     77394    C   python3                                      10869MiB |
+    +-----------------------------------------------------------------------------+
+
+## Wed 8 Nov
+
+A big mistake: I didn't set `max_to_keep` (default to 5) so the saver removes 
+my best model but keeps the latest one. 
+
+Fixed it. This time I'll run a test
+job before submitting. The last job took me 4 days and 1% of my budget.
+ 
+Submitted `test.job`, waiting (Priority)... Done. It works. Now it's time to
+restart `exp-variation.job`.
+
+
+Questions: 
+
+- why does epoch number start at 1?
+- how to use 2 GPUs?
+- can the RAM fit 2 instances?
+
 
 5. [x] Try out scikit implementation 
 4. [x] Implement custom kernel ("We found that the graph has about the right density for common senses when ... between 85 to 98.")1. [ ] Input and output for SemCor and OMSTI

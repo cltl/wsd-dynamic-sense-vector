@@ -1,0 +1,27 @@
+#!/bin/bash
+#SBATCH --time 5-00:00:00
+#SBATCH --partition gpu
+
+module load cuda/8.0.61
+module load cudnn/8.0-v6.0
+
+echo -n 'Started: ' && date
+
+preprocess_version="2017-11-02-a453bc1"
+
+for seed in 124 261 9165 293 1005
+do
+    # Check inside for loop in case the version has changed. There can be
+    # a day between iterations.
+    base_dir=output/`python3 version.py`
+    mkdir $base_dir 
+    base_path=$base_dir/lstm-wsd-gigaword-small_seed-$seed
+    echo "Running seed $seed. Log is written to $base_path.log"
+    python3 -u train-lstm-wsd.py --seed $seed --model small \
+            --data_path preprocessed-data/$preprocess_version/gigaword-for-lstm-wsd \
+            --save_path $base_path > $base_path.log 2>&1
+done
+
+wait
+
+echo -n 'Finished: ' && date
