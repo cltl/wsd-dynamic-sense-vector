@@ -1,0 +1,15 @@
+#!/bin/bash
+#SBATCH --time 5-00:00:00
+#SBATCH --partition gpu
+
+module load cuda/8.0.61
+module load cudnn/8.0-v6.0
+
+echo -n 'Started: ' && date
+
+base_dir=output/`python3 version.py`
+mkdir $base_dir 
+python3 -u measure-speedups.py --config sampled-softmax
+python3 -u measure-speedups.py --config optimized-batches
+
+echo -n 'Finished: ' && date

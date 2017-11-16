@@ -85,3 +85,18 @@ Train by running:
 	* `python convertbn2wn_v2.py`
 4. Train sense embeddings: `./train-sense-embeddings.sh`
 5. Check your sense embeddings: `python3 examine-sense-embeddings.py`
+
+### Reproduction paper
+
+#### Reproduce variation experiment
+
+0. `git checkout a453bc1`
+1. Pre-process GigaWord into plain text: `sbatch cartesius/process-gigaword.job`
+2. More preprocessing to make binary files: `sbatch cartesius/prepare-lstm-wsd.job`
+0. `git checkout ?todo?`
+1. Run at the same time: `sbatch cartesius/exp-variation1.job` and `cartesius/sbatch exp-variation2.job`
+2. When they both finish, run `sbatch cartesius/exp-variation-score.job`
+
+#### Data size experiment
+
+0. `git checkout ?todo?`

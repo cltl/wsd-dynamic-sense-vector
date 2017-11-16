@@ -28,7 +28,8 @@ from version import version
 
 dev_sents = 20000 # absolute maximum
 dev_portion = 0.01 # relative maximum
-batch_size = 64000 # words
+# if you get OOM (out of memory) error, reduce this number
+batch_size = 60000 # words
 vocab_size = 10**6
 min_count = 5
 
@@ -65,70 +66,55 @@ def lookup_and_iter_sents(filename, word2id):
             words = line.strip().split()
             yield [word2id.get(word) or unkn_id for word in words]
             
-class PadFunc(object):
-    
-    dry_run=False
-    
-    def __init__(self):
-        self.total = 0
-        self.pads = 0
-    def __call__(self, sents, max_len, pad_id):
-        if self.dry_run:
-            arr = np.empty(0)
-            value_count = sum(1 for s in sents for _ in s)
-            size = len(sents) * max_len
-        else:
-            arr = np.zeros((len(sents), max_len), dtype=np.int32)
-            size = arr.size
-            arr.fill(pad_id)
-            value_count = 0
-            for i, s in enumerate(sents):
-                for j, v in enumerate(s):
-                    arr[i,j] = v
-                    value_count += 1
-        self.pads += (size - value_count) 
-        self.total += size
-        return arr
+def pad(sents, max_len, pad_id, dry_run=False):
+    if dry_run:
+        arr = np.empty(0)
+    else:
+        arr = np.empty((len(sents), max_len), dtype=np.int32)
+        arr.fill(pad_id)
+        for i, s in enumerate(sents):
+            arr[i, :len(s)] = s
+    return arr
 
 def pad_batches(inp_path, word2id, dev_sent_ids):
     sys.stderr.write('Dividing and padding...\n')
-    pad = PadFunc()
     pad_id = word2id['<pad>']
     dev = []
     batches = {}
     sent_lens = []
-    last_max_len = 0
-    last_batch = []
+    curr_max_len = 0
+    curr_batch = []
+    batch_id = 0
     for sent_id, sent in enumerate(progress(lookup_and_iter_sents(inp_path, word2id))):
         if sent_id in dev_sent_ids:
             dev.append(sent)
         else:
-            new_size = (len(last_batch)+1) * max(last_max_len,len(sent))
+            new_size = (len(curr_batch)+1) * max(curr_max_len,len(sent))
             if new_size > batch_size:
-                batches['batch%d' %len(batches)] = pad(last_batch, last_max_len, pad_id)
-                last_max_len = 0
-                last_batch = []
-            last_max_len = max(last_max_len, len(sent))
-            last_batch.append(sent)
+                batches['batch%d' %batch_id] = pad(curr_batch, curr_max_len, pad_id)
+                batches['lens%d' %batch_id] = np.array([len(s) for s in curr_batch])
+                batch_id += 1
+                curr_max_len = 0
+                curr_batch = []
+            curr_max_len = max(curr_max_len, len(sent))
+            curr_batch.append(sent)
         sent_lens.append(len(sent))
-    if last_batch:
-        batches['batch%d' %len(batches)] = pad(last_batch, last_max_len, pad_id)
+    if curr_batch:
+        batches['batch%d' %batch_id] = pad(curr_batch, curr_max_len, pad_id)
+        batches['lens%d' %batch_id] = np.array([len(s) for s in curr_batch])
+        batch_id += 1 # important to count num batches correctly
     sent_lens = np.array(sent_lens)
     dev_lens = np.array([len(s) for s in dev], dtype=np.int32)
-    dev_padded = PadFunc()(dev, max(dev_lens), pad_id)
+    dev_padded = pad(dev, max(dev_lens), pad_id)
     sys.stderr.write('Dividing and padding... Done.\n')
-    sizes = np.array([b.size for b in batches.values()])
-    if len(batches) >= 2:
+    sizes = np.array([batches['batch%d'%i].size for i in range(batch_id)])
+    if batch_id >= 2:
         sys.stderr.write('Divided into %d batches (%d elements each, std=%d, '
                          'except last batch of %d).\n'
-                         %(len(batches), sizes[:-1].mean(), sizes[:-1].std(), sizes[-1]))
+                         %(batch_id, sizes[:-1].mean(), sizes[:-1].std(), sizes[-1]))
     else:
-        assert len(batches) == 1
+        assert batch_id == 1
         sys.stderr.write('Created 1 batch of %d elements.\n' %sizes[0])
-    sys.stderr.write('Added %d elements as padding (%.2f%%).\n' 
-                     %(pad.pads, pad.pads*100.0/pad.total))
-    sys.stderr.write('Consumed roughly %.2f GiB.\n' 
-                     %(pad.total*4/float(2**30)))
     sys.stderr.write('Development set contains %d sentences\n' %len(dev_lens))
     sys.stderr.write('Sentence lengths: %.5f (std=%.5f)\n' 
                      %(sent_lens.mean(), sent_lens.std()))
@@ -156,67 +142,71 @@ def shuffle_and_pad_batches(inp_path, word2id, dev_sent_ids):
     total_sents = len(lens)
     batches = {}
     dev_lens = []
-    last_max_len = 0
-    last_batch = []
+    curr_max_len = 0
+    curr_batch_lens = []
     sent2batch = {}
+    batch_id = 0
     for sent_id in indices:
         l = lens[sent_id]
         if sent_id in dev_sent_ids:
             dev_lens.append(l)
             sent2batch[sent_id] = 'dev'
         else:
-            new_size = (len(last_batch)+1) * max(last_max_len,l)
+            new_size = (len(curr_batch_lens)+1) * max(curr_max_len,l)
             if new_size >= batch_size:
-                batches['batch%d' %len(batches)] = np.empty((len(last_batch), last_max_len))
-                last_max_len = 0
-                last_batch = []
-            last_max_len = max(last_max_len, l)
-            last_batch.append(l)
-            sent2batch[sent_id] = 'batch%d' %len(batches)
-    if last_batch:
-        batches['batch%d' %len(batches)] = np.empty((len(last_batch), last_max_len))
+                batches['batch%d' %batch_id] = \
+                        np.empty((len(curr_batch_lens), max(curr_batch_lens)))
+                batches['lens%d' %batch_id] = np.array(curr_batch_lens)
+                batch_id += 1
+                curr_max_len = 0
+                curr_batch_lens = []
+            curr_max_len = max(curr_max_len, l)
+            curr_batch_lens.append(l)
+            sent2batch[sent_id] = 'batch%d' %batch_id
+    if curr_batch_lens:
+        batches['batch%d' %batch_id] = \
+                np.empty((len(curr_batch_lens), max(curr_batch_lens)))
+        batches['lens%d' %batch_id] = np.array(curr_batch_lens)
+        batch_id += 1 # important to count num batches correctly
     dev_lens = np.array(dev_lens)
-    dev = np.empty((len(dev_lens), max(dev_lens)))
+    dev_data = np.empty((len(dev_lens), max(dev_lens)))
     sys.stderr.write('Done.\n')
     
     sys.stderr.write('Dividing and padding...\n')
     pad_id = word2id['<pad>']
-    for b in batches.values(): b.fill(pad_id)
-    dev.fill(pad_id)
+    for i in range(batch_id): batches['batch%d'%i].fill(pad_id)
+    dev_data.fill(pad_id)
     nonpad_count = 0
-    counter = Counter()
+    sent_counter = Counter()
     for sent_id, sent in progress(enumerate(lookup_and_iter_sents(inp_path, word2id))):
         assert lens[sent_id] == len(sent)
         batch_name = sent2batch[sent_id]
-        arr = dev if batch_name == 'dev' else batches[batch_name]
-        arr[counter[batch_name],:len(sent)] = sent
+        arr = dev_data if batch_name == 'dev' else batches[batch_name]
+        arr[sent_counter[batch_name],:len(sent)] = sent
         if batch_name != 'dev': nonpad_count += len(sent)
-        counter[batch_name] += 1
-    assert counter['dev'] == dev.shape[0]
-    for batch_name, b in batches.items():
-        assert counter[batch_name] == b.shape[0]
+        sent_counter[batch_name] += 1
+    # check that we filled all arrays
+    for batch_name in sent_counter:
+        arr = dev_data if batch_name == 'dev' else batches[batch_name]
+        assert sent_counter[batch_name] == arr.shape[0]
     sys.stderr.write('Dividing and padding... Done.\n')
     
-    sizes = np.array([b.size for b in batches.values()])
-    if len(batches) >= 2:
+    sizes = np.array([batches['batch%d'%i].size for i in range(batch_id)])
+    if batch_id >= 2:
         sys.stderr.write('Divided into %d batches (%d elements each, std=%d, '
                          'except last batch of %d).\n'
-                         %(len(batches), sizes[:-1].mean(), sizes[:-1].std(), sizes[-1]))
+                         %(batch_id, sizes[:-1].mean(), sizes[:-1].std(), sizes[-1]))
     else:
-        assert len(batches) == 1
+        assert batch_id == 1
         sys.stderr.write('Created 1 batch of %d elements.\n' %sizes[0])
     total = sum(sizes)
     pad_count = total - nonpad_count
-    sys.stderr.write('Added %d elements as padding (%.2f%%).\n' 
-                     %(pad_count, pad_count*100.0/total))
-    sys.stderr.write('Consumed roughly %.2f GiB.\n' 
-                     %(total*4/float(2**30)))
     sys.stderr.write('Development set contains %d sentences\n' %len(dev_lens))
     sys.stderr.write('Sentence lengths: %.5f (std=%.5f)\n' 
                      %(lens.mean(), lens.std()))
     sys.stderr.write('Sentence lengths in development set: %.5f (std=%.5f)\n' 
                      %(dev_lens.mean(), dev_lens.std()))
-    return batches, dev, dev_lens
+    return batches, dev_data, dev_lens
 
 def run(inp_path, out_path, shuffle=True):
     index_path = out_path + '.index.pkl'
@@ -237,8 +227,8 @@ def run(inp_path, out_path, shuffle=True):
     
     train_path = out_path + '.train.npz'
     dev_path = out_path + '.dev.npz'
-    shuffled_train_path = out_path + '.train-shuffled.npz'
-    shuffled_dev_path = out_path + '.dev-shuffled.npz'
+    shuffled_train_path = out_path + '-shuffled.train.npz'
+    shuffled_dev_path = out_path + '-shuffled.dev.npz'
     if os.path.exists(dev_path):
         sys.stderr.write('Result already exists: %s. Skipped.\n' %dev_path)
     else:

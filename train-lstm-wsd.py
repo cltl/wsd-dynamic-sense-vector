@@ -14,7 +14,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.python.client import timeline
 import sys
-from model import WSDModelTrain, WSDModelEvaluate, DummyModelTrain, train_model
+from model import WSDModel, train_model
 from configs import get_config
 
 flags = tf.flags
@@ -37,14 +37,14 @@ def main(_):
     if not FLAGS.data_path:
         raise ValueError("Must set --data_path to the base path of "
                          "prepared input (e.g. output/gigaword)")
-    config = get_config()
+    config = get_config(FLAGS)
     with tf.Graph().as_default():
         initializer = tf.random_uniform_initializer(-config.init_scale,
                                                     config.init_scale)
     with tf.variable_scope("Model", reuse=None, initializer=initializer):
-        m_train = WSDModelTrain(config)
+        m_train = WSDModel(config, optimized=True)
     with tf.variable_scope("Model", reuse=True):
-        m_evaluate = WSDModelEvaluate(config)
+        m_evaluate = WSDModel(config, reuse_variables=True)
     m_train.print_device_placement()
     train_model(m_train, m_evaluate, FLAGS, config)
 

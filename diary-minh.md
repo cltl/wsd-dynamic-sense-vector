@@ -783,6 +783,16 @@ job before submitting. The last job took me 4 days and 1% of my budget.
 Submitted `test.job`, waiting (Priority)... Done. It works. Now it's time to
 restart `exp-variation.job`.
 
+Submitted variation experiments. I divided the job file into two files because
+in 5 days we can only maximally finish 5 seeds. 
+
+    [minhle@int1 wsd-dynamic-sense-vector]$ sbatch cartesius/exp-variation1.job
+    Submitted batch job 3742501
+    [minhle@int1 wsd-dynamic-sense-vector]$ sbatch cartesius/exp-variation2.job
+    Submitted batch job 3742545
+    [minhle@int1 wsd-dynamic-sense-vector]$ squeue | grep minh
+               3742501       gpu exp-vari   minhle PD       0:00      1 (Priority)
+               3742545       gpu exp-vari   minhle PD       0:00      1 (Priority)
 
 Questions: 
 
@@ -790,6 +800,36 @@ Questions:
 - how to use 2 GPUs?
 - can the RAM fit 2 instances?
 
+## Tue 14 Nov
+
+5 days has ended. 8 experiments successfully completed, 2 were aborted.
+
+    [minhle@int1 wsd-dynamic-sense-vector]$ ls output/2017-11-08-ce8a024/lstm-wsd-gigaword-small_seed*best-model.index
+    output/2017-11-08-ce8a024/lstm-wsd-gigaword-small_seed-124-best-model.index
+    output/2017-11-08-ce8a024/lstm-wsd-gigaword-small_seed-16651-best-model.index
+    output/2017-11-08-ce8a024/lstm-wsd-gigaword-small_seed-261-best-model.index
+    output/2017-11-08-ce8a024/lstm-wsd-gigaword-small_seed-293-best-model.index
+    output/2017-11-08-ce8a024/lstm-wsd-gigaword-small_seed-651-best-model.index
+    output/2017-11-08-ce8a024/lstm-wsd-gigaword-small_seed-91-best-model.index
+    output/2017-11-08-ce8a024/lstm-wsd-gigaword-small_seed-9165-best-model.index
+    output/2017-11-08-ce8a024/lstm-wsd-gigaword-small_seed-961-best-model.index
+
+Now I'll evaluate them:
+
+    sbatch cartesius/exp-variation-score.job
+    
+Error: `one_full_experiment_v2.sh: No such file or directory` --> mailed Marten.
+
+Tried to measure speed with(out) some optimization tricks. Found out that the 
+preprocessed data (for training) doesn't have length information. Need to rerun
+preprocessing script again! (Maybe I should work around this... Changing the
+script would mean more debugging and more waiting...)
+
+## Wed 15 Nov
+
+I looked at the 280 lines of code in `prepare-lstm-wsd.py` and didn't want to 
+touch any of them. For the moment I change anything, I'll go down the rabbit 
+hole and 1 day will pass very fast.
 
 5. [x] Try out scikit implementation 
 4. [x] Implement custom kernel ("We found that the graph has about the right density for common senses when ... between 85 to 98.")1. [ ] Input and output for SemCor and OMSTI
@@ -797,6 +837,6 @@ Questions:
 2. [ ] Query UkWaC??? for sentences that contain a certain lemma
 3. [x] Build graph and run Scikit label propagation
 4. [x] for 25 Oct: label prop. Semcor + OMSTI
-5. [ ] for 25 Oct: list of all experiments for the reproduction paper
+5. [x] for 25 Oct: list of all experiments for the reproduction paper
 6. [x] save models of every epoch (instead of only the best one)
-6. [ ] Read more about label propagation (Zhou et al. 2004)
+6. [x] Read more about label propagation (Zhou et al. 2004)

@@ -1,4 +1,3 @@
-import tensorflow as tf
 import os
 from version import version
 
@@ -7,14 +6,12 @@ os.makedirs(output_dir, exist_ok=True)
 
 gigaword_path = 'data/gigaword'
 preprocessed_gigaword_path = os.path.join('preprocessed-data', 'gigaword.txt')
-gigaword_for_lstm_wsd_path = os.path.join('preprocessed-data', 'todo', 'gigaword-for-lstm-wsd')
 
 class DefaultConfig(object):
     vocab_size = 10**6 + 3
     max_grad_norm = 5
     num_senses = 4
-    float_dtype = tf.float32
-    training_on_same_length_sentences = True
+    assume_same_lengths = True
     sampled_softmax = True
     optimized_batches = True
 
@@ -63,8 +60,7 @@ class TestConfig(DefaultConfig):
     batch_size = 20
     max_stagnant_count = -1
 
-def get_config():
-    FLAGS = tf.flags.FLAGS
+def get_config(FLAGS):
     if FLAGS.model == "small":
         return SmallConfig()
     elif FLAGS.model == "medium":
