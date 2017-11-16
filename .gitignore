@@ -1,3 +1,4 @@
 .DS_Store
 /draft.py
 __pycache__
+slurm-*.out
