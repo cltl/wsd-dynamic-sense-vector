@@ -1,7 +1,8 @@
 
 ## Setup
 
-    pip3 install --user beautifulsoup4 sklearn testfixtures unittest2 pyemd morfessor pandas
+    pip3 install --user beautifulsoup4 sklearn testfixtures unittest2 pyemd morfessor
+    pip3 install --user pandas==0.20.3
     pip3 install --user spacy
     pip3 install --user https://github.com/explosion/spacy-models/releases/download/en_core_web_md-1.2.1/en_core_web_md-1.2.1.tar.gz
     python3 -m spacy link en_core_web_md en_default
@@ -93,9 +94,17 @@ Train by running:
 0. `git checkout a453bc1`
 1. Pre-process GigaWord into plain text: `sbatch cartesius/process-gigaword.job`
 2. More preprocessing to make binary files: `sbatch cartesius/prepare-lstm-wsd.job`
-0. `git checkout ?todo?`
+0. `git checkout 4ed25bd`
 1. Run at the same time: `sbatch cartesius/exp-variation1.job` and `cartesius/sbatch exp-variation2.job`
 2. When they both finish, run `sbatch cartesius/exp-variation-score.job`
+
+#### Reproduce optimization experiment
+
+0. `git checkout a9618a6`
+1. Pre-process GigaWord into plain text (if you haven't done it): `sbatch cartesius/process-gigaword.job`
+2. More preprocessing to make binary files: `sbatch cartesius/prepare-lstm-wsd.job`
+3. `git checkout 4ed25bd`
+4. Run in parallel: `sbatch cartesius/exp-optimization{i}.job` where i=1,2,3
 
 #### Data size experiment
 

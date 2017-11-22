@@ -208,7 +208,7 @@ with tf.Session() as sess:  # your session object
     saver = tf.train.import_meta_graph(args.model_path + '.meta', clear_devices=True)
     saver.restore(sess, args.model_path)
     predicted_context_embs = sess.graph.get_tensor_by_name('Model/predicted_context_embs:0')
-    x = sess.graph.get_tensor_by_name('Model/Placeholder:0')
+    x = sess.graph.get_tensor_by_name('Model_1/x:0')
 
     for row_index, row in wsd_df.iterrows():
         target_index, sentence_tokens, lemma, pos =  extract_sentence_wsd_competition(row)
