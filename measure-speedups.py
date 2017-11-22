@@ -63,7 +63,7 @@ def main(_):
     else:
         configs = all_configs
         
-    gigaword_for_lstm_wsd_path = os.path.join('preprocessed-data', '2017-11-16-a9618a6', 'gigaword-for-lstm-wsd')
+    gigaword_for_lstm_wsd_path = os.path.join('preprocessed-data', '2017-11-22-ed5305b', 'gigaword-for-lstm-wsd')
     for config in configs:
         if config.optimized_batches:
             FLAGS.data_path = gigaword_for_lstm_wsd_path

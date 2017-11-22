@@ -89,6 +89,8 @@ Train by running:
 
 ### Reproduction paper
 
+Requirements: You'll need at least 64 GB of RAM to run the preparation script. 
+
 #### Reproduce variation experiment
 
 0. `git checkout a453bc1`
