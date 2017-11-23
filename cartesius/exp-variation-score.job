@@ -8,15 +8,16 @@ module load cudnn/8.0-v6.0
 echo -n 'Started: ' && date
 
 preprocess_version="2017-11-02-a453bc1"
-output_version=`python3 version.py`
-mkdir output/$output_version
+model_version="2017-11-08-ce8a024"
 
 cd evaluate
 
 for seed in 124 261 9165 293 1005 16651 91 172 961 651
 do
+    output_version=`python3 version.py`
+    mkdir ../output/$output_version
     ./evaluate.job \
-            ../output/$output_version/lstm-wsd-gigaword-small_seed-$seed-best-model \
+            ../output/$model_version/lstm-wsd-gigaword-small_seed-$seed-best-model \
             ../preprocessed-data/$preprocess_version/gigaword-for-lstm-wsd.index.pkl \
             ../output/$output_version/results-seed-$seed
 done

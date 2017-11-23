@@ -831,6 +831,92 @@ I looked at the 280 lines of code in `prepare-lstm-wsd.py` and didn't want to
 touch any of them. For the moment I change anything, I'll go down the rabbit 
 hole and 1 day will pass very fast.
 
+## Thu 16 Nov
+
+Started a complex network of jobs on Cartesius. I hope that they all work...
+
+    [minhle@int1 wsd-dynamic-sense-vector]$ git checkout a453bc1
+    Previous HEAD position was a9618a6... make them runnable
+    HEAD is now at a453bc1... run on Cartesius
+    [minhle@int1 wsd-dynamic-sense-vector]$ sbatch cartesius/prepare-lstm-wsd.job
+    Submitted batch job 3764660
+    [minhle@int1 wsd-dynamic-sense-vector]$ squeue | grep minh
+               3764660    normal prepare-   minhle  R       0:11      1 tcn635
+    [minhle@int1 wsd-dynamic-sense-vector]$ git checkout a9618a6
+    Previous HEAD position was a453bc1... run on Cartesius
+    HEAD is now at a9618a6... make them runnable
+    [minhle@int1 wsd-dynamic-sense-vector]$ sbatch cartesius/prepare-lstm-wsd.job
+    Submitted batch job 3764663
+    [minhle@int1 wsd-dynamic-sense-vector]$ squeue | grep minh
+               3764663    normal prepare-   minhle  R       0:02      1 tcn721
+               3764660    normal prepare-   minhle  R       1:25      1 tcn635
+    [minhle@int1 wsd-dynamic-sense-vector]$ sbatch --dependency=afterok:3764660 cartesius/exp-variation-score.job
+    Submitted batch job 3764664
+    [minhle@int1 wsd-dynamic-sense-vector]$ sbatch --dependency=afterok:3764663 cartesius/exp-optimization1.job
+    Submitted batch job 3764741
+    [minhle@int1 wsd-dynamic-sense-vector]$ sbatch --dependency=afterok:3764663 cartesius/exp-optimization2.job
+    Submitted batch job 3764742
+    [minhle@int1 wsd-dynamic-sense-vector]$ sbatch --dependency=afterok:3764663 cartesius/exp-optimization3.job
+    Submitted batch job 3764743
+    [minhle@int1 wsd-dynamic-sense-vector]$ squeue | grep minh
+               3764669       gpu exp-opti   minhle PD       0:00      1 (Dependency)
+               3764741       gpu exp-opti   minhle PD       0:00      1 (Dependency)
+               3764742       gpu exp-opti   minhle PD       0:00      1 (Dependency)
+               3764743       gpu exp-opti   minhle PD       0:00      1 (Dependency)
+               3764663    normal prepare-   minhle  R       7:54      1 tcn721
+               3764660    normal prepare-   minhle  R       9:17      1 tcn635
+
+Explanation:
+
+- To run the scoring script for variation experiment, I need to rerun preparation script version a453bc1.
+- To run optimization experiments, I need to run (for the first time) preparation script version a9618a6.
+- I divided optimization experiments into smaller jobs to avoid hitting the 5-day limit,
+all of them will start simultaneously.
+
+## Mon 20 Nov
+
+Somehow my jobs was killed early, actually on the same day I submitted them :-| 
+I'll resubmit and contact Cartesius people. 
+
+    [minhle@int1 wsd-dynamic-sense-vector]$ git checkout a453bc1
+    Previous HEAD position was a9618a6... make them runnable
+    HEAD is now at a453bc1... run on Cartesius
+    [minhle@int1 wsd-dynamic-sense-vector]$ sbatch cartesius/prepare-lstm-wsd.job
+    Submitted batch job 3771725
+    [minhle@int1 wsd-dynamic-sense-vector]$ squeue | grep minh
+               3771725    normal prepare-   minhle  R       0:07      1 tcn618
+    [minhle@int1 wsd-dynamic-sense-vector]$ git checkout a9618a6
+    Checking out files: 100% (47/47), done.
+    Previous HEAD position was a453bc1... run on Cartesius
+    HEAD is now at a9618a6... make them runnable
+    [minhle@int1 wsd-dynamic-sense-vector]$ sbatch cartesius/prepare-lstm-wsd.job
+    Submitted batch job 3771726
+    [minhle@int1 wsd-dynamic-sense-vector]$ squeue | grep minh
+               3771726    normal prepare-   minhle  R       0:04      1 tcn619
+               3771725    normal prepare-   minhle  R       0:26      1 tcn618
+
+## Tue 21 Nov
+
+It was killed again, SURFsara hasn't replied.
+
+Tested job files with `--time=1:00` and `--time 1:00` (without the equal sign).
+They both seem to work properly and when they are canceled, there were a
+message, for example:
+
+    slurmstepd: *** JOB 3774760 ON tcn559 CANCELLED AT 2017-11-21T15:00:38 DUE TO TIME LIMIT ***
+
+So my preprocessing script must have been killed for a different reason.
+
+
+## Wed 22 Nov
+
+Set for all NumPy arrays `dtype=np.int32`. Now the preparation script is running
+without error while consuming 99% of RAM. I'll need to do memory map otherwise
+I'll have no space for my model.
+
+Marten and I fixed some bugs in Marten's evaluation script.
+
+
 5. [x] Try out scikit implementation 
 4. [x] Implement custom kernel ("We found that the graph has about the right density for common senses when ... between 85 to 98.")1. [ ] Input and output for SemCor and OMSTI
 3. [x] measure running time
