@@ -916,6 +916,66 @@ I'll have no space for my model.
 
 Marten and I fixed some bugs in Marten's evaluation script.
 
+Tried loading shuffled dataset, it uses only around 40 GB (of 62.5 Gb) but I 
+creating models resulted in a memory error. Luckily, GPU nodes have 96 GB so I
+hope that's enough.
+
+Forgot to disable subvocab creation for `sampled_softmax=False`. Did it now. 
+Restarted experiment, only `exp-optimization1.job` for now.
+
+    [minhle@int1 ~]$ squeue | grep minh
+               3777791       gpu exp-opti   minhle  R      11:40      1 gcn39
+
+## Thu 23 Nov
+
+The training did work but super slowly. After 8h38m, it "finished 27000 of 157344 batches"
+(17% of an epoch). At this speed it will take 19 days to finish 10 epochs. In
+other words, it will consume all of my budget. I'll use this to estimate  
+
+    [minhle@int1 wsd-dynamic-sense-vector]$ sbatch cartesius/exp-optimization2.job
+    Submitted batch job 3778073
+    [minhle@int1 wsd-dynamic-sense-vector]$ sbatch cartesius/exp-optimization3.job
+    Submitted batch job 3778074
+
+Got these numbers for the variation experiment:
+
+    [minhle@int1 output]$ tail -vn +1 results-seed-*/semcor/results.txt
+    ==> results-seed-124/semcor/results.txt <==
+    912
+    ==> results-seed-16651/semcor/results.txt <==
+    905
+    ==> results-seed-261/semcor/results.txt <==
+    914
+    ==> results-seed-293/semcor/results.txt <==
+    923
+    ==> results-seed-651/semcor/results.txt <==
+    946
+    ==> results-seed-91/semcor/results.txt <==
+    918
+    ==> results-seed-9165/semcor/results.txt <==
+    929
+    ==> results-seed-961/semcor/results.txt <==
+    911
+    
+    [minhle@int1 output]$ tail -vn +1 results-seed-*/mun/results.txt
+    ==> results-seed-124/mun/results.txt <==
+    989
+    ==> results-seed-16651/mun/results.txt <==
+    984
+    ==> results-seed-261/mun/results.txt <==
+    989
+    ==> results-seed-293/mun/results.txt <==
+    994
+    ==> results-seed-651/mun/results.txt <==
+    1009
+    ==> results-seed-91/mun/results.txt <==
+    985
+    ==> results-seed-9165/mun/results.txt <==
+    1004
+    ==> results-seed-961/mun/results.txt <==
+    990
+ 
+
 
 5. [x] Try out scikit implementation 
 4. [x] Implement custom kernel ("We found that the graph has about the right density for common senses when ... between 85 to 98.")1. [ ] Input and output for SemCor and OMSTI

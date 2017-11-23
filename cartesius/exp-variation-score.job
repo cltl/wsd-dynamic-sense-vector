@@ -14,7 +14,7 @@ cd evaluate
 
 for seed in 124 261 9165 293 1005 16651 91 172 961 651
 do
-    output_version=`python3 version.py`
+    output_version=`python3 ../version.py`
     mkdir ../output/$output_version
     ./evaluate.job \
             ../output/$model_version/lstm-wsd-gigaword-small_seed-$seed-best-model \

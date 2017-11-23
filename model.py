@@ -225,7 +225,7 @@ class WSIModel(WSDModel):
             self._logits = tf.reduce_max(tf.reshape(sense_logits,
                     (-1, self.config.vocab_size, self.config.num_senses)), axis=2)
             
-def load_data(FLAGS):
+def load_data(FLAGS, prepare_subvocabs=False):
     sys.stderr.write('Loading data...\n')
     full_vocab = np.load(FLAGS.vocab_path if hasattr(FLAGS, 'vocab_path')
                          else FLAGS.data_path + '.index.pkl')
@@ -234,10 +234,13 @@ def load_data(FLAGS):
     num_batches = sum(1 for key in train if key.startswith('batch'))
     for i in range(num_batches):
         sentences, lens = train['batch%d' %i], train['lens%d' %i]
-        batch_vocab, inverse = np.unique(sentences, return_inverse=True)
-        outputs = inverse.reshape(sentences.shape)
-        sys.stderr.write('Batch %d of %d, vocab size: %d (%.2f%% of original)\n'
-                         %(i, num_batches, batch_vocab.size, batch_vocab.size*100.0/len(full_vocab)))
+        if prepare_subvocabs: 
+            batch_vocab, inverse = np.unique(sentences, return_inverse=True)
+            outputs = inverse.reshape(sentences.shape)
+            sys.stderr.write('Batch %d of %d, vocab size: %d (%.2f%% of original)\n'
+                             %(i, num_batches, batch_vocab.size, batch_vocab.size*100.0/len(full_vocab)))
+        else:
+            outputs, batch_vocab = sentences, np.empty(0)
         train_batches.append((sentences, outputs, batch_vocab, lens))
     dev = np.load(FLAGS.data_path + '.dev.npz')
     sys.stderr.write('Loading data... Done.\n')
