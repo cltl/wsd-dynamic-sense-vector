@@ -981,6 +981,14 @@ right folder. Restarted:
     [minhle@int1 wsd-dynamic-sense-vector]$ sbatch cartesius/exp-optimization2.job
     Submitted batch job 3778716
 
+Restarted yet again because subvocabs weren't prepared even for sampled softmax.
+
+    [minhle@int1 wsd-dynamic-sense-vector]$ sbatch cartesius/exp-h256p64.job
+    Submitted batch job 3779735
+    [minhle@int1 wsd-dynamic-sense-vector]$ sbatch cartesius/exp-optimization2.job
+    Submitted batch job 3779738
+    [minhle@int1 wsd-dynamic-sense-vector]$ sbatch cartesius/exp-optimization3.job
+    Submitted batch job 3779739
 
 5. [x] Try out scikit implementation 
 4. [x] Implement custom kernel ("We found that the graph has about the right density for common senses when ... between 85 to 98.")1. [ ] Input and output for SemCor and OMSTI
