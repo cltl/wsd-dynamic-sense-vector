@@ -9,7 +9,8 @@ Use this to get a version identifier for your experiment
 import os
 from datetime import date
 
-changed = os.popen('git ls-files -m').read().strip() != ''
+changed = (os.popen('git diff').read().strip() != '' or 
+           os.popen('git diff --staged').read().strip() != '')
 if changed:
     version = date.today().strftime('%Y-%m-%d') + '-' + 'working'
 else:

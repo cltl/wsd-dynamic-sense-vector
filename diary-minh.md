@@ -975,6 +975,11 @@ Got these numbers for the variation experiment:
     ==> results-seed-961/mun/results.txt <==
     990
  
+An experiment failed because I forgot to copy one preprocessed data file to the
+right folder. Restarted:
+
+    [minhle@int1 wsd-dynamic-sense-vector]$ sbatch cartesius/exp-optimization2.job
+    Submitted batch job 3778716
 
 
 5. [x] Try out scikit implementation 

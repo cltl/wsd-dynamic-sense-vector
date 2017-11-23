@@ -24,7 +24,7 @@ class SmallConfig(DefaultConfig):
     emb_dims = 10
     max_stagnant_count = 5
 
-class MediumConfig(DefaultConfig):
+class H256P64(DefaultConfig):
     """Medium config."""
     init_scale = 0.05
     learning_rate = 0.1
@@ -63,11 +63,11 @@ class TestConfig(DefaultConfig):
 def get_config(FLAGS):
     if FLAGS.model == "small":
         return SmallConfig()
-    elif FLAGS.model == "medium":
-        return MediumConfig()
-    elif FLAGS.model == "large":
+    elif FLAGS.model == "h256p64":
+        return H256P64()
+    elif FLAGS.model == "large" or FLAGS.model == "h512p128":
         return LargeConfig()
-    elif FLAGS.model == "google":
+    elif FLAGS.model == "google" or FLAGS.model == "h2048p512":
         return GoogleConfig()
     elif FLAGS.model == "test":
         return TestConfig()

@@ -247,7 +247,7 @@ def load_data(FLAGS, prepare_subvocabs=False):
     return full_vocab, train_batches, dev['data'], dev['lens']
 
 def train_model(m_train, m_evaluate, FLAGS, config):
-    vocab, train_batches, dev_data, dev_lens = load_data(FLAGS)
+    vocab, train_batches, dev_data, dev_lens = load_data(FLAGS, prepare_subvocabs=config.sampled_softmax)
     target_id = vocab['<target>']
 
     best_cost = None # don't know how to update this within a managed session yet
