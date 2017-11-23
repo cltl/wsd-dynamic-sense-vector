@@ -10,13 +10,14 @@ echo -n 'Started: ' && date
 preprocess_version="2017-11-22-ed5305b"
 
 percent=$1
+echo "Running experiment on ${percent}% of Gigaword"
 
 base_dir=output/`python3 version.py`
 mkdir $base_dir 
-base_path=$base_dir/lstm-wsd-gigaword_${percent}pct-google
+base_path=$base_dir/lstm-wsd-gigaword_${percent}-pc_google
 
 python3 -u train-lstm-wsd.py --model google \
-        --data_path preprocessed-data/$preprocess_version/gigaword-for-lstm-wsd \
+        --data_path preprocessed-data/$preprocess_version/gigaword-for-lstm-wsd_${percent}-pc \
         --save_path $base_path
         
 cd evaluate

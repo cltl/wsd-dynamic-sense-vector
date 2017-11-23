@@ -242,7 +242,7 @@ def load_data(FLAGS, prepare_subvocabs=False):
         else:
             outputs, batch_vocab = sentences, np.empty(0)
         train_batches.append((sentences, outputs, batch_vocab, lens))
-#         if i >= 100: break # for debugging
+#         if i >= 10: break # for debugging
     dev = np.load(FLAGS.data_path + '.dev.npz')
     sys.stderr.write('Loading data... Done.\n')
     return full_vocab, train_batches, dev['data'], dev['lens']
