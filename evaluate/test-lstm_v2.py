@@ -5,6 +5,7 @@ import argparse
 import pickle
 from datetime import datetime
 from itertools import islice
+import tensor_utils as utils
 
 
 parser = argparse.ArgumentParser(description='Trains meaning embeddings based on precomputed LSTM model')
@@ -60,9 +61,10 @@ counter = 0
 with tf.Session() as sess:  # your session object
     saver = tf.train.import_meta_graph(args.model_path + '.meta', clear_devices=True)
     saver.restore(sess, args.model_path)
-    x = sess.graph.get_tensor_by_name('Model_1/x:0')
-    predicted_context_embs = sess.graph.get_tensor_by_name('Model_1/predicted_context_embs:0')
-    lens = sess.graph.get_tensor_by_name('Model_1/lens:0')
+    x, predicted_context_embs, lens = utils.load_tensors(sess)
+    #x = sess.graph.get_tensor_by_name('Model_1/x:0')
+    #predicted_context_embs = sess.graph.get_tensor_by_name('Model_1/predicted_context_embs:0')
+    #lens = sess.graph.get_tensor_by_name('Model_1/lens:0')
 
 
     with open(args.input_path) as infile:

@@ -7,6 +7,7 @@ import pandas
 from nltk.corpus import wordnet as wn
 from scipy import spatial
 import morpho_utils
+import tensor_utils as utils
 
 parser = argparse.ArgumentParser(description='Perform WSD using LSTM model')
 parser.add_argument('-m', dest='model_path', required=True, help='path to model trained LSTM model')
@@ -203,8 +204,9 @@ vocab = np.load(args.vocab_path)
 with tf.Session() as sess:  # your session object
     saver = tf.train.import_meta_graph(args.model_path + '.meta', clear_devices=True)
     saver.restore(sess, args.model_path)
-    predicted_context_embs = sess.graph.get_tensor_by_name('Model/predicted_context_embs:0')
-    x = sess.graph.get_tensor_by_name('Model/Placeholder:0')
+    x, predicted_context_embs, lens = utils.load_tensors(sess)
+    #predicted_context_embs = sess.graph.get_tensor_by_name('Model/predicted_context_embs:0')
+    #x = sess.graph.get_tensor_by_name('Model/Placeholder:0')
 
     for row_index, row in wsd_df.iterrows():
         target_index, sentence_tokens, lemma, pos =  extract_sentence_wsd_competition(row)
@@ -212,7 +214,13 @@ with tf.Session() as sess:  # your session object
         target_id = vocab['<target>']
         sentence_as_ids = [vocab.get(w) or vocab['<unkn>'] for w in sentence_tokens]
         sentence_as_ids[target_index] = target_id
-        target_embedding = sess.run(predicted_context_embs, {x: [sentence_as_ids]})[0]
+
+        target_embeddings = sess.run(predicted_context_embs, {x: [sentence_as_ids],
+                                                              lens: [len(sentence_as_ids)]})
+        for target_embedding in target_embeddings:
+            break
+
+        #target_embedding = sess.run(predicted_context_embs, {x: [sentence_as_ids]})[0]
 
         # load token object
         token_obj = row['tokens'][0]
