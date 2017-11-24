@@ -136,7 +136,7 @@ class WSDModel(object):
             x, y_all, subvocab, lens = data[batch_id]
             i =  np.random.randint(x.shape[1])
             y = y_all[:,i]
-            old_xi = x[:,i].copy()
+            old_xi = x[:,i].copy() # old_xi might be different from y because of subvocab
             x[:,i] = target_id
     
             feed_dict = {self._x: x, self._y: y, self._subvocab: subvocab, self._lens: lens}
@@ -172,26 +172,18 @@ class WSDModel(object):
             sess.run(self._train_op, feed_dict)
             print("******** End of device placement ********")
 
-    def measure_dev_cost(self, session, data, lens, target_id, max_batch_size=1000):
-        # resample the sentences so that each token has equal chance to become target
-        samples = np.random.choice(len(data), size=len(data), p=lens/lens.sum())
-        # copying is needed here because one sentence might be chosen multiple times
-        # injecting targets into multiple references of the same sentence will
-        # create a mess
-        x, lens2 = data[samples].copy(), lens[samples] 
-        # sample targets
-        target_indices = np.mod(np.random.randint(1000000, size=lens2.shape), lens2)
-        one_to_n = np.arange(lens2.size)
-        y = x[one_to_n, target_indices]
-        x[one_to_n, target_indices] = target_id
+    def measure_dev_cost(self, session, data, target_id):
+        # make sure that we measure against the same dataset every time we call this method
+        rng = np.random.RandomState(925) 
+        total_examples = 0
         total_cost = 0.0
         total_hit = 0.0
-        for batch_start in range(0, len(x), max_batch_size):
-            batch_end = min(len(x), batch_start + max_batch_size)
-            batch_x = x[batch_start:batch_end]
-            batch_y = y[batch_start:batch_end]
-            batch_lens = lens2[batch_start:batch_end]
-            batch_size = batch_end - batch_start
+        for batch_x, _, _, batch_lens in data:
+            batch_size = len(batch_lens)
+            target_indices = np.mod(rng.randint(1000000, size=batch_size), batch_lens)
+            one_to_n = np.arange(batch_size)
+            batch_y = batch_x[one_to_n, target_indices]
+            batch_x[one_to_n, target_indices] = target_id
             # initialize the RNN
             feed_dict = { self._x: batch_x, self._y: batch_y, self._lens: batch_lens}
             state = session.run(self._initial_state, feed_dict)
@@ -202,7 +194,10 @@ class WSDModel(object):
             cost, hit_at_100 = session.run([self._cost, self._hit_at_100], feed_dict)        
             total_cost += cost * batch_size
             total_hit += hit_at_100 * batch_size
-        return total_cost / len(x), total_hit / len(x)
+            total_examples += batch_size
+            # restore the data
+            batch_x[one_to_n, target_indices] = batch_y
+        return total_cost / total_examples, total_hit / total_examples
 
 class WSIModel(WSDModel):
     """A LSTM word sense induction (WSI) model designed for fast training."""
@@ -225,30 +220,37 @@ class WSIModel(WSDModel):
             self._logits = tf.reduce_max(tf.reshape(sense_logits,
                     (-1, self.config.vocab_size, self.config.num_senses)), axis=2)
             
-def load_data(FLAGS, prepare_subvocabs=False):
-    sys.stderr.write('Loading data...\n')
-    full_vocab = np.load(FLAGS.vocab_path if hasattr(FLAGS, 'vocab_path')
-                         else FLAGS.data_path + '.index.pkl')
-    train = np.load(FLAGS.data_path + '.train.npz')
-    train_batches = []
-    num_batches = sum(1 for key in train if key.startswith('batch'))
+def from_npz_to_batches(npz, full_vocab, prepare_subvocabs):
+    batches = []
+    num_batches = sum(1 for key in npz if key.startswith('batch'))
     for i in range(num_batches):
-        sentences, lens = train['batch%d' %i], train['lens%d' %i]
+#         if i >= 10: break # for debugging
+        sentences, lens = npz['batch%d' %i], npz['lens%d' %i]
         if prepare_subvocabs: 
             batch_vocab, inverse = np.unique(sentences, return_inverse=True)
             outputs = inverse.reshape(sentences.shape)
             sys.stderr.write('Batch %d of %d, vocab size: %d (%.2f%% of original)\n'
-                             %(i, num_batches, batch_vocab.size, batch_vocab.size*100.0/len(full_vocab)))
+                             %(i, num_batches, batch_vocab.size, 
+                               batch_vocab.size*100.0/len(full_vocab)))
         else:
             outputs, batch_vocab = sentences, np.empty(0)
-        train_batches.append((sentences, outputs, batch_vocab, lens))
-#         if i >= 10: break # for debugging
-    dev = np.load(FLAGS.data_path + '.dev.npz')
+        batches.append((sentences, outputs, batch_vocab, lens))
+    return batches
+            
+def load_data(FLAGS, prepare_subvocabs=False):
+    sys.stderr.write('Loading data...\n')
+    full_vocab = np.load(FLAGS.vocab_path if getattr(FLAGS, 'vocab_path', '') != ''
+                         else FLAGS.data_path + '.index.pkl')
+    train = np.load(FLAGS.data_path + '.train.npz')
+    train_batches = from_npz_to_batches(train, full_vocab, prepare_subvocabs)
+    dev = np.load(FLAGS.dev_path if getattr(FLAGS, 'dev_path', '') != '' 
+                  else FLAGS.data_path + '.dev.npz')
+    dev_batches = from_npz_to_batches(dev, full_vocab, False)
     sys.stderr.write('Loading data... Done.\n')
-    return full_vocab, train_batches, dev['data'], dev['lens']
+    return full_vocab, train_batches, dev_batches
 
 def train_model(m_train, m_evaluate, FLAGS, config):
-    vocab, train_batches, dev_data, dev_lens = load_data(FLAGS, prepare_subvocabs=config.sampled_softmax)
+    vocab, train_batches, dev_batches = load_data(FLAGS, prepare_subvocabs=config.sampled_softmax)
     target_id = vocab['<target>']
 
     best_cost = None # don't know how to update this within a managed session yet
@@ -274,7 +276,7 @@ def train_model(m_train, m_evaluate, FLAGS, config):
             print("\tTrain cost: %.3f" %train_cost)
             saver.save(sess, FLAGS.save_path, global_step=i)
             if m_evaluate:
-                dev_cost, hit_at_100 = m_evaluate.measure_dev_cost(sess, dev_data, dev_lens, target_id)
+                dev_cost, hit_at_100 = m_evaluate.measure_dev_cost(sess, dev_batches, target_id)
                 print("\tDev cost: %.3f, hit@100: %.1f%%" %(dev_cost, hit_at_100))
                 if best_cost is None or dev_cost < best_cost:
                     best_cost = dev_cost

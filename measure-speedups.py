@@ -69,6 +69,7 @@ def main(_):
             FLAGS.data_path = gigaword_for_lstm_wsd_path
         else:
             FLAGS.data_path = gigaword_for_lstm_wsd_path + '-shuffled'
+            FLAGS.dev_path = gigaword_for_lstm_wsd_path + '.dev.npz'
             FLAGS.vocab_path = gigaword_for_lstm_wsd_path + '.index.pkl'
         FLAGS.save_path = os.path.join('output', version, 'speedups-%s' %config.name)
             

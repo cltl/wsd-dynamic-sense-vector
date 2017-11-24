@@ -7,6 +7,7 @@ Read a simple text file (one sentence per line) and produce these files:
 - <fname>.train.npz: training batches (each batch contains roughly the same
 number of tokens but differing number of sentences depends on sentence length)
 - <fname>.dev.npz: development dataset (as big as one epoch)
+- 
 
 @author: Minh Le
 '''
@@ -32,6 +33,11 @@ dev_portion = 0.01 # relative maximum
 batch_size = 60000 # words
 vocab_size = 10**6
 min_count = 5
+
+inp_path = preprocessed_gigaword_path
+# inp_path = 'preprocessed-data/gigaword_1m-sents.txt' # for debugging    
+out_dir = os.path.join('preprocessed-data', version)
+out_path = os.path.join(out_dir, 'gigaword-for-lstm-wsd')
 
 special_symbols = ['<target>', '<unkn>', '<pad>']
 
@@ -61,12 +67,14 @@ def sort_sentences(inp_path, out_path):
     sys.stderr.write('sorting finished after %.1f minutes...\n' %((time()-start)/60))
     assert status == 0
 
-def lookup_and_iter_sents(filename, word2id):
+def lookup_and_iter_sents(filename, word2id, include_ids=None, exclude_ids=None):
     unkn_id = word2id['<unkn>']
     with codecs.open(filename, 'r', 'utf-8') as f:
-        for line in f:
-            words = line.strip().split()
-            yield [word2id.get(word) or unkn_id for word in words]
+        for sent_id, line in enumerate(f):
+            if ((include_ids is None or sent_id in include_ids) and 
+                (exclude_ids is None or sent_id not in exclude_ids)):
+                words = line.strip().split()
+                yield [word2id.get(word) or unkn_id for word in words]
             
 def pad(sents, max_len, pad_id):
     arr = np.empty((len(sents), max_len), dtype=np.int32)
@@ -75,36 +83,31 @@ def pad(sents, max_len, pad_id):
         arr[i, :len(s)] = s
     return arr
 
-def pad_batches(inp_path, word2id, dev_sent_ids):
+def pad_batches(inp_path, word2id, include_ids, exclude_ids, max_sents=-1):
     sys.stderr.write('Dividing and padding...\n')
     pad_id = word2id['<pad>']
-    dev = []
     batches = {}
     sent_lens = []
     curr_max_len = 0
     curr_batch = []
     batch_id = 0
-    for sent_id, sent in enumerate(progress(lookup_and_iter_sents(inp_path, word2id))):
-        if sent_id in dev_sent_ids:
-            dev.append(sent)
-        else:
-            new_size = (len(curr_batch)+1) * max(curr_max_len,len(sent))
-            if new_size > batch_size:
-                batches['batch%d' %batch_id] = pad(curr_batch, curr_max_len, pad_id)
-                batches['lens%d' %batch_id] = np.array([len(s) for s in curr_batch], dtype=np.int32)
-                batch_id += 1
-                curr_max_len = 0
-                curr_batch = []
-            curr_max_len = max(curr_max_len, len(sent))
-            curr_batch.append(sent)
+    for sent in progress(lookup_and_iter_sents(inp_path, word2id,
+                                               include_ids, exclude_ids)):
+        new_size = (len(curr_batch)+1) * max(curr_max_len,len(sent))
+        if new_size > batch_size or (max_sents > 0 and len(curr_batch) >= max_sents):
+            batches['batch%d' %batch_id] = pad(curr_batch, curr_max_len, pad_id)
+            batches['lens%d' %batch_id] = np.array([len(s) for s in curr_batch], dtype=np.int32)
+            batch_id += 1
+            curr_max_len = 0
+            curr_batch = []
+        curr_max_len = max(curr_max_len, len(sent))
+        curr_batch.append(sent)
         sent_lens.append(len(sent))
     if curr_batch:
         batches['batch%d' %batch_id] = pad(curr_batch, curr_max_len, pad_id)
         batches['lens%d' %batch_id] = np.array([len(s) for s in curr_batch], dtype=np.int32)
         batch_id += 1 # important to count num batches correctly
     sent_lens = np.array(sent_lens, dtype=np.int32)
-    dev_lens = np.array([len(s) for s in dev], dtype=np.int32)
-    dev_padded = pad(dev, max(dev_lens), pad_id)
     sys.stderr.write('Dividing and padding... Done.\n')
     sizes = np.array([batches['batch%d'%i].size for i in range(batch_id)])
     if batch_id >= 2:
@@ -114,12 +117,9 @@ def pad_batches(inp_path, word2id, dev_sent_ids):
     else:
         assert batch_id == 1
         sys.stderr.write('Created 1 batch of %d elements.\n' %sizes[0])
-    sys.stderr.write('Development set contains %d sentences\n' %len(dev_lens))
     sys.stderr.write('Sentence lengths: %.5f (std=%.5f)\n' 
                      %(sent_lens.mean(), sent_lens.std()))
-    sys.stderr.write('Sentence lengths in development set: %.5f (std=%.5f)\n' 
-                     %(dev_lens.mean(), dev_lens.std()))
-    return batches, dev_padded, dev_lens
+    return batches
 
 
 def shuffle_and_pad_batches(inp_path, word2id, dev_sent_ids):
@@ -140,17 +140,13 @@ def shuffle_and_pad_batches(inp_path, word2id, dev_sent_ids):
     rng.shuffle(indices)
     total_sents = len(lens)
     batches = {}
-    dev_lens = []
     curr_max_len = 0
     curr_batch_lens = []
     sent2batch = {}
     batch_id = 0
     for sent_id in progress(indices, label='sentences'):
         l = lens[sent_id]
-        if sent_id in dev_sent_ids:
-            dev_lens.append(l)
-            sent2batch[sent_id] = 'dev'
-        else:
+        if sent_id not in dev_sent_ids:
             new_size = (len(curr_batch_lens)+1) * max(curr_max_len,l)
             if new_size >= batch_size:
                 batches['batch%d' %batch_id] = \
@@ -167,27 +163,23 @@ def shuffle_and_pad_batches(inp_path, word2id, dev_sent_ids):
                 np.empty((len(curr_batch_lens), max(curr_batch_lens)), dtype=np.int32)
         batches['lens%d' %batch_id] = np.array(curr_batch_lens, dtype=np.int32)
         batch_id += 1 # important to count num batches correctly
-    dev_lens = np.array(dev_lens, dtype=np.int32)
-    dev_data = np.empty((len(dev_lens), max(dev_lens)), dtype=np.int32)
     sys.stderr.write('Done.\n')
     
     sys.stderr.write('Dividing and padding...\n')
     pad_id = word2id['<pad>']
     for i in range(batch_id): batches['batch%d'%i].fill(pad_id)
-    dev_data.fill(pad_id)
     nonpad_count = 0
     sent_counter = Counter()
     for sent_id, sent in progress(enumerate(lookup_and_iter_sents(inp_path, word2id)), label='sentences'):
         assert lens[sent_id] == len(sent)
-        batch_name = sent2batch[sent_id]
-        arr = dev_data if batch_name == 'dev' else batches[batch_name]
-        arr[sent_counter[batch_name],:len(sent)] = sent
-        if batch_name != 'dev': nonpad_count += len(sent)
-        sent_counter[batch_name] += 1
+        batch_name = sent2batch.get(sent_id)
+        if batch_name is not None: # could be in dev set
+            batches[batch_name][sent_counter[batch_name],:len(sent)] = sent
+            nonpad_count += len(sent)
+            sent_counter[batch_name] += 1
     # check that we filled all arrays
     for batch_name in sent_counter:
-        arr = dev_data if batch_name == 'dev' else batches[batch_name]
-        assert sent_counter[batch_name] == arr.shape[0]
+        assert sent_counter[batch_name] == batches[batch_name].shape[0]
     sys.stderr.write('Dividing and padding... Done.\n')
     
     sizes = np.array([batches['batch%d'%i].size for i in range(batch_id)])
@@ -200,14 +192,12 @@ def shuffle_and_pad_batches(inp_path, word2id, dev_sent_ids):
         sys.stderr.write('Created 1 batch of %d elements.\n' %sizes[0])
     total = sum(sizes)
     pad_count = total - nonpad_count
-    sys.stderr.write('Development set contains %d sentences\n' %len(dev_lens))
     sys.stderr.write('Sentence lengths: %.5f (std=%.5f)\n' 
                      %(lens.mean(), lens.std()))
-    sys.stderr.write('Sentence lengths in development set: %.5f (std=%.5f)\n' 
-                     %(dev_lens.mean(), dev_lens.std()))
-    return batches, dev_data, dev_lens
+    return batches
 
-def run(inp_path, out_path, shuffle=True):
+def run():
+    os.makedirs(out_dir, exist_ok=True)
     index_path = out_path + '.index.pkl'
     if os.path.exists(index_path):
         sys.stderr.write('Reading vocabulary from %s... ' %index_path)
@@ -223,47 +213,38 @@ def run(inp_path, out_path, shuffle=True):
         sys.stderr.write('Sentences are already sorted at %s\n' %sorted_sents_path)
     else:
         sort_sentences(inp_path, sorted_sents_path)
+        
+    total_sents = count_lines_fast(sorted_sents_path)
+    real_num_dev_sents = int(min(dev_sents, dev_portion*total_sents))
+    np.random.seed(918)
+    dev_sent_ids = set(np.random.choice(total_sents, size=real_num_dev_sents, replace=False))
     
     train_path = out_path + '.train.npz'
     dev_path = out_path + '.dev.npz'
     shuffled_train_path = out_path + '-shuffled.train.npz'
-    shuffled_dev_path = out_path + '-shuffled.dev.npz'
-    if os.path.exists(dev_path):
-        sys.stderr.write('Result already exists: %s. Skipped.\n' %dev_path)
+    if os.path.exists(shuffled_train_path):
+        sys.stderr.write('Result already exists: %s. Skipped.\n' %shuffled_train_path)
     else:
-        total_sents = count_lines_fast(sorted_sents_path)
-        real_num_dev_sents = int(min(dev_sents, dev_portion*total_sents))
-        np.random.seed(918)
-        dev_sent_ids = set(np.random.choice(total_sents, size=real_num_dev_sents, replace=False))
-        
-        batches, dev_data, dev_lens = pad_batches(sorted_sents_path, word2id, dev_sent_ids)
+        print("- Training set:")
+        batches = pad_batches(sorted_sents_path, word2id, None, dev_sent_ids)
         np.savez(train_path, **batches)
-        np.savez(dev_path, data=dev_data, lens=dev_lens)
-        
-        if shuffle:
-            batches, dev_data, dev_lens = shuffle_and_pad_batches(sorted_sents_path, word2id, dev_sent_ids)
-            np.savez(shuffled_train_path, **batches)
-            np.savez(shuffled_dev_path, data=dev_data, lens=dev_lens)
-    
-def copy_lines(num_lines, src_path, dest_path):
-    with open(src_path, 'rb') as f_src, open(dest_path, 'wb') as f_dest:
-        for _ in range(num_lines):
-            f_dest.write(f_src.readline())
+        print("- Development set:")
+        batches = pad_batches(sorted_sents_path, word2id, dev_sent_ids, None, 768)
+        np.savez(dev_path, **batches)
+        print("- Shuffled training set:")
+        batches = shuffle_and_pad_batches(sorted_sents_path, word2id, dev_sent_ids)
+        np.savez(shuffled_train_path, **batches)
+            
+    for percent in (1, 10, 25, 50, 75):
+        num_lines = int(percent / 100.0 * total_sents)
+        sampled_ids = set(np.random.choice(total_sents, size=num_lines, replace=False))
+        pc_train_path = out_path + ('_%02d-pc.train.npz' %percent)
+        if os.path.exists(pc_train_path):
+            sys.stderr.write('%02d%% dataset already exists: %s. Skipped.\n' %pc_train_path)
+        else:
+            print("- Reduced training set (%02d%%):" %percent)
+            batches = pad_batches(sorted_sents_path, word2id, sampled_ids, dev_sent_ids)
+            np.savez(pc_train_path, **batches)
 
 if __name__ == '__main__':
-    inp_path = preprocessed_gigaword_path
-#     inp_path = 'preprocessed-data/gigaword_1m-sents.txt' # for debugging    
-    out_dir = os.path.join('preprocessed-data', version)
-    os.makedirs(out_dir, exist_ok=True)
-    out_path = os.path.join(out_dir, 'gigaword-for-lstm-wsd')
-    run(inp_path, out_path, shuffle=True)
-    
-    total_lines = count_lines_fast(inp_path)
-    for percent in (1, 10, 25, 50, 75):
-        num_lines = int(percent / 100.0 * total_lines)
-        
-        inp_path_pc = os.path.join(out_dir, 'gigaword_%02d-pc.txt' %percent)
-        out_path_pc = os.path.join(out_dir, 'gigaword-for-lstm-wsd_%02d-pc' %percent)
-        
-        copy_lines(num_lines, inp_path, inp_path_pc)
-        run(inp_path_pc, out_path_pc, shuffle=False)
+    run()

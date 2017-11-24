@@ -25,7 +25,11 @@ flags.DEFINE_integer("seed", 192,
 flags.DEFINE_string("model", "small",
                     "A type of model. Possible options are: small, medium, large, google.")
 flags.DEFINE_string("data_path", None,
-                    "Where the training/test data is stored.")
+                    "Where the training/valid data is stored.")
+flags.DEFINE_string("dev_path", '',
+                    "Where the valid data is stored, if it cannot be inferred from data_path.")
+flags.DEFINE_string("vocab_path", '',
+                    "Where the vocabulary is stored, if it cannot be inferred from data_path.")
 flags.DEFINE_string("save_path", None,
                     "Model output directory.")
 flags.DEFINE_bool("trace_timeline", False,
@@ -45,7 +49,7 @@ def main(_):
         m_train = WSDModel(config, optimized=True)
     with tf.variable_scope("Model", reuse=True):
         m_evaluate = WSDModel(config, reuse_variables=True)
-    m_train.print_device_placement()
+#     m_train.print_device_placement() # for debugging
     train_model(m_train, m_evaluate, FLAGS, config)
 
     if FLAGS.trace_timeline:
