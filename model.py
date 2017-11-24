@@ -238,7 +238,8 @@ def from_npz_to_batches(npz, full_vocab, prepare_subvocabs):
     return batches
             
 def load_data(FLAGS, prepare_subvocabs=False):
-    sys.stderr.write('Loading data...\n')
+    sys.stderr.write('Loading data from data_path=%s, vocab_path=%s, dev_path=%s...\n'
+                     %(FLAGS.data_path, getattr(FLAGS, 'vocab_path', ''), getattr(FLAGS, 'dev_path', '')))
     full_vocab = np.load(FLAGS.vocab_path if getattr(FLAGS, 'vocab_path', '') != ''
                          else FLAGS.data_path + '.index.pkl')
     train = np.load(FLAGS.data_path + '.train.npz')

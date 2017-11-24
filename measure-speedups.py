@@ -51,9 +51,15 @@ class SampledSoftmax(Baseline):
     name = 'sampled-softmax'
     assume_same_lengths = True
     sampled_softmax = True
+    optimized_batches = False
+    
+class OptimizedBatchesAndVocab(Baseline):
+    name = 'optimized-batches-and-vocab'
+    assume_same_lengths = True
+    sampled_softmax = True
     optimized_batches = True
     
-all_configs = (Baseline, AssumeSameLengths, SampledSoftmax, OptimizedBatches)
+all_configs = (Baseline, AssumeSameLengths, SampledSoftmax, OptimizedBatches, OptimizedBatchesAndVocab)
 
 def main(_):
     tf.set_random_seed(252)
@@ -63,7 +69,7 @@ def main(_):
     else:
         configs = all_configs
         
-    gigaword_for_lstm_wsd_path = os.path.join('preprocessed-data', '2017-11-22-ed5305b', 'gigaword-for-lstm-wsd')
+    gigaword_for_lstm_wsd_path = os.path.join('preprocessed-data', '2017-11-24-a74bda6', 'gigaword-for-lstm-wsd')
     for config in configs:
         if config.optimized_batches:
             FLAGS.data_path = gigaword_for_lstm_wsd_path

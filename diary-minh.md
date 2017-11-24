@@ -1039,8 +1039,10 @@ One experiment failed, probably because of memory overflow:
 
 Apparently, unoptimized batches and sampled softmax don't go well together.
 To do sampled softmax, we need to create a copy of sentences with subvocab indices,
-i.e. we'll need double the amount of RAM. I changed the program so that it
-optimize batches before applying sampled softmax.
+i.e. we'll need double the amount of RAM. Optimizing batches before applying 
+sampled softmax doesn't work either because
+(big #sentence) * (big vocabulary) = OOM. So I will only report the 
+effect of applying both of them together.
                       
 Same-length experiment:
 

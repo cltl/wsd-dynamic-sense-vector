@@ -102,18 +102,18 @@ Requirements: You'll need at least 64 GB of RAM to run the preparation script.
 
 #### Reproduce optimization experiment
 
-0. `git checkout ed5305b`
+0. `git checkout a74bda6`
 1. Pre-process GigaWord into plain text (if you haven't done so): `sbatch cartesius/process-gigaword.job`
 2. More preprocessing to make binary files: `sbatch cartesius/prepare-lstm-wsd.job`
-3. `git checkout cc10486`
-4. Run in parallel: `sbatch cartesius/exp-optimization{i}.job` where i=1,2,3
+3. `git checkout e93fdb2`
+4. Run in parallel: `sbatch cartesius/exp-optimization{i}.job` where i=1,2,3,4
 
 #### Model capacity experiment
 
 0. `git checkout a74bda6`
 1. Pre-process GigaWord into plain text (if you haven't done so): `sbatch cartesius/process-gigaword.job`
 2. More preprocessing to make binary files (if you haven't done so): `sbatch cartesius/prepare-lstm-wsd.job`
-3. `git checkout 9a0eca4`
+3. `git checkout e93fdb2`
 4. Run `cartesius/exp-h256p64.sh` (which calls `sbatch`)
 
 #### Data size experiment
@@ -121,5 +121,5 @@ Requirements: You'll need at least 64 GB of RAM to run the preparation script.
 0. `git checkout a74bda6`
 1. Pre-process GigaWord into plain text (if you haven't done so): `sbatch cartesius/process-gigaword.job`
 2. More preprocessing to make binary files: `sbatch cartesius/prepare-lstm-wsd.job`
-3. `git checkout ?todo?`
+3. `git checkout 4e4a04a`
 4. Run `sbatch cartesius/exp-data-size.job {i}` with i="01",10,25,50,75
