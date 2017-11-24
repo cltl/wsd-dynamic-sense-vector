@@ -41,14 +41,14 @@ class AssumeSameLengths(Baseline):
     sampled_softmax = False
     optimized_batches = False
     
-class SampledSoftmax(Baseline):
-    name = 'sampled-softmax'
-    assume_same_lengths = True
-    sampled_softmax = True
-    optimized_batches = False
-    
 class OptimizedBatches(Baseline):
     name = 'optimized-batches'
+    assume_same_lengths = True
+    sampled_softmax = False
+    optimized_batches = True
+    
+class SampledSoftmax(Baseline):
+    name = 'sampled-softmax'
     assume_same_lengths = True
     sampled_softmax = True
     optimized_batches = True

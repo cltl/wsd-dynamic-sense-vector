@@ -990,8 +990,60 @@ Restarted yet again because subvocabs weren't prepared even for sampled softmax.
     [minhle@int1 wsd-dynamic-sense-vector]$ sbatch cartesius/exp-optimization3.job
     Submitted batch job 3779739
 
+Canceled h256p64 because the result directory is incorrect. Reran and started
+data size experiments:
+
+    [minhle@int1 wsd-dynamic-sense-vector]$ sbatch cartesius/exp-data-size.job 01
+    Submitted batch job 3779915
+    [minhle@int1 wsd-dynamic-sense-vector]$ sbatch cartesius/exp-data-size.job 10
+    Submitted batch job 3779916 
+    [minhle@int1 wsd-dynamic-sense-vector]$ !squeu
+    squeue | grep minh
+               3779919       gpu exp-h256   minhle  R       0:06      1 gcn46
+               3779916       gpu exp-data   minhle  R       1:54      1 gcn18
+               3779915       gpu exp-data   minhle  R       1:57      1 gcn8
+               3779739       gpu exp-opti   minhle  R      58:37      1 gcn15
+               3779738       gpu exp-opti   minhle  R      58:40      1 gcn14
+               
+Yet another problem: turns out that I was actually using the full dataset instead
+of 1% or 10%. Cancel jobs and restarted again.
+
+    [minhle@int1 wsd-dynamic-sense-vector]$ sbatch cartesius/exp-data-size.job 01
+    Submitted batch job 3780005
+    [minhle@int1 wsd-dynamic-sense-vector]$ sbatch cartesius/exp-data-size.job 10
+    Submitted batch job 3780006
+    [minhle@int1 wsd-dynamic-sense-vector]$ !sque
+    squeue | grep minh
+               3780006       gpu exp-data   minhle  R       0:08      1 gcn39
+               3780005       gpu exp-data   minhle  R       1:32      1 gcn18
+               3779919       gpu exp-h256   minhle  R      35:06      1 gcn46
+               3779739       gpu exp-opti   minhle  R    1:33:37      1 gcn15
+               3779738       gpu exp-opti   minhle  R    1:33:40      1 gcn14
+           
+Training 1% data takes ~40 min per epoch:           
+
+    Epoch #1 finished:
+            Train cost: 8.001
+            Dev cost: 10.722, hit@100: 0.5%
+            Saved best model to output/2017-11-23-fb4baa4/lstm-wsd-gigaword_01-pc_google-best-model
+            Elapsed time: 38.8 minutes
+
+Stopped data-size experiment because the dev set was different for each data size.
+It could become misleading when I plot learning-curve graph.
+           
+## Fri 24 Nov
+
+One experiment failed, probably because of memory overflow:
+
+    /var/log/slurm/spool_slurmd//job3779738/slurm_script: line 12: 50729 Killed                  python3 -u measure-speedups.py --config sampled-softmax
+
+Apparently, unoptimized batches and sampled softmax don't go well together.
+To do sampled softmax, we need to create a copy of sentences with subvocab indices,
+i.e. we'll need double the amount of RAM. I changed the program so that it
+optimize batches before applying sampled softmax.
+                      
 5. [x] Try out scikit implementation 
-4. [x] Implement custom kernel ("We found that the graph has about the right density for common senses when ... between 85 to 98.")1. [ ] Input and output for SemCor and OMSTI
+4. [x] Implement custom kernel ("We found that the graph has about the right density for common senses when ... between 85 to 98.")
 3. [x] measure running time
 2. [ ] Query UkWaC??? for sentences that contain a certain lemma
 3. [x] Build graph and run Scikit label propagation
@@ -999,3 +1051,8 @@ Restarted yet again because subvocabs weren't prepared even for sampled softmax.
 5. [x] for 25 Oct: list of all experiments for the reproduction paper
 6. [x] save models of every epoch (instead of only the best one)
 6. [x] Read more about label propagation (Zhou et al. 2004)
+7. [ ] Hyperparameter tuning of label propagation
+8. [ ] Training creates a lot of models, how to reduce it?
+9. [ ] Send code+data to Jacopo to run
+10. [ ] Polish the paper
+11. [ ] Use the same dev set for different sizes of the data.
