@@ -134,7 +134,7 @@ def shuffle_and_pad_batches(inp_path, word2id, dev_sent_ids):
     lens = np.array(lens, dtype=np.int32)
     sys.stderr.write('Reading lengths... Done.\n')
     
-    sys.stderr.write('Calculating batch shapes... ')
+    sys.stderr.write('Calculating batch shapes...\n')
     indices = list(range(len(lens)))
     rng = Random(29)
     rng.shuffle(indices)
@@ -163,7 +163,7 @@ def shuffle_and_pad_batches(inp_path, word2id, dev_sent_ids):
                 np.empty((len(curr_batch_lens), max(curr_batch_lens)), dtype=np.int32)
         batches['lens%d' %batch_id] = np.array(curr_batch_lens, dtype=np.int32)
         batch_id += 1 # important to count num batches correctly
-    sys.stderr.write('Done.\n')
+    sys.stderr.write('Calculating batch shapes... Done.\n')
     
     sys.stderr.write('Dividing and padding...\n')
     pad_id = word2id['<pad>']

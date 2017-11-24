@@ -16,6 +16,7 @@ from tensorflow.python.client import timeline
 import sys
 from model import WSDModel, train_model
 from configs import get_config
+import random
 
 flags = tf.flags
 logging = tf.logging
@@ -37,7 +38,9 @@ flags.DEFINE_bool("trace_timeline", False,
 FLAGS = flags.FLAGS
 
 def main(_):
-    tf.set_random_seed(FLAGS.seed)
+    random.seed(FLAGS.seed)
+    np.random.seed(random.randint(0, 10**6))
+    tf.set_random_seed(random.randint(0, 10**6))
     if not FLAGS.data_path:
         raise ValueError("Must set --data_path to the base path of "
                          "prepared input (e.g. output/gigaword)")

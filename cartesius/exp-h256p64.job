@@ -7,13 +7,16 @@ module load cudnn/8.0-v6.0
 
 echo -n 'Started: ' && date
 
-preprocess_version="2017-11-22-ed5305b"
+seed=$1
+preprocess_version="2017-11-24-a74bda6"
 
 base_dir=output/`python3 version.py`
 mkdir $base_dir 
-base_path=$base_dir/lstm-wsd-gigaword-h256p64
+base_path=$base_dir/lstm-wsd-gigaword-h256p64-seed_$seed
 
-python3 -u train-lstm-wsd.py --seed 152 --model h256p64 \
+echo "Training h256p64 with seed=$1, base_path=$base_path"
+
+python3 -u train-lstm-wsd.py --seed $seed --model h256p64 \
         --data_path preprocessed-data/$preprocess_version/gigaword-for-lstm-wsd \
         --save_path $base_path
 

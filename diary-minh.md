@@ -1042,6 +1042,22 @@ To do sampled softmax, we need to create a copy of sentences with subvocab indic
 i.e. we'll need double the amount of RAM. I changed the program so that it
 optimize batches before applying sampled softmax.
                       
+Same-length experiment:
+
+    squeue | grep minh
+               3779739       gpu exp-opti   minhle  R 1-00:49:00      1 gcn15
+    
+    [minhle@int1 wsd-dynamic-sense-vector]$ tail -n 1 slurm-3779739.out
+        finished 88000 of 157344 batches, sample batch cost: 0.0000002
+
+So it would take: 10/(88000/157344) = 17.88 days to finish 10 epochs. I can
+already report this number. I stopped the job so it won't consume too much of
+my budget.
+
+Cancelled job 3779919 (exp-h256p64.job) because it the dev set wasn't fixed. It
+would cause bigger random variation.
+
+                          
 5. [x] Try out scikit implementation 
 4. [x] Implement custom kernel ("We found that the graph has about the right density for common senses when ... between 85 to 98.")
 3. [x] measure running time
