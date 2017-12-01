@@ -1,0 +1,16 @@
+#!/bin/bash
+#SBATCH --time=72:00:00
+#SBATCH -C TitanX
+#SBATCH --gres=gpu:1
+
+module load cuda80/toolkit
+module load cuda80/blas
+module load cuda80
+module load cuDNN
+
+echo -n 'Started: ' && date
+
+python3 debug_lp.py --sim=$1 --gamma=$2
+
+echo -n 'Finished: ' && date
+    
