@@ -8,6 +8,7 @@ from nltk.corpus import wordnet as wn
 from scipy import spatial
 import morpho_utils
 import tensor_utils as utils
+import score_utils 
 
 parser = argparse.ArgumentParser(description='Perform WSD using LSTM model')
 parser.add_argument('-m', dest='model_path', required=True, help='path to model trained LSTM model')
@@ -309,7 +310,13 @@ wsd_df.to_pickle(args.output_path)
 with open(args.results, 'w') as outfile:
     outfile.write('%s' % num_correct)
 
+# json output path
+output_path_json = args.results.replace('.txt', '.json')
 
+results = score_utils.experiment_results(wsd_df, args.mfs_fallback, args.wsd_df_path)
+
+with open(output_path_json, 'w') as outfile:
+    json.dump(results, outfile)
 
 
 
