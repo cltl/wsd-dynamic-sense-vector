@@ -101,9 +101,12 @@ Made a backup of all job outputs in `~/wsd-dynamic-sense-vector.bak`.
 ## Thu 30 Nov
 
 4 of 5 h256p64 experiments finished successfully, the other was terminated due
-to time limit. TODO: resume it because it's very close to finish.
+to time limit. Resumed it because it's very close to finish.
 
-
+    [minhle@int2 wsd-dynamic-sense-vector]$ git checkout e93fdb2
+    ...
+    [minhle@int2 wsd-dynamic-sense-vector]$ sbatch cartesius/exp-h256p64.job 71
+    Submitted batch job 3802297
 
 The results are quite stable, I'm happy :D
 
@@ -128,11 +131,18 @@ The results are quite stable, I'm happy :D
     1038
 
 
+## Fri 1 Dec 2017
 
-[minhle@int2 wsd-dynamic-sense-vector]$ git checkout e93fdb2
-...
-[minhle@int2 wsd-dynamic-sense-vector]$ sbatch cartesius/exp-h256p64.job 71
-Submitted batch job 3802297
+Fixed bug: mistake distance for affinity (similarity) in label propagation.
+
+Started some hyperparameter testing on DAS-5:
+
+    [minhle@fs0 wsd-dynamic-sense-vector]$ das5/exp-hyperp-label-propagation.sh
+    Submitted batch job 1694124
+    Submitted batch job 1694125
+    Submitted batch job 1694126
+    Submitted batch job 1694127
+    Submitted batch job 1694128
 
                           
 5. [x] Try out scikit implementation 

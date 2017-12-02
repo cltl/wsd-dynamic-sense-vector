@@ -14,6 +14,7 @@ from datetime import datetime
 from collections import defaultdict
 from label_propagation import LabelPropagation, expander, RBF
 from docopt import docopt
+from version import version
 
 
 def score_lp(system_input, system_output, gold):
@@ -64,7 +65,8 @@ if __name__ == '__main__':
     path_system='output/dev.lp'
     path_gold='output/dev.lp.gold'
 
-    path_senses_output = path_system + '.out'
+    path_senses_output = os.path.join('output', version, 'debug_lp_sim-%s_gamma-%s.pkl' 
+                                      %(arguments['--sim'], arguments['--gamma']))
     system_input = pickle.load(open(path_system, 'rb'))
     gold = pickle.load(open(path_gold, 'rb'))
     
