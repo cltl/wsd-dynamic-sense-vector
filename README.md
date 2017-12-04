@@ -91,6 +91,19 @@ Train by running:
 
 Requirements: You'll need at least 64 GB of RAM to run the preparation script. 
 
+#### Convert annotated corpora into input format LSTM
+
+0. cd script
+1. bash convert_for_paper.sh 
+The bash file calls the python script sense_annotations2lstm_format.py, which converts the sense annotations into the format needed to train the embeddings at the preferred granularity level (sensekey or synset).
+
+#### label propagation
+
+After running the sense_annotations2lstm_format.py with omsti as corpus, the output of that run needs to be provided as an argument to pwgc_to_ulm.py.
+This creates a development set for the label propagation:
+a) annotated corpus: pwgc
+b) unannotated corpus: omsti
+
 #### Reproduce variation experiment
 
 0. `git checkout a453bc1`
@@ -105,10 +118,10 @@ Requirements: You'll need at least 64 GB of RAM to run the preparation script.
 0. `git checkout a74bda6`
 1. Pre-process GigaWord into plain text (if you haven't done so): `sbatch cartesius/process-gigaword.job`
 2. More preprocessing to make binary files: `sbatch cartesius/prepare-lstm-wsd.job`
-3. `git checkout fc78409`
-4. Run in parallel: `sbatch cartesius/exp-optimization{i}.job` where i=1,2,3
+3. `git checkout e93fdb2`
+4. Run in parallel: `sbatch cartesius/exp-optimization{i}.job` where i=1,2,3,4
 
-#### Reproduce model capacity experiment
+#### Model capacity experiment
 
 0. `git checkout a74bda6`
 1. Pre-process GigaWord into plain text (if you haven't done so): `sbatch cartesius/process-gigaword.job`
@@ -116,7 +129,7 @@ Requirements: You'll need at least 64 GB of RAM to run the preparation script.
 3. `git checkout e93fdb2`
 4. Run `cartesius/exp-h256p64.sh` (which calls `sbatch`)
 
-#### Reproduce data size experiment
+#### Data size experiment
 
 0. `git checkout a74bda6`
 1. Pre-process GigaWord into plain text (if you haven't done so): `sbatch cartesius/process-gigaword.job`
