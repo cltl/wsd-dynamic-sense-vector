@@ -12,10 +12,10 @@ echo -n 'Started: ' && date
 
 out_dir=output/`python3 version.py`
 mkdir $out_dir
-log_file=$out_dir/exp-hyperp-label-propagation_sim-$1_gamma-$2.log
+log_file=$out_dir/exp-hyperp-label-propagation_algo-$3_sim-$1_gamma-$2.log
 echo "Log is written to $log_file"
 
-python3 debug_lp.py --sim=$1 --gamma=$2 2>&1 | tee $log_file 
+python3 debug_lp.py --algo=$3 --sim=$1 --gamma=$2 2>&1 | tee $log_file 
 
 echo -n 'Finished: ' && date
     

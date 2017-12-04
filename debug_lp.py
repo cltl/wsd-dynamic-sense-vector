@@ -1,10 +1,11 @@
 """Evaluate label propagation on a development set.
 
 Usage:
-  debug_lp.py --sim=<func> --gamma=<val>
+  debug_lp.py --algo=<algo> --sim=<func> --gamma=<val>
 
 Options:
   -h --help     Show this screen.
+  --algo=<algo> Choose the algorithm (propagate, spread, or nearest) [default: propagate]
   --sim=<func>  Choose the similarity function to test (either rbf or expander)
   --gamma=<val> Value of gamma for RBF function
 """
@@ -12,7 +13,8 @@ Options:
 import os
 from datetime import datetime 
 from collections import defaultdict
-from label_propagation import LabelPropagation, expander, RBF
+from label_propagation import LabelPropagation, expander, RBF, NearestNeighbor,\
+    LabelSpreading
 from docopt import docopt
 from version import version
 
@@ -57,6 +59,8 @@ if __name__ == '__main__':
         sim_func = expander
     elif arguments['--sim'] == 'rbf':
         sim_func = RBF(float(arguments['--gamma']))
+    else:
+        raise ValueError('Unknown similarity function: %s' %arguments['--sim'])
 
     model_path='/var/scratch/mcpostma/testing/model-google-65/model-google/lstm-wsd-gigaword-google'
     vocab_path='/var/scratch/mcpostma/wsd-dynamic-sense-vector/output/gigaword-lstm-wsd.index.pkl'
@@ -65,22 +69,32 @@ if __name__ == '__main__':
     path_system='output/dev.lp'
     path_gold='output/dev.lp.gold'
 
-    path_senses_output = os.path.join('output', version, 'debug_lp_sim-%s_gamma-%s.pkl' 
-                                      %(arguments['--sim'], arguments['--gamma']))
+    path_senses_output = os.path.join('output', version, 'debug_lp__algo-%s_sim-%s_gamma-%s.pkl' 
+                                      %(arguments['--algo'], arguments['--sim'], arguments['--gamma']))
+    print('Senses written to %s' %path_senses_output)
     system_input = pickle.load(open(path_system, 'rb'))
     gold = pickle.load(open(path_gold, 'rb'))
     
     old_system_input = deepcopy(system_input)
 
-    assert os.path.exists(vocab_path) and os.path.exists(model_path + '.meta'), 'Please update the paths hard-coded in this file (for testing only)'
+    assert os.path.exists(vocab_path) and os.path.exists(model_path + '.meta'), \
+            'Please update the paths hard-coded in this file (for testing only)'
     import tensorflow as tf
     with tf.Session() as sess:
-        lp = LabelPropagation(sess, vocab_path, model_path, 1000)
+        if arguments['--algo'] == 'propagate': 
+            lp = LabelPropagation(sess, vocab_path, model_path, 1000, sim_func=sim_func)
+        elif arguments['--algo'] == 'spread':
+            lp = LabelSpreading(sess, vocab_path, model_path, 1000, sim_func=sim_func)
+        elif arguments['--algo'] == 'nearest':
+            lp = NearestNeighbor(sess, vocab_path, model_path, 1000, sim_func=sim_func)
+        else:
+            raise ValueError('Unknown algorithm: %s' %arguments['--algo'])
         system_output = lp.predict(system_input)
         with open(path_senses_output, 'wb') as outfile:
             pickle.dump(system_output, outfile)
 
-        print(datetime.now())
+        lp.print_stats()
+        print('Finished predicting at %s' %datetime.now())
 
     # score output (if gold provided)
     score_lp(old_system_input, system_output, gold)

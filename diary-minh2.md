@@ -145,6 +145,8 @@ Started some hyperparameter testing on DAS-5:
     Submitted batch job 1694128
 
                           
+TODO: docker image
+                          
 5. [x] Try out scikit implementation 
 4. [x] Implement custom kernel ("We found that the graph has about the right density for common senses when ... between 85 to 98.")
 3. [x] measure running time
