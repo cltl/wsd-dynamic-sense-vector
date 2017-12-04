@@ -136,3 +136,9 @@ b) unannotated corpus: omsti
 2. More preprocessing to make binary files: `sbatch cartesius/prepare-lstm-wsd.job`
 3. `git checkout 4e4a04a`
 4. Run `sbatch cartesius/exp-data-size.job {i}` with i="01",10,25,50,75
+
+#### Hyperparameter tuning for label propagation
+
+1. TODO @Marten: how to create debug.lp and debug.lp.gold
+2. `git checkout 0448586`
+3. `das5/exp-hyperp-label-propagation.sh` (which calls `sbatch`)

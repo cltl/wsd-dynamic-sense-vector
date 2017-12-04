@@ -15,7 +15,7 @@ mkdir $out_dir
 log_file=$out_dir/exp-hyperp-label-propagation_algo-$3_sim-$1_gamma-$2.log
 echo "Log is written to $log_file"
 
-python3 debug_lp.py --algo=$3 --sim=$1 --gamma=$2 2>&1 | tee $log_file 
+python3 -u debug_lp.py --algo=$3 --sim=$1 --gamma=$2 2>&1 | tee $log_file 
 
 echo -n 'Finished: ' && date
     

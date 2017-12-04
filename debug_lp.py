@@ -81,18 +81,17 @@ if __name__ == '__main__':
             'Please update the paths hard-coded in this file (for testing only)'
     import tensorflow as tf
     with tf.Session() as sess:
-        if arguments['--algo'] == 'propagate': 
+        if arguments['--algo'] in ('propagate', 'LabelPropagation'): 
             lp = LabelPropagation(sess, vocab_path, model_path, 1000, sim_func=sim_func)
-        elif arguments['--algo'] == 'spread':
+        elif arguments['--algo'] in ('spread', 'LabelSpreading'):
             lp = LabelSpreading(sess, vocab_path, model_path, 1000, sim_func=sim_func)
-        elif arguments['--algo'] == 'nearest':
+        elif arguments['--algo'] in ('nearest', 'NearestNeighbor'):
             lp = NearestNeighbor(sess, vocab_path, model_path, 1000, sim_func=sim_func)
         else:
             raise ValueError('Unknown algorithm: %s' %arguments['--algo'])
         system_output = lp.predict(system_input)
         with open(path_senses_output, 'wb') as outfile:
             pickle.dump(system_output, outfile)
-
         lp.print_stats()
         print('Finished predicting at %s' %datetime.now())
 
