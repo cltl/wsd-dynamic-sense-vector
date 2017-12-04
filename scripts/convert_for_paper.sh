@@ -1,0 +1,17 @@
+
+
+sbatch convert_sense_annotations.job semcor sensekey
+sbatch convert_sense_annotations.job mun sensekey
+sbatch convert_sense_annotations.job semcor_mun sensekey
+
+sbatch convert_sense_annotations.job semcor synset
+sbatch convert_sense_annotations.job mun synset
+sbatch convert_sense_annotations.job semcor_mun synset
+
+sbatch convert_sense_annotations_171.job semcor synset
+sbatch convert_sense_annotations_171.job mun synset
+sbatch convert_sense_annotations_171.job semcor_mun synset
+
+sbatch convert_sense_annotations_171.job semcor sensekey
+sbatch convert_sense_annotations_171.job mun sensekey
+sbatch convert_sense_annotations_171.job semcor_mun sensekey
