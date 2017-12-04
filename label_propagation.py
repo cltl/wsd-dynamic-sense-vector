@@ -3,17 +3,15 @@ from time import time
 from sklearn.metrics.pairwise import euclidean_distances
 from collections import Counter
 from scipy.sparse.csr import csr_matrix
-import os
 import sys
 from sklearn import semi_supervised
-import math
 
 class RBF(object):
     def __init__(self, gamma):
         self.gamma = gamma
     def __call__(self, X, Y):
         distances = euclidean_distances(X, Y)
-        return math.exp(-self.gamma*distances*distances)
+        return np.exp(-self.gamma*distances*distances)
     
 def expander(X, Y): 
     ''' The similarity function used by Ravi and Diao (2015, pp 524) 
@@ -142,7 +140,9 @@ class LabelPropagation(object):
         lemma2contexts = {}
         start = 0
         for lemma in converted_data:
-            lemma2contexts[lemma] = lstm_output[start:start+len(converted_data[lemma])]
+            stop = start+len(converted_data[lemma])
+            lemma2contexts[lemma] = lstm_output[start:stop]
+            start = stop
         assert start == lstm_output.shape[0]
         print('Running LSTM... Done.')
         return lemma2contexts
@@ -219,16 +219,20 @@ class NearestNeighbor(LabelPropagation):
             if self.debugging and lemma_no >= 100: break # for debugging
             print("Lemma #%d of %d: %s" %(lemma_no, len(converted_data), lemma))
             d = converted_data[lemma]
-            labeled_indices = [i for i in range(len(d)) if d[i] >= 0]
-            unlabeled_indices = [i for i in range(len(d)) if d[i] < 0]
+            labeled_indices = [i for i, (sense, _, _) in enumerate(d) if sense >= 0]
+            unlabeled_indices = [i for i, (sense, _, _) in enumerate(d) if sense < 0]
+#             print(len(labeled_indices), len(unlabeled_indices)) # for debugging
             
             labeled_contexts = contexts[labeled_indices]
             unlabeled_contexts = contexts[unlabeled_indices]
             sims = self.sim_func(unlabeled_contexts, labeled_contexts)
             most_similar_labeled_contexts = np.argsort(-sims)[:,0]
-            predicted_indices = d.copy()
+            predicted_indices = [sense for sense, _, _ in d]
             for i, j in zip(unlabeled_indices, most_similar_labeled_contexts):
-                predicted_indices[i] = d[labeled_indices[j]]
+                predicted_indices[i] = d[labeled_indices[j]][0]
             output[lemma] = [sense_ids[index] for index in predicted_indices]
         return output
+    
+    def print_stats(self):
+        pass
     
