@@ -26,7 +26,7 @@ rm -rf $base_folder && mkdir $base_folder
 
 use_case_strategy=False
 use_number_strategy=False
-mfs_fallback=True
+mfs_fallback=${4-True}
 batch_size=400
 emb_setting=sensekey
 eval_setting=sensekey

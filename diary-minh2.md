@@ -169,13 +169,80 @@ but label spreading is the best:
 The similarity function is also very important because I tried label spreading
 before with Euclidean distance and RBF but got terrible results.
 
-I'm curious about nearest neighbor of the averaged context vector:
+I'm curious about nearest neighbor of the averaged context vector.
 
-    [minhle@fs0 wsd-dynamic-sense-vector]$ sbatch das5/exp-hyperp-label-propagation.job expander "" average
-    Submitted batch job 1697858
-    [minhle@fs0 wsd-dynamic-sense-vector]$ tail -f slurm-1697858.out
-    Started: Tue Dec  5 02:56:40 CET 2017
+Ran a big batch of experiments to test everything. I hope I could sort it out
+today. Otherwise it'll sit there forever because I need to finish the paper and
+from January I'll have very limited time.
+    
+    [minhle@fs0 wsd-dynamic-sense-vector]$ tail -n 1 output/2017-12-05-dcd006e/*.log
+    ==> output/2017-12-05-dcd006e/exp-hyperp-label-propagation_algo-average_sim-expander_gamma-.log <==
+    total 0.22927465097096772
+    
+    ==> output/2017-12-05-dcd006e/exp-hyperp-label-propagation_algo-average_sim-rbf_gamma-1.log <==
+    total 0.2948646144132952
+    
+    ==> output/2017-12-05-dcd006e/exp-hyperp-label-propagation_algo-nearest_sim-expander_gamma-.log <==
+    total 0.4798983717070091
+    
+    ==> output/2017-12-05-dcd006e/exp-hyperp-label-propagation_algo-nearest_sim-rbf_gamma-1.log <==
+    total 0.35843575930998667
+    
+    ==> output/2017-12-05-dcd006e/exp-hyperp-label-propagation_algo-propagate_sim-expander_gamma-.log <==
+    total 0.35850958747874256
+    
+    ==> output/2017-12-05-dcd006e/exp-hyperp-label-propagation_algo-propagate_sim-rbf_gamma-0.01.log <==
+    total 0.35854777446258185
+    
+    ==> output/2017-12-05-dcd006e/exp-hyperp-label-propagation_algo-propagate_sim-rbf_gamma-0.1.log <==
+    total 0.35855032026150446
+    
+    ==> output/2017-12-05-dcd006e/exp-hyperp-label-propagation_algo-propagate_sim-rbf_gamma-0.5.log <==
+    total 0.35841030132076046
+    
+    ==> output/2017-12-05-dcd006e/exp-hyperp-label-propagation_algo-propagate_sim-rbf_gamma-1.log <==
+    total 0.35841030132076046
+    
+    ==> output/2017-12-05-dcd006e/exp-hyperp-label-propagation_algo-spread_sim-expander_gamma-.log <==
+    total 0.4909980550096231
+    
+    ==> output/2017-12-05-dcd006e/exp-hyperp-label-propagation_algo-spread_sim-rbf_gamma-0.01.log <==
+    total 0.47848036170711095
+    
+    ==> output/2017-12-05-dcd006e/exp-hyperp-label-propagation_algo-spread_sim-rbf_gamma-0.1.log <==
+    total 0.46497744422154563
+    
+    ==> output/2017-12-05-dcd006e/exp-hyperp-label-propagation_algo-spread_sim-rbf_gamma-0.5.log <==
+    total 0.3595915520208552
+    
+    ==> output/2017-12-05-dcd006e/exp-hyperp-label-propagation_algo-spread_sim-rbf_gamma-1.log <==
+    total 0.35843321351106405
 
+Cartesius was super busy for a while, I only got access to GPUs today. Seed 71 
+experiment was ruined because when it started yesterday, the source code has
+changed to a different version. So I checkout the right version again and resumed it:
+
+    [minhle@int2 wsd-dynamic-sense-vector]$ git checkout e93fdb2
+    ...
+    [minhle@int2 wsd-dynamic-sense-vector]$ sbatch cartesius/exp-h256p64.job 71
+    Submitted batch job 3814222
+
+I'm using 6.3 tetrabytes! :-O :-O :-O
+
+    [minhle@int2 wsd-dynamic-sense-vector]$ du -sh .
+    6.3T    .
+
+Resumed data-size 25% as well because it was terminated due to some mysterious error
+(`ResourceExhaustedError (see above for traceback): output/2017-11-24-fc78409/lstm-wsd-gigaword_25-pc_large/model.ckpt-1090253.data-00000-of-00001.tempstate5936053556082246253`). I guess
+there's a hidden quota on the scratch folder of Cartesius.
+
+    [minhle@int2 wsd-dynamic-sense-vector]$ python3 version.py
+    2017-11-24-4e4a04a
+    [minhle@int2 wsd-dynamic-sense-vector]$ sbatch cartesius/exp-data-size.job 25
+    Submitted batch job 3814289
+
+Data-size 50% is gone because it happens to be run on a working version and I
+have just purged all working output to avoid weird errors.
 
 TODO: docker image
         

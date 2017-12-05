@@ -242,18 +242,18 @@ class NearestNeighborOfAverage(LabelPropagation):
             for i, (sense, _, _) in enumerate(d):
                 if sense >= 0:
                     sense2indices[sense].append(i)
-            labeled_contexts = np.empty((len(sense2indices), contexts.shape[1]))
+            averaged_contexts = np.empty((len(sense2indices), contexts.shape[1]))
             context2sense = {}
             for context_id, (sense, indices) in enumerate(sense2indices.items()):
                 context2sense[context_id] = sense 
-                labeled_contexts[context_id] = contexts[indices].mean()
+                averaged_contexts[context_id] = contexts[indices].mean()
 #             print(len(labeled_indices), len(unlabeled_indices)) # for debugging
             unlabeled_indices = [i for i, (sense, _, _) in enumerate(d) if sense < 0]
             unlabeled_contexts = contexts[unlabeled_indices]
-            sims = self.sim_func(unlabeled_contexts, labeled_contexts)
-            most_similar_labeled_contexts = np.argsort(-sims)[:,0]
+            sims = self.sim_func(unlabeled_contexts, averaged_contexts)
+            most_similar_averaged_contexts = np.argsort(-sims)[:,0]
             predicted_indices = [sense for sense, _, _ in d]
-            for i, j in zip(unlabeled_indices, most_similar_labeled_contexts):
+            for i, j in zip(unlabeled_indices, most_similar_averaged_contexts):
                 predicted_indices[i] = context2sense[j]
             output[lemma] = [sense_ids[index] for index in predicted_indices]
         return output

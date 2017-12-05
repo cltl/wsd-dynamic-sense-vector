@@ -109,9 +109,13 @@ b) unannotated corpus: omsti
 0. `git checkout a453bc1`
 1. Pre-process GigaWord into plain text: `sbatch cartesius/process-gigaword.job`
 2. More preprocessing to make binary files: `sbatch cartesius/prepare-lstm-wsd.job`
-0. `git checkout 4ed25bd`
+0. `git checkout ce8a024`
 1. Run at the same time: `sbatch cartesius/exp-variation1.job` and `cartesius/sbatch exp-variation2.job`
-2. When they both finish, run `sbatch cartesius/exp-variation-score.job`
+0. `git checkout a74bda6`
+2. Preprocessing to make binary files (if you haven't done so): `sbatch cartesius/prepare-lstm-wsd.job`
+3. `git checkout e93fdb2`
+4. Run `cartesius/exp-h256p64.sh` (which calls `sbatch`)
+2. When everything finishes, run `sbatch cartesius/exp-variation-score.job`
 
 #### Reproduce optimization experiment
 
@@ -120,14 +124,6 @@ b) unannotated corpus: omsti
 2. More preprocessing to make binary files: `sbatch cartesius/prepare-lstm-wsd.job`
 3. `git checkout e93fdb2`
 4. Run in parallel: `sbatch cartesius/exp-optimization{i}.job` where i=1,2,3,4
-
-#### Model capacity experiment
-
-0. `git checkout a74bda6`
-1. Pre-process GigaWord into plain text (if you haven't done so): `sbatch cartesius/process-gigaword.job`
-2. More preprocessing to make binary files (if you haven't done so): `sbatch cartesius/prepare-lstm-wsd.job`
-3. `git checkout e93fdb2`
-4. Run `cartesius/exp-h256p64.sh` (which calls `sbatch`)
 
 #### Data size experiment
 

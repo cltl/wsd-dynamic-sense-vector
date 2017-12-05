@@ -5,21 +5,42 @@
 module load cuda/8.0.61
 module load cudnn/8.0-v6.0
 
+cd evaluate
+
 echo -n 'Started: ' && date
 
 preprocess_version="2017-11-02-a453bc1"
+vocab_path="preprocessed-data/$preprocess_version/gigaword-for-lstm-wsd.index.pkl"
 model_version="2017-11-08-ce8a024"
-
-cd evaluate
 
 for seed in 124 261 9165 293 1005 16651 91 172 961 651
 do
     output_version=`python3 ../version.py`
     mkdir ../output/$output_version
-    ./evaluate.job \
-            ../output/$model_version/lstm-wsd-gigaword-small_seed-$seed-best-model \
-            ../preprocessed-data/$preprocess_version/gigaword-for-lstm-wsd.index.pkl \
-            ../output/$output_version/results-seed-$seed
+    model_path="output/$model_version/lstm-wsd-gigaword-small_seed-$seed-best-model"
+    base_path="output/$output_version/exp-variation-small-results-seed-$seed"
+    
+    ./evaluate.job ../$model_path ../$vocab_path ../$base_path-with-mfs True
+    ./evaluate.job ../$model_path ../$vocab_path ../$base_path-without-mfs False
 done
+
+if false; then # for debugging
+
+preprocess_version="2017-11-24-a74bda6"
+vocab_path="preprocessed-data/$preprocess_version/gigaword-for-lstm-wsd.index.pkl"
+model_version="2017-11-24-e93fdb2"
+
+for seed in 12 493 398 814 71
+do
+    output_version=`python3 ../version.py`
+    mkdir ../output/$output_version
+    model_path="output/$model_version/lstm-wsd-gigaword-h256p64-seed_$seed-best-model"
+    base_path="output/$output_version/exp-variation-h256p64-results-seed-$seed"
+    
+    ./evaluate.job ../$model_path ../$vocab_path ../$base_path-with-mfs True
+    ./evaluate.job ../$model_path ../$vocab_path ../$base_path-without-mfs False
+done
+
+fi
 
 echo -n 'Finished: ' && date
