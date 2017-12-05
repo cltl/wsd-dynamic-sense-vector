@@ -5,6 +5,7 @@ from collections import Counter
 from scipy.sparse.csr import csr_matrix
 import sys
 from sklearn import semi_supervised
+from _collections import defaultdict
 
 class RBF(object):
     def __init__(self, gamma):
@@ -73,7 +74,7 @@ class LabelPropagation(object):
         assert X1 is X2, "Unsupported case: two different sets of vectors"
         contexts = X1
         num_examples = len(contexts)
-        sims = self.sim_func(contexts)
+        sims = self.sim_func(contexts, contexts)
         sorted_indices = np.dstack(np.unravel_index(np.argsort(-sims.ravel()), 
                                                     sims.shape))[0]
         sorted_indices = [(u, v) for u, v in sorted_indices if u < v] # keep only one of two equivalent pairs
@@ -98,8 +99,6 @@ class LabelPropagation(object):
         self.adding_edges_elapsed_sec += (time() - adding_edges_start_sec)
         self.num_total_edges += len(selected_pairs) 
         # make the matrix
-        for u, v in selected_pairs:
-            print('\t%d, %d --> %f' %(u, v, self.sim_func(contexts[u], contexts[v])))
         sims, rows, cols = zip(*[(sims[u,v], u,v) for u,v in selected_pairs] +
                                 [(sims[v,u], v,u) for u,v in selected_pairs])
         return csr_matrix((sims, (rows, cols)), shape=(num_examples,num_examples))
@@ -194,8 +193,8 @@ class LabelSpreading(LabelPropagation):
     a very skewed distribution, we might end up with infrequent senses being
     overridden. '''
     
-    def _apply_label_propagation_model(self, contexts, labels, affinity):
-        label_prop_model = semi_supervised.LabelSpreading(kernel=lambda a, b: affinity)
+    def _apply_label_propagation_model(self, contexts, labels):
+        label_prop_model = semi_supervised.LabelSpreading(kernel=self.affinity_func)
         label_prop_model.fit(contexts, labels)
         return label_prop_model.transduction_    
     
@@ -203,14 +202,6 @@ class NearestNeighbor(LabelPropagation):
     ''' This is a baseline to evaluate label propagation models '''
     
     def predict(self, data):
-        '''
-        input data format: dict(lemma -> list((sense_id[str], sentence_tokens, target_index)))
-        set sense_id to None for unlabeled instances 
-
-        batch_size: number of sentences in a batch to be used as input for LSTM
-        
-        output format: dict(lemma -> list(sense_id)), the order in each list corresponds to the input
-        '''
         converted_data, sense_ids = self._convert_sense_ids(data)
         lemma2context = self._run_lstm(converted_data)
         
@@ -230,6 +221,40 @@ class NearestNeighbor(LabelPropagation):
             predicted_indices = [sense for sense, _, _ in d]
             for i, j in zip(unlabeled_indices, most_similar_labeled_contexts):
                 predicted_indices[i] = d[labeled_indices[j]][0]
+            output[lemma] = [sense_ids[index] for index in predicted_indices]
+        return output
+    
+    def print_stats(self):
+        pass
+    
+class NearestNeighborOfAverage(LabelPropagation):
+    ''' This is a baseline to evaluate label propagation models '''
+    
+    def predict(self, data):
+        converted_data, sense_ids = self._convert_sense_ids(data)
+        if self.debugging: converted_data = dict([converted_data.popitem()])
+        lemma2context = self._run_lstm(converted_data)
+        output = {}
+        for lemma_no, (lemma, contexts) in enumerate(lemma2context.items()):
+            print("Lemma #%d of %d: %s" %(lemma_no, len(converted_data), lemma))
+            d = converted_data[lemma]
+            sense2indices = defaultdict(list)
+            for i, (sense, _, _) in enumerate(d):
+                if sense >= 0:
+                    sense2indices[sense].append(i)
+            labeled_contexts = np.empty((len(sense2indices), contexts.shape[1]))
+            context2sense = {}
+            for context_id, (sense, indices) in enumerate(sense2indices.items()):
+                context2sense[context_id] = sense 
+                labeled_contexts[context_id] = contexts[indices].mean()
+#             print(len(labeled_indices), len(unlabeled_indices)) # for debugging
+            unlabeled_indices = [i for i, (sense, _, _) in enumerate(d) if sense < 0]
+            unlabeled_contexts = contexts[unlabeled_indices]
+            sims = self.sim_func(unlabeled_contexts, labeled_contexts)
+            most_similar_labeled_contexts = np.argsort(-sims)[:,0]
+            predicted_indices = [sense for sense, _, _ in d]
+            for i, j in zip(unlabeled_indices, most_similar_labeled_contexts):
+                predicted_indices[i] = context2sense[j]
             output[lemma] = [sense_ids[index] for index in predicted_indices]
         return output
     

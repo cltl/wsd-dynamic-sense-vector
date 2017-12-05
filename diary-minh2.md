@@ -144,13 +144,44 @@ Started some hyperparameter testing on DAS-5:
     Submitted batch job 1694127
     Submitted batch job 1694128
 
-                          
+## Tue 5 Dec 2017
+
+Fixed 101 bugs in label propagation experiments. Got some results: label 
+propagation (with current implementation) is worse than simple nearest neighbor
+but label spreading is the best:
+
+    [minhle@fs0 wsd-dynamic-sense-vector]$ head -n 3 slurm-1697466.out && tail -n 2 slurm-1697466.out
+    Started: Mon Dec  4 15:36:59 CET 2017
+    Log is written to output/2017-12-04-working/exp-hyperp-label-propagation_algo-propagate_sim-rbf_gamma-0.01.log
+    total 0.35854777446258185
+    Finished: Mon Dec  4 16:15:32 CET 2017
+    [minhle@fs0 wsd-dynamic-sense-vector]$ head -n 3 slurm-1697467.out && tail -n 2 slurm-1697467.out
+    Started: Mon Dec  4 15:36:59 CET 2017
+    Log is written to output/2017-12-04-working/exp-hyperp-label-propagation_algo-spread_sim-expander_gamma-.log
+    total 0.4909980550096231
+    Finished: Mon Dec  4 16:09:39 CET 2017
+    [minhle@fs0 wsd-dynamic-sense-vector]$ head -n 3 slurm-1697468.out && tail -n 2 slurm-1697468.out
+    Started: Mon Dec  4 15:36:59 CET 2017
+    Log is written to output/2017-12-04-working/exp-hyperp-label-propagation_algo-nearest_sim-expander_gamma-.log
+    total 0.4798983717070091
+    Finished: Mon Dec  4 15:53:56 CET 2017
+
+The similarity function is also very important because I tried label spreading
+before with Euclidean distance and RBF but got terrible results.
+
+I'm curious about nearest neighbor of the averaged context vector:
+
+    [minhle@fs0 wsd-dynamic-sense-vector]$ sbatch das5/exp-hyperp-label-propagation.job expander "" average
+    Submitted batch job 1697858
+    [minhle@fs0 wsd-dynamic-sense-vector]$ tail -f slurm-1697858.out
+    Started: Tue Dec  5 02:56:40 CET 2017
+
+
 TODO: docker image
-                          
+        
 5. [x] Try out scikit implementation 
 4. [x] Implement custom kernel ("We found that the graph has about the right density for common senses when ... between 85 to 98.")
 3. [x] measure running time
-2. [ ] Query UkWaC??? for sentences that contain a certain lemma
 3. [x] Build graph and run Scikit label propagation
 4. [x] for 25 Oct: label prop. Semcor + OMSTI
 5. [x] for 25 Oct: list of all experiments for the reproduction paper

@@ -14,7 +14,7 @@ import os
 from datetime import datetime 
 from collections import defaultdict
 from label_propagation import LabelPropagation, expander, RBF, NearestNeighbor,\
-    LabelSpreading
+    LabelSpreading, NearestNeighborOfAverage
 from docopt import docopt
 from version import version
 
@@ -87,6 +87,8 @@ if __name__ == '__main__':
             lp = LabelSpreading(sess, vocab_path, model_path, 1000, sim_func=sim_func)
         elif arguments['--algo'] in ('nearest', 'NearestNeighbor'):
             lp = NearestNeighbor(sess, vocab_path, model_path, 1000, sim_func=sim_func)
+        elif arguments['--algo'] in ('average', 'NearestNeighborOfAverage'):
+            lp = NearestNeighborOfAverage(sess, vocab_path, model_path, 1000, sim_func=sim_func)
         else:
             raise ValueError('Unknown algorithm: %s' %arguments['--algo'])
         system_output = lp.predict(system_input)
