@@ -1,11 +1,16 @@
 import os
-import pandas as pd
 from collections import namedtuple
 import re
 import csv
 import sys
-from configs import SmallConfig
 import math
+import numpy as np
+import seaborn as sns
+from matplotlib.backends.backend_pdf import PdfPages
+import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn.linear_model.base import LinearRegression
+import configs
 
 ModelPerformance = namedtuple('ModelPerformance', ['name', 'semcor', 'mun'])
 
@@ -31,6 +36,7 @@ def variation_experiment():
     print('Variation experiment')
     print('=' * 50)
 
+    from configs import SmallConfig
     print('Small (h%dp%d):' %(SmallConfig.hidden_size, SmallConfig.emb_dims))
     output_dir = os.path.join('output', '2017-11-23-02d85a9')
     result_dirs = []
@@ -89,7 +95,62 @@ def report_wsd_performance_vs_data_size():
     csv_writer.writerow(['Data size', 'Train NLL', 'Valid NLL'])
     csv_writer.writerows(rows)
 
+def draw_data_size_vs_performance_chart():
+    ''' Create figure for paper '''
+    df = pd.read_csv('output/data_size_vs_performance.csv')
+    df['data_size'] = df['data_size']*(10**9)
+    with PdfPages('output/data_size_vs_performance.pdf') as pdf:
+        semcor_handle, = plt.plot(df['data_size'], df['semcor'], label='SemEval13 (T: SemCor)')
+        mun_handle, = plt.plot(df['data_size'], df['mun'], label='SemEval13 (T: OMSTI)')
+        plt.legend(handles=[semcor_handle, mun_handle])
+        plt.axis([1.8e7, 1e11, 0, 1])
+        plt.ylabel('F1')
+        plt.xlabel('Words')
+        plt.xscale('log')
+        pdf.savefig()
+        sns.set_style("darkgrid")
+        plt.show()
+        plt.close()
+    # extrapolate from data
+    lr = LinearRegression()
+    lr.fit(df['semcor'].values.reshape([-1,1]), 
+           np.log10(df['data_size']).values.reshape([-1,1]))
+    print('Extrapolated data size:')
+    print(lr.predict([[0.75], [0.8]]))
+
+def draw_capacity_vs_performance_chart():
+    ''' Create figure for paper '''
+    df = pd.read_csv('output/capacity_vs_performance.csv')
+    vocab_size = configs.DefaultConfig.vocab_size
+    df['num_params'] = (vocab_size*df['p']*2 + # input and output embeddings
+                        df['p']*df['h'] + df['h']*df['h'] + df['h'] + # input gates
+                        df['p']*df['h'] + df['h']*df['h'] + df['h'] + # candidate states
+                        df['p']*df['h'] + df['h']*df['h'] + df['h'] + # forget gates
+                        df['p']*df['h'] + df['h']*df['h'] + df['h']*df['h'] + df['h'] + # output gates
+                        df['p']*df['h'] # context layer
+                        )
+    print(df)
+    with PdfPages('output/capacity_vs_performance.pdf') as pdf:
+        semcor_handle, = plt.plot(df['num_params'], df['semcor'], label='SemEval13 (T: SemCor)')
+        mun_handle, = plt.plot(df['num_params'], df['mun'], label='SemEval13 (T: OMSTI)')
+        plt.legend(handles=[semcor_handle, mun_handle])
+        plt.axis([1.9e7, 1.1e9, 0, 1])
+        plt.ylabel('F1')
+        plt.xlabel('Parameters')
+        plt.xscale('log')
+        pdf.savefig()
+        sns.set_style("darkgrid")
+        plt.show()
+        plt.close()
+    # extrapolate from data
+#     lr = LinearRegression()
+#     lr.fit(df['semcor'].values.reshape([-1,1]), 
+#            np.log10(df['data_size']).values.reshape([-1,1]))
+#     print('Extrapolated data size:')
+#     print(lr.predict([[0.75], [0.8]]))
+
 if __name__ == '__main__':
-    report_wsd_performance_vs_data_size()
+#     report_wsd_performance_vs_data_size()
 #     variation_experiment()
-    
+#     draw_data_size_vs_performance_chart()
+    draw_capacity_vs_performance_chart()
