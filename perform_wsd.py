@@ -1,12 +1,15 @@
 import numpy as np
+import os
 import tensorflow as tf
 import json
 import argparse
 import pickle
 import pandas
 from nltk.corpus import wordnet as wn
+from nltk.corpus.reader.wordnet import WordNetCorpusReader
 from scipy import spatial
 import morpho_utils
+import tensor_utils as utils
 
 parser = argparse.ArgumentParser(description='Perform WSD using LSTM model')
 parser.add_argument('-m', dest='model_path', required=True, help='path to model trained LSTM model')
@@ -22,23 +25,27 @@ parser.add_argument('-t', dest='path_case_freq', help='path to pickle with case 
 parser.add_argument('-a', dest='use_case_strategy', help='set to True to use morphological strategy case')
 parser.add_argument('-p', dest='path_plural_freq', help='path to pickle with plural freq')
 parser.add_argument('-b', dest='use_number_strategy', help='set to True to use morphological strategy number')
-parser.add_argument('-z', dest='path_lp', help='if provided, lp output will be used')
+parser.add_argument('-y', dest='path_lp', help='path to lp output')
+parser.add_argument('-z', dest='use_lp', help='set to True to use label propagation') 
 
 
 args = parser.parse_args()
 args.mfs_fallback = args.mfs_fallback == 'True'
 case_strategy = args.use_case_strategy == 'True'
 number_strategy = args.use_number_strategy == 'True'
-lp_strategy = args.path_lp is not None
+lp_strategy = args.use_lp == 'True'
 
-if case_strategy:
-    case_freq = pickle.load(open(args.path_case_freq, 'rb'))
+case_freq = pickle.load(open(args.path_case_freq, 'rb'))
+plural_freq = pickle.load(open(args.path_plural_freq, 'rb'))
+lp_info = dict()
 
-if number_strategy:
-    plural_freq = pickle.load(open(args.path_case_freq, 'rb'))
-
-if lp_strategy:
-    lp_info = pickle.load(open(args.path_lp, 'rb'))
+the_wn_version = '30'
+# load relevant wordnet
+if '171' in args.wsd_df_path:
+    the_wn_version = '171'
+    cwd = os.path.dirname(os.path.realpath(__file__))
+    path_to_wn_dict_folder = os.path.join(cwd, 'scripts', 'wordnets', '171', 'WordNet-1.7.1', 'dict')
+    wn = WordNetCorpusReader(path_to_wn_dict_folder, None)
 
 
 with open(args.sense_embeddings_path + '.freq', 'rb') as infile:
@@ -90,7 +97,7 @@ def synset2identifier(synset, wn_version):
     offset_8_char = offset.zfill(8)
 
     pos = synset.pos()
-    if pos == 'j':
+    if pos in {'s', 'j'}:
         pos = 'a'
 
     identifier = 'eng-{wn_version}-{offset_8_char}-{pos}'.format_map(locals())
@@ -121,9 +128,9 @@ def extract_sentence_wsd_competition(row):
         sentence_tokens.append(sentence_token.text)
 
     assert len(sentence_tokens) >= 2
-    assert pos is not None
-    assert lemma is not None
-    assert target_index is not None
+    #assert pos is not None # only needed for sem2013-aw
+    #assert lemma is not None, (lemma, pos)
+    #assert target_index is not None
 
     return target_index, sentence_tokens, lemma, pos
 
@@ -207,8 +214,9 @@ vocab = np.load(args.vocab_path)
 with tf.Session() as sess:  # your session object
     saver = tf.train.import_meta_graph(args.model_path + '.meta', clear_devices=True)
     saver.restore(sess, args.model_path)
-    predicted_context_embs = sess.graph.get_tensor_by_name('Model/predicted_context_embs:0')
-    x = sess.graph.get_tensor_by_name('Model_1/x:0')
+    x, predicted_context_embs, lens = utils.load_tensors(sess)
+    #predicted_context_embs = sess.graph.get_tensor_by_name('Model/predicted_context_embs:0')
+    #x = sess.graph.get_tensor_by_name('Model/Placeholder:0')
 
     for row_index, row in wsd_df.iterrows():
         target_index, sentence_tokens, lemma, pos =  extract_sentence_wsd_competition(row)
@@ -216,15 +224,27 @@ with tf.Session() as sess:  # your session object
         target_id = vocab['<target>']
         sentence_as_ids = [vocab.get(w) or vocab['<unkn>'] for w in sentence_tokens]
         sentence_as_ids[target_index] = target_id
-        target_embedding = sess.run(predicted_context_embs, {x: [sentence_as_ids]})[0]
+
+        target_embeddings = sess.run(predicted_context_embs, {x: [sentence_as_ids],
+                                                              lens: [len(sentence_as_ids)]})
+        for target_embedding in target_embeddings:
+            break
+
+        #target_embedding = sess.run(predicted_context_embs, {x: [sentence_as_ids]})[0]
 
         # load token object
         token_obj = row['tokens'][0]
 
         # morphology reduced polysemy
+        pos = row['pos']
+        if the_wn_version in {'171'}:
+            pos = None
+       
+   
         candidate_synsets, \
         new_candidate_synsets, \
-        gold_in_candidates = morpho_utils.candidate_selection(token=token_obj.text,
+        gold_in_candidates = morpho_utils.candidate_selection(wn,
+                                                              token=token_obj.text,
                                                               target_lemma=row['target_lemma'],
                                                               pos=row['pos'],
                                                               morphofeat=token_obj.morphofeat,
@@ -235,9 +255,11 @@ with tf.Session() as sess:  # your session object
                                                               plural_freq=plural_freq,
                                                               debug=False)
 
-        the_chosen_candidates = [synset2identifier(synset, wn_version='30')
+        the_chosen_candidates = [synset2identifier(synset, wn_version=the_wn_version)
                                  for synset in new_candidate_synsets]
 
+        print()
+        print(the_chosen_candidates, gold_in_candidates)
         # get mapping to higher abstraction level
         synset2higher_level = dict()
         if args.gran in {'sensekey', 'blc20', 'direct_hypernym'}:
@@ -265,7 +287,7 @@ with tf.Session() as sess:  # your session object
         # perform wsd
         if len(the_chosen_candidates) >= 2:
             chosen_synset, \
-            candidate_freq\
+            candidate_freq, \
             strategy = score_synsets(target_embedding,
                                      the_chosen_candidates,
                                      sense_embeddings,
@@ -279,7 +301,9 @@ with tf.Session() as sess:  # your session object
             #    wsd_strategy = 'mfs_fallback'
 
         else:
-            chosen_synset = the_chosen_candidates[0]
+            chosen_synset = None
+            if the_chosen_candidates:
+            	chosen_synset = the_chosen_candidates[0]
             candidate_freq = dict()
 
         # add to dataframe
@@ -290,7 +314,8 @@ with tf.Session() as sess:  # your session object
         wsd_df.set_value(row_index, col='wsd_strategy', value=wsd_strategy)
 
         # score it
-        lstm_acc = chosen_synset in row['wn30_engs']
+        print(chosen_synset, row['source_wn_engs'])
+        lstm_acc = chosen_synset in row['source_wn_engs'] # used to be wn30_engs
         wsd_df.set_value(row_index, col='lstm_acc', value=lstm_acc)
         wsd_df.set_value(row_index, col='emb_freq', value=candidate_freq)        
         

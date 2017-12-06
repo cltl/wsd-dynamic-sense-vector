@@ -1,5 +1,6 @@
 
-def candidate_selection(token,
+def candidate_selection(wn,
+                        token,
                         target_lemma,
                         pos,
                         morphofeat,
@@ -44,7 +45,11 @@ def candidate_selection(token,
     apply_morph_strategy = True
 
     # check if candidate_synsets without morphological information is monosemous
-    candidate_synsets = wn.synsets(target_lemma, pos)
+    if pos is None:
+        candidate_synsets = wn.synsets(target_lemma)
+    else:
+    	candidate_synsets = wn.synsets(target_lemma, pos)
+
     if len(candidate_synsets) == 1:
         apply_morph_strategy = False
 
@@ -111,5 +116,13 @@ def candidate_selection(token,
     # if no synsets remain, use original ones
     if not new_candidate_synsets:
         new_candidate_synsets = candidate_synsets
+
+        for synset in candidate_synsets:
+
+            # check if gold in candidate
+            lexkeys = {lemma.key() for lemma in synset.lemmas()}
+            if any(gold_key in lexkeys
+                   for gold_key in gold_lexkeys):
+                gold_in_candidates = True
 
     return candidate_synsets, new_candidate_synsets, gold_in_candidates

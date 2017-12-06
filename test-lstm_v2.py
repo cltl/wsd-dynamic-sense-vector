@@ -5,6 +5,8 @@ import argparse
 import pickle
 from datetime import datetime
 from itertools import islice
+import tensor_utils as utils
+import sys
 
 
 parser = argparse.ArgumentParser(description='Trains meaning embeddings based on precomputed LSTM model')
@@ -20,6 +22,8 @@ parser.add_argument('-s', dest='setting', required=True, help='sensekey | synset
 args = parser.parse_args()
 
 print('loaded arguments for training meaning embeddings')
+
+
 
 def ctx_embd_input(sentence):
     """
@@ -58,30 +62,34 @@ counter = 0
 
 
 with tf.Session() as sess:  # your session object
+    print('opened session object')
     saver = tf.train.import_meta_graph(args.model_path + '.meta', clear_devices=True)
+    print('saver')
     saver.restore(sess, args.model_path)
-    x = sess.graph.get_tensor_by_name('Model_1/x:0')
-    predicted_context_embs = sess.graph.get_tensor_by_name('Model_1/predicted_context_embs:0')
-    lens = sess.graph.get_tensor_by_name('Model_1/lens:0')
+    print('restore')
+    x, predicted_context_embs, lens = utils.load_tensors(sess)
+    print('loaded tensors')
+    #x = sess.graph.get_tensor_by_name('Model_1/x:0')
+    #predicted_context_embs = sess.graph.get_tensor_by_name('Model_1/predicted_context_embs:0')
+    #lens = sess.graph.get_tensor_by_name('Model_1/lens:0')
 
 
     with open(args.input_path) as infile:
         for n_lines in iter(lambda: tuple(islice(infile, batch_size)), ()):
 
+            counter += len(n_lines)
+            if counter >= int(args.max_lines):
+                break
+            
+
+            print(counter, datetime.now())
 
             identifiers = []  # list of sy_ids
             annotated_sentences = []
             sentence_lens = []  # list of ints
-
+            
             for line in n_lines:
 
-                counter += 1
-
-                if counter >= int(args.max_lines):
-                    break
-
-                if counter % 1000 == 0:
-                    print(counter, datetime.now())
 
 
                 sentence = line.strip()
