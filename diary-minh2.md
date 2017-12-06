@@ -244,6 +244,23 @@ there's a hidden quota on the scratch folder of Cartesius.
 Data-size 50% is gone because it happens to be run on a working version and I
 have just purged all working output to avoid weird errors.
 
+Adapted evaluation scripts to report more numbers.
+
+## Wed 6 Dec 2017
+
+For whatever reason, my evaluation script can't be submitted as a slurm job --
+it always get stuck at CG (completing) status. I'm running it using interactive
+job:
+
+    [minhle@int2 wsd-dynamic-sense-vector]$ srun -p gpu -t 5:00:00 --pty bash
+    [minhle@gcn40 wsd-dynamic-sense-vector]$ python3 version.py
+    2017-12-06-42bc700
+    [minhle@gcn40 wsd-dynamic-sense-vector]$ nohup cartesius/exp-variation-score.job > output/`python3 version.py`/exp-variation-score.job.out 2>&1 &
+    [1] 40999
+    [minhle@gcn40 wsd-dynamic-sense-vector]$ tail -f output/`python3 version.py`/exp-variation-score.job.out
+    ...
+
+
 TODO: docker image
         
 5. [x] Try out scikit implementation 

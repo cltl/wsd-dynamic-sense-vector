@@ -112,10 +112,11 @@ b) unannotated corpus: omsti
 0. `git checkout ce8a024`
 1. Run at the same time: `sbatch cartesius/exp-variation1.job` and `cartesius/sbatch exp-variation2.job`
 0. `git checkout a74bda6`
-2. Preprocessing to make binary files (if you haven't done so): `sbatch cartesius/prepare-lstm-wsd.job`
+2. Preprocess to make binary files (the format is slightly different from the previous version): `sbatch cartesius/prepare-lstm-wsd.job`
 3. `git checkout e93fdb2`
 4. Run `cartesius/exp-h256p64.sh` (which calls `sbatch`)
-2. When everything finishes, run `sbatch cartesius/exp-variation-score.job`
+2. When everything finishes, do `git checkout 42bc700` 
+3. Run `sbatch cartesius/exp-variation-score.job`
 
 #### Reproduce optimization experiment
 
