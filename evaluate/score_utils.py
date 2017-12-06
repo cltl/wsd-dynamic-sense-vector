@@ -26,6 +26,11 @@ def experiment_results(df, mfs_fallback, wsd_df_path):
     
     # competition
     basename = os.path.basename(wsd_df_path)
+
+    if '-171_' in basename:
+        competition = 'Senseval2'
+    elif '-30_' in basename:
+        competition = 'SemEval13'
     
     # corpora
     corpora = 'SemCor'
@@ -36,7 +41,7 @@ def experiment_results(df, mfs_fallback, wsd_df_path):
     
     text_corpora = 'Our LSTM (T: %s)' % corpora
 
-    result =  {'competition' : 'SemEval13',
+    result =  {'competition' : competition,
                'model' : text_corpora,
                '+MFS' : fallback_used,
                'P' : "%.3f" % p,

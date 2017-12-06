@@ -1,14 +1,16 @@
 import numpy as np
+import os
 import tensorflow as tf
 import json
 import argparse
 import pickle
 import pandas
 from nltk.corpus import wordnet as wn
+from nltk.corpus.reader.wordnet import WordNetCorpusReader
 from scipy import spatial
 import morpho_utils
 import tensor_utils as utils
-import score_utils 
+import score_utils
 
 parser = argparse.ArgumentParser(description='Perform WSD using LSTM model')
 parser.add_argument('-m', dest='model_path', required=True, help='path to model trained LSTM model')
@@ -37,6 +39,14 @@ lp_strategy = args.use_lp == 'True'
 case_freq = pickle.load(open(args.path_case_freq, 'rb'))
 plural_freq = pickle.load(open(args.path_plural_freq, 'rb'))
 lp_info = dict()
+
+the_wn_version = '30'
+# load relevant wordnet
+if '171' in args.wsd_df_path:
+    the_wn_version = '171'
+    cwd = os.path.dirname(os.path.realpath(__file__))
+    path_to_wn_dict_folder = os.path.join(cwd, 'wordnets', '171', 'WordNet-1.7.1', 'dict')
+    wn = WordNetCorpusReader(path_to_wn_dict_folder, None)
 
 
 with open(args.sense_embeddings_path + '.freq', 'rb') as infile:
@@ -88,7 +98,7 @@ def synset2identifier(synset, wn_version):
     offset_8_char = offset.zfill(8)
 
     pos = synset.pos()
-    if pos == 'j':
+    if pos in {'s', 'j'}:
         pos = 'a'
 
     identifier = 'eng-{wn_version}-{offset_8_char}-{pos}'.format_map(locals())
@@ -119,9 +129,9 @@ def extract_sentence_wsd_competition(row):
         sentence_tokens.append(sentence_token.text)
 
     assert len(sentence_tokens) >= 2
-    assert pos is not None
-    assert lemma is not None
-    assert target_index is not None
+    #assert pos is not None # only needed for sem2013-aw
+    #assert lemma is not None, (lemma, pos)
+    #assert target_index is not None
 
     return target_index, sentence_tokens, lemma, pos
 
@@ -227,9 +237,15 @@ with tf.Session() as sess:  # your session object
         token_obj = row['tokens'][0]
 
         # morphology reduced polysemy
+        pos = row['pos']
+        if the_wn_version in {'171'}:
+            pos = None
+       
+   
         candidate_synsets, \
         new_candidate_synsets, \
-        gold_in_candidates = morpho_utils.candidate_selection(token=token_obj.text,
+        gold_in_candidates = morpho_utils.candidate_selection(wn,
+                                                              token=token_obj.text,
                                                               target_lemma=row['target_lemma'],
                                                               pos=row['pos'],
                                                               morphofeat=token_obj.morphofeat,
@@ -240,9 +256,11 @@ with tf.Session() as sess:  # your session object
                                                               plural_freq=plural_freq,
                                                               debug=False)
 
-        the_chosen_candidates = [synset2identifier(synset, wn_version='30')
+        the_chosen_candidates = [synset2identifier(synset, wn_version=the_wn_version)
                                  for synset in new_candidate_synsets]
 
+        print()
+        print(the_chosen_candidates, gold_in_candidates)
         # get mapping to higher abstraction level
         synset2higher_level = dict()
         if args.gran in {'sensekey', 'blc20', 'direct_hypernym'}:
@@ -284,7 +302,9 @@ with tf.Session() as sess:  # your session object
             #    wsd_strategy = 'mfs_fallback'
 
         else:
-            chosen_synset = the_chosen_candidates[0]
+            chosen_synset = None
+            if the_chosen_candidates:
+            	chosen_synset = the_chosen_candidates[0]
             candidate_freq = dict()
 
         # add to dataframe
@@ -295,7 +315,8 @@ with tf.Session() as sess:  # your session object
         wsd_df.set_value(row_index, col='wsd_strategy', value=wsd_strategy)
 
         # score it
-        lstm_acc = chosen_synset in row['wn30_engs']
+        print(chosen_synset, row['source_wn_engs'])
+        lstm_acc = chosen_synset in row['source_wn_engs'] # used to be wn30_engs
         wsd_df.set_value(row_index, col='lstm_acc', value=lstm_acc)
         wsd_df.set_value(row_index, col='emb_freq', value=candidate_freq)        
         
@@ -317,9 +338,6 @@ results = score_utils.experiment_results(wsd_df, args.mfs_fallback, args.wsd_df_
 
 with open(output_path_json, 'w') as outfile:
     json.dump(results, outfile)
-
-
-
 
 
 

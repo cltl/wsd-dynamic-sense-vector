@@ -1,6 +1,6 @@
-from nltk.corpus import wordnet as wn 
 
-def candidate_selection(token,
+def candidate_selection(wn,
+                        token,
                         target_lemma,
                         pos,
                         morphofeat,
@@ -45,7 +45,11 @@ def candidate_selection(token,
     apply_morph_strategy = True
 
     # check if candidate_synsets without morphological information is monosemous
-    candidate_synsets = wn.synsets(target_lemma, pos)
+    if pos is None:
+        candidate_synsets = wn.synsets(target_lemma)
+    else:
+    	candidate_synsets = wn.synsets(target_lemma, pos)
+
     if len(candidate_synsets) == 1:
         apply_morph_strategy = False
 
