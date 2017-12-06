@@ -24,7 +24,6 @@ do
     ./evaluate.job ../$model_path ../$vocab_path ../$base_path-without-mfs False
 done
 
-if false; then # for debugging
 
 preprocess_version="2017-11-24-a74bda6"
 vocab_path="preprocessed-data/$preprocess_version/gigaword-for-lstm-wsd.index.pkl"
@@ -40,7 +39,5 @@ do
     ./evaluate.job ../$model_path ../$vocab_path ../$base_path-with-mfs True
     ./evaluate.job ../$model_path ../$vocab_path ../$base_path-without-mfs False
 done
-
-fi
 
 echo -n 'Finished: ' && date
