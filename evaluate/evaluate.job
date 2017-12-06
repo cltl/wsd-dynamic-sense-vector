@@ -26,15 +26,16 @@ rm -rf $base_folder && mkdir $base_folder
 
 use_case_strategy=False
 use_number_strategy=False
-mfs_fallback=${4-True}
+mfs_fallback=True
 batch_size=400
-emb_setting=sensekey
-eval_setting=sensekey
+emb_setting=synset
+eval_setting=synset
 model_path=$1
 vocab_path=$2
 
-out_dir=$base_folder/semcor
-base=resources/sensekey-semcor
+
+out_dir=$base_folder/se2_semcor
+base=resources/synset-171_semcor
 sense_annotations_path="$base.txt"
 wsd_df_in="$base.bin"
 path_case_freq="$base.case_freq"
@@ -44,8 +45,29 @@ use_lp_strategy=False
 
 bash one_full_experiment_v2.sh $out_dir $batch_size $emb_setting $eval_setting $model_path $vocab_path $sense_annotations_path $wsd_df_in $mfs_fallback $path_case_freq $use_case_strategy $path_plural_freq $use_number_strategy $path_lp $use_lp_strategy
 
-out_dir=$base_folder/mun
-base=resources/sensekey-mun
+out_dir=$base_folder/se2_omsti
+base=resources/synset-171_mun
+sense_annotations_path="$base.txt"
+wsd_df_in="$base.bin"
+path_case_freq="$base.case_freq"
+path_plural_freq="$base.plural_freq"
+path_lp="$base.lp.out"
+use_lp_strategy=False
+bash one_full_experiment_v2.sh $out_dir $batch_size $emb_setting $eval_setting $model_path $vocab_path $sense_annotations_path $wsd_df_in $mfs_fallback $path_case_freq $use_case_strategy $path_plural_freq $use_number_strategy $path_lp $use_lp_strategy
+
+out_dir=$base_folder/se13_semcor
+base=resources/synset-30_semcor
+sense_annotations_path="$base.txt"
+wsd_df_in="$base.bin"
+path_case_freq="$base.case_freq"
+path_plural_freq="$base.plural_freq"
+path_lp="$base.lp.out"
+use_lp_strategy=False
+
+bash one_full_experiment_v2.sh $out_dir $batch_size $emb_setting $eval_setting $model_path $vocab_path $sense_annotations_path $wsd_df_in $mfs_fallback $path_case_freq $use_case_strategy $path_plural_freq $use_number_strategy $path_lp $use_lp_strategy
+
+out_dir=$base_folder/se13_omsti
+base=resources/synset-30_mun
 sense_annotations_path="$base.txt"
 wsd_df_in="$base.bin"
 path_case_freq="$base.case_freq"
