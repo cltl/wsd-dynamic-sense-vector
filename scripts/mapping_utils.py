@@ -1,4 +1,6 @@
-from semantic_class_manager import BLC
+#from semantic_class_manager import BLC
+from WordNetMapper import WordNetMapper
+
 
 
 def map_sensekey_to_sensekey(instance_id, mapping):
@@ -133,12 +135,13 @@ def load_mapping_sensekey2offset(path_to_index_sense, wn_version):
     return sensekey2offset
 
 
-def load_instance_id2offset(mapping_path, sensekey2offset, debug=False):
+def load_instance_id2offset(mapping_path, sensekey2offset, target_wn_version, debug=False):
     """
     load mapping between instance_id -> wordnet offset
 
     :param str mapping_path: path to mapping instance_id -> sensekeys
     :param dict sensekey2offset: see output function load_mapping_sensekey2offset
+    :param str target_wn_version: version to which sensekeys should be mapped
 
     :rtype: dict
     :return: instance_id -> offset
@@ -149,10 +152,27 @@ def load_instance_id2offset(mapping_path, sensekey2offset, debug=False):
     more_than_one_offset = 0
     no_offsets = 0
 
+    if target_wn_version != '30':
+        my_mapper = WordNetMapper()
+
+
     with open(mapping_path) as infile:
         for line in infile:
             instance_id, *sensekeys = line.strip().split()
 
+            if target_wn_version != '30':
+                new_sensekeys = []
+                for sensekey in sensekeys:
+                    try:
+                        mapped_key = my_mapper.map_lexkey_to_lexkey(sensekey, '30', target_wn_version)
+                    except ValueError:
+                        continue
+
+                    new_sensekeys.append(mapped_key)
+
+                sensekeys = []
+                sensekeys.extend(new_sensekeys)
+    
             instance_id2sensekeys[instance_id] = sensekeys
 
             offsets = {sensekey2offset[sensekey]

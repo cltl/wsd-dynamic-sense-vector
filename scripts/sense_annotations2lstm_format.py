@@ -3,7 +3,9 @@ import os
 from lxml import html
 from datetime import datetime
 import pickle
-from semantic_class_manager import BLC
+#from semantic_class_manager import BLC
+from nltk.corpus.reader.wordnet import WordNetCorpusReader
+from nltk.corpus import wordnet as wn
 
 from spacy.en import English
 nlp = English()
@@ -42,6 +44,10 @@ assert args.abstraction_level in {'direct_hypernym', 'sensekey', 'synset', 'blc2
 accepted_pos = set(args.accepted_pos.split('_'))
 pos_mapping = defaultdict(str)
 pos_mapping['NOUN'] = 'n'
+pos_mapping['VERB'] = 'v'
+pos_mapping['ADJ'] = 'a'
+pos_mapping['ADV'] = 'r'
+
 
 # input path
 if 'mun' in corpora_to_include:
@@ -56,19 +62,26 @@ assert os.path.exists(input_mapping_path)
 
 
 # wn version
-assert args.wn_version in {'30'}, 'wordnet version: %s is not supported' % args.wn_version
+assert args.wn_version in {'171', '30'}, 'wordnet version: %s is not supported' % args.wn_version
 
-if args.wn_version == '30':
-    from nltk.corpus import wordnet as wn
-    path_to_wn_dict_folder = str(wn._get_root())  # change this for other wn versions
-    path_to_wn_index_sense = os.path.join(path_to_wn_dict_folder, 'index.sense')  # change this for other wn versions
+path_to_wn_dict_folder = str(wn._get_root())  # change this for other wn versions
+path_to_wn_index_sense = os.path.join(path_to_wn_dict_folder, 'index.sense')  # change this for other wn versions
+
+if args.wn_version == '171':
+    cwd = os.path.dirname(os.path.realpath(__file__))
+    path_to_wn_dict_folder = os.path.join(cwd, 'wordnets', '171', 'WordNet-1.7.1', 'dict')
+    path_to_wn_index_sense = os.path.join(path_to_wn_dict_folder, 'index.sense')
+    wn = WordNetCorpusReader(path_to_wn_dict_folder, None)
+    
 
 # output path
-base_output_path = os.path.join(args.output_folder, args.abstraction_level + '-' + '_'.join(corpora_to_include))
+base_output_path = os.path.join(args.output_folder, 
+                                args.abstraction_level + '-' + args.wn_version + '_' + '_'.join(corpora_to_include))
 output_path = base_output_path + '.txt'
 log_path = base_output_path + '.log'
 stats_path = base_output_path + '.stats'
 lp_path = base_output_path + '.lp'
+gold_lp_path = base_output_path + 'lp_gold'
 df_output_path = base_output_path + '.bin'
 case_freq_path = base_output_path + '.case_freq'
 plural_freq_path = base_output_path + '.plural_freq'
@@ -90,6 +103,7 @@ sensekey2offset = mapping_utils.load_mapping_sensekey2offset(path_to_wn_index_se
 
 instance_id2offset, instance_id2sensekeys = mapping_utils.load_instance_id2offset(input_mapping_path,
                                                                                   sensekey2offset,
+                                                                                  args.wn_version,
                                                                                   debug=False)
 
 if args.abstraction_level in {'sensekey', 'synset'}:
@@ -173,6 +187,7 @@ stats = defaultdict(int)
 # label propagation info
 sc_lemma_pos2label_sent_index = defaultdict(list)
 omsti_lemma_pos2label_sent_index = defaultdict(list)
+lp_gold = defaultdict(list)
 
 lemma_lower_pos2meaning2freq_uppercase = dict()
 lemma_lower_pos2meaning2freq_plural = dict()
@@ -216,6 +231,9 @@ for corpus_node in my_html_tree.xpath('body/corpus'):
 
 
                     instance_id = child_el.get('id')
+                    if instance_id not in instance_id2offset:
+                        continue
+
                     synset_id = instance_id2offset[instance_id]
 
                     # determine key for mapping
@@ -266,12 +284,14 @@ for corpus_node in my_html_tree.xpath('body/corpus'):
                 if target_lemma in target_lemmas:
                     outfile.write(training_example + '\n')
 
-
+		# add gold lp info 
+                lp_gold[(target_lemma, target_pos)].append((token_annotation, sentence_tokens, target_index))
+		
                 # add to label propagation dicts
                 if the_corpus == 'semcor':
                     sc_lemma_pos2label_sent_index[(target_lemma, target_pos)].append((token_annotation, sentence_tokens, target_index))
                 elif the_corpus == 'mun':
-                    omsti_lemma_pos2label_sent_index[(target_lemma, target_pos)].append((-1, sentence_tokens, target_index))
+                    omsti_lemma_pos2label_sent_index[(target_lemma, target_pos)].append((None, sentence_tokens, target_index))
 
 outfile.close()
 
@@ -312,7 +332,12 @@ with open(log_path, 'w') as outfile:
             omsti_info = sample(omsti_info, 1000)
         num_omsti_after = len(omsti_info)
 
-        lp_input[(target_lemma, target_pos)] = sc_info + omsti_info
+        if all([num_sc > 10,
+                num_omsti_after > 10]):
+                
+            lp_input[(target_lemma, target_pos)] = sc_info + omsti_info
+            assert num_sc > 10
+            assert num_omsti_after > 10
 
         outfile.write('\t'.join([target_lemma,
                                  target_pos,
@@ -331,7 +356,8 @@ for index, row in df.iterrows():
     # check polysemy
     synsets = wn.synsets(lemma, pos)
 
-    if len(synsets) >= 2:
+    if all([len(synsets) >= 2,
+            (lemma, pos) in lp_input]):
 
         target_id = row['token_ids'][0]
         target_index = None
@@ -350,11 +376,12 @@ for index, row in df.iterrows():
 
         lp_index = len(sc_and_omsti_info)
 
-        lp_input[(lemma, pos)].append((-1, sentence, target_index))
+        lp_input[(lemma, pos)].append((None, sentence, target_index))
 
         len_after = len(lp_input[(lemma, pos)])
 
         assert len_before != len_after
+        assert lp_index is not None, 'lp index is None for %s' % target_id
 
     else: # monosemous
         lp_index = None
@@ -368,6 +395,10 @@ df.to_pickle(df_output_path)
 with open(lp_path, 'wb') as outfile:
     pickle.dump(lp_input, outfile)
 
+
+# save one dictionary with gold label propagation
+with open(gold_lp_path, 'wb') as outfile:
+    pickle.dump(lp_gold, outfile)
 
 
 
