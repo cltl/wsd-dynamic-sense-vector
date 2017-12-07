@@ -1,0 +1,23 @@
+#!/bin/bash
+#SBATCH --time=24:00:00
+
+module load python/3.5.2
+
+#check if enough arguments are passed, else print usage information
+if [ $# -eq 0 ];
+then
+    echo
+    echo "Usage:                  : $0 corpora abstraction_level"
+    echo
+    echo "corpora                 : semcor | mun | semcor_mun"
+    echo "abstraction_level       : sensekey"
+    exit -1;
+fi
+
+#assign command line arguments to variables and obtain basename
+export cwd=/${PWD#*/}
+export corpora=$1
+export abstraction_level=$2
+
+python3 sense_annotations2lstm_format.py -i resources/WSD_Training_Corpora -c $corpora -l $abstraction_level -d resources/sem2013-aw.p -p NOUN -w 30 -o higher_level_annotations
+

@@ -45,7 +45,7 @@ the_wn_version = '30'
 if '171' in args.wsd_df_path:
     the_wn_version = '171'
     cwd = os.path.dirname(os.path.realpath(__file__))
-    path_to_wn_dict_folder = os.path.join(cwd, 'wordnets', '171', 'WordNet-1.7.1', 'dict')
+    path_to_wn_dict_folder = os.path.join(cwd, 'resources', 'wordnet_171', 'WordNet-1.7.1', 'dict')
     wn = WordNetCorpusReader(path_to_wn_dict_folder, None)
 
 
