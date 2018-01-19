@@ -6,6 +6,7 @@ from scipy.sparse.csr import csr_matrix
 import sys
 from sklearn import semi_supervised
 from _collections import defaultdict
+from tensor_utils import pad
 
 class RBF(object):
     def __init__(self, gamma):
@@ -34,8 +35,6 @@ class LabelPropagation(object):
         sys.stdout.write('Loading model from %s... ' %model_path)
         saver.restore(sess, model_path)
         sys.stdout.write('Done (%.0f sec).\n' %(time()-start_sec))
-#         self.predicted_context_embs = sess.graph.get_tensor_by_name('Model/predicted_context_embs:0')
-#         self.x = sess.graph.get_tensor_by_name('Model/x:0')
         self.x = sess.graph.get_tensor_by_name('Model_1/x:0')
         self.predicted_context_embs = sess.graph.get_tensor_by_name('Model_1/predicted_context_embs:0')
         self.lens = sess.graph.get_tensor_by_name('Model_1/lens:0')
@@ -103,19 +102,11 @@ class LabelPropagation(object):
                                 [(sims[v,u], v,u) for u,v in selected_pairs])
         return csr_matrix((sims, (rows, cols)), shape=(num_examples,num_examples))
         
-    def _pad(self, list_of_lists, pad_id):
-        max_len = max(len(s) for s in list_of_lists)
-        for s in list_of_lists:
-            while len(s) < max_len:
-                s.append(pad_id)
-        return list_of_lists
-        
     def _run_lstm(self, converted_data):
         print('Running LSTM...')
         # create one big matrix of LSTM input
+        target_id, pad_id, eos_id = self.vocab['<target>'], self.vocab['<pad>'], self.vocab['<eos>']
         lstm_input = []
-        target_id = self.vocab['<target>']
-        pad_id = self.vocab['<pad>']
         for lemma in converted_data:
             for _, sentence_tokens, target_index in converted_data[lemma]:
                 sentence_as_ids = [self.vocab.get(w) or self.vocab['<unkn>'] 
@@ -123,8 +114,7 @@ class LabelPropagation(object):
                 sentence_as_ids[target_index] = target_id
                 lstm_input.append(sentence_as_ids)
         lens = np.array([len(s) for s in lstm_input])
-        self._pad(lstm_input, pad_id)
-        lstm_input = np.array(lstm_input)
+        lstm_input = pad(lstm_input, pad_id, eos_id)
         # process the input in batches
         lstm_output = []
         for batch_no, batch_start in enumerate(range(0, len(lstm_input), self.batch_size)):

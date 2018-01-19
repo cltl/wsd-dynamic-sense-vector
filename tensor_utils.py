@@ -1,4 +1,4 @@
-
+import numpy as np
 
 def load_tensors(sess):
     x = sess.graph.get_tensor_by_name('Model_1/x:0')
@@ -6,3 +6,11 @@ def load_tensors(sess):
     lens = sess.graph.get_tensor_by_name('Model_1/lens:0')
     
     return x, predicted_context_embs, lens
+            
+def pad(sents, max_len, pad_id, eos_id):
+    arr = np.empty((len(sents), max_len+1), dtype=np.int32)
+    arr.fill(pad_id)
+    for i, s in enumerate(sents):
+        arr[i, :len(s)] = s
+        arr[i, len(s)] = eos_id
+    return arr

@@ -280,8 +280,6 @@ and a more recent version. Let's try.
 
 Added `<eos>` to the preparation script.
 
-I'll also need to add it to the evaluation scripts. 
-
     >>> from collections import Counter
     >>> c = Counter()
     >>> with open('preprocessed-data/694cb4d/gigaword.txt') as f:
@@ -292,6 +290,15 @@ I'll also need to add it to the evaluation scripts.
     >>> total = sum(c.values())
     >>> [(tok, cnt/total) for tok, cnt in c.most_common(10)]
     [('.', 0.8052320716307731), ("''", 0.04020230113211145), ('"', 0.039914496196088396), (')', 0.012596199360251295), ('_', 0.01117867983270516), (':', 0.00913549690604858), ('?', 0.008458283721904037), ('--', 0.004405057422483782), ("'", 0.00369116600590189), ('...', 0.002474634316970099)]
+
+Started a job to prepare datasets with `<eos>`:
+
+    [minhle@fs0 wsd-dynamic-sense-vector]$ sbatch das5/prepare-lstm-wsd.job
+    Submitted batch job 1713648
+
+I'll also need to add it to the evaluation scripts.
+
+... OK, did it. It's 12:30 am now... 
 
 
 TODO: docker image

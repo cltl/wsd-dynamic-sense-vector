@@ -78,7 +78,7 @@ echo "use_lp" $use_lp >> $log_file
 # create embeddings
 echo 'started training meaning embeddings at:' >> $log_file
 date >> $log_file
-echo "python3 /var/scratch/mcpostma/wsd-dynamic-sense-vector/test-lstm_v2.py -m $model_path -v $vocab_path -i $sense_annotations_path -o $embeddings_path -b $batch_size -t 1000000 -s $emb_setting"
+echo "python3 test-lstm_v2.py -m $model_path -v $vocab_path -i $sense_annotations_path -o $embeddings_path -b $batch_size -t 1000000 -s $emb_setting"
 python3 test-lstm_v2.py -m $model_path -v $vocab_path -i $sense_annotations_path -o $embeddings_path -b $batch_size -t 1000000 -s $emb_setting
 echo 'finished training meaning embeddings at:' >> $log_file
 date >> $log_file
@@ -86,7 +86,7 @@ date >> $log_file
 # evaluate embeddings
 echo 'started evaluation' >> $log_file
 date >> $log_file
-echo "python3 /var/scratch/mcpostma/wsd-dynamic-sense-vector/perform_wsd.py -m $model_path -v $vocab_path -c $wsd_df_in -s $embeddings_path -o $wsd_df_out -r $results -g $eval_setting " >> $log_file
+echo "python3 perform_wsd.py -m $model_path -v $vocab_path -c $wsd_df_in -s $embeddings_path -o $wsd_df_out -r $results -g $eval_setting " >> $log_file
 python3 perform_wsd.py -m $model_path -v $vocab_path -c $wsd_df_in -l $settings_path -s $embeddings_path -o $wsd_df_out -r $results -g $eval_setting -f $mfs_fallback -t $path_case_freq -a $use_case_strategy -p $path_plural_freq -b $use_number_strategy -y $path_lp -z $use_lp
 echo 'ended evaluation' >> $log_file
 date >> $log_file

@@ -26,6 +26,7 @@ from collections import Counter
 from utils import progress, count_lines_fast
 from configs import output_dir
 from version import version
+from tensor_utils import pad
 
 dev_sents = 20000 # absolute maximum
 dev_portion = 0.01 # relative maximum
@@ -70,14 +71,6 @@ def lookup_and_iter_sents(filename, word2id, include_ids=None, exclude_ids=None)
                 (exclude_ids is None or sent_id not in exclude_ids)):
                 words = line.strip().split()
                 yield [word2id.get(word) or unkn_id for word in words]
-            
-def pad(sents, max_len, pad_id, eos_id):
-    arr = np.empty((len(sents), max_len+1), dtype=np.int32)
-    arr.fill(pad_id)
-    for i, s in enumerate(sents):
-        arr[i, :len(s)] = s
-        arr[i, len(s)] = eos_id
-    return arr
 
 def pad_batches(inp_path, word2id, include_ids, exclude_ids, max_sents=-1):
     sys.stderr.write('Dividing and padding...\n')
