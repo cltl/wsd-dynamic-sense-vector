@@ -5,7 +5,6 @@ output_dir = os.path.join('output', version)
 os.makedirs(output_dir, exist_ok=True)
 
 gigaword_path = 'data/gigaword'
-preprocessed_gigaword_path = os.path.join('preprocessed-data', 'gigaword.txt')
 
 class DefaultConfig(object):
     vocab_size = 10**6 + 3

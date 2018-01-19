@@ -260,6 +260,39 @@ job:
     [minhle@gcn40 wsd-dynamic-sense-vector]$ tail -f output/`python3 version.py`/exp-variation-score.job.out
     ...
 
+## Thu 7 Dec
+
+Worked on the paper. Data size 25% experiment has finished. Tried to run the
+newest evaluation script on it but no GPU machine is available yet.
+
+       42bc700..0a0d02b  master     -> origin/master
+    First, rewinding head to replay your work on top of it...
+    Fast-forwarded master to 0a0d02b4538dcf7322742e32e367a90ec1055899.
+    [minhle@int2 wsd-dynamic-sense-vector]$ sbatch cartesius/eval-data-size.job
+    Submitted batch job 3820439
+
+## Fri 19 Dec
+
+Meeting with Jacopo+Marten. Jacopo would like to retrain everything with <eos>
+token. Checked everything again. There doesn't seem to be big difference (that
+I don't know of) between the version that produced current reported results
+and a more recent version. Let's try.
+
+Added `<eos>` to the preparation script.
+
+I'll also need to add it to the evaluation scripts. 
+
+    >>> from collections import Counter
+    >>> c = Counter()
+    >>> with open('preprocessed-data/694cb4d/gigaword.txt') as f:
+          for sent in f:
+            c[sent.strip().split()[-1]] += 1
+    >>> c.most_common(10)
+    [('.', 141537114), ("''", 7066432), ('"', 7015844), (')', 2214057), ('_', 1964897), (':', 1605763), ('?', 1486728), ('--', 774285), ("'", 648803), ('...', 434971)]
+    >>> total = sum(c.values())
+    >>> [(tok, cnt/total) for tok, cnt in c.most_common(10)]
+    [('.', 0.8052320716307731), ("''", 0.04020230113211145), ('"', 0.039914496196088396), (')', 0.012596199360251295), ('_', 0.01117867983270516), (':', 0.00913549690604858), ('?', 0.008458283721904037), ('--', 0.004405057422483782), ("'", 0.00369116600590189), ('...', 0.002474634316970099)]
+
 
 TODO: docker image
         
@@ -271,8 +304,8 @@ TODO: docker image
 5. [x] for 25 Oct: list of all experiments for the reproduction paper
 6. [x] save models of every epoch (instead of only the best one)
 6. [x] Read more about label propagation (Zhou et al. 2004)
-7. [ ] Hyperparameter tuning of label propagation
+7. [x] Hyperparameter tuning of label propagation
 8. [ ] Training creates a lot of models, how to reduce it?
 9. [ ] Send code+data to Jacopo to run
-10. [ ] Polish the paper
+10. [x] Polish the arxiv paper
 11. [x] Use the same dev set for different sizes of the data.

@@ -1,4 +1,4 @@
-from configs import preprocessed_gigaword_path, output_dir
+from configs import output_dir
 from collections import Counter
 from nltk.stem import WordNetLemmatizer
 import codecs
@@ -9,6 +9,7 @@ if __name__ == '__main__':
     token_count = Counter()
     lemma_count = Counter()
     wordnet_lemmatizer = WordNetLemmatizer()
+    preprocessed_gigaword_path = 'preprocessed-data/694cb4d/gigaword.txt'
     with codecs.open(preprocessed_gigaword_path, 'r', 'utf-8') as f:
         for line_no, line in enumerate(f):
             for tok in line.split():

@@ -1,0 +1,1719 @@
+************************************************************************************
+
+This is a ***edited*** patch file that compare revision 354acc1cfdd542142490afe40447cb6f40d2fd7c (Jul 6, 2017),
+which produced our first h=2048,p=512 (code name "google") model, to a more recent
+revision, 3a24bb0560b41e435bae5215c5c5556d5542134f (Dec 6, 2017).
+
+The purpose is to identify any difference that could affect performance, should it
+goes down.
+
+************************************************************************************
+
+
+
+
+
+
+
+diff --git a/model.py b/model.py
+index 85f627a..b751d0c 100644
+--- a/model.py
++++ b/model.py
+@@ -1,15 +1,19 @@
+ import numpy as np
+ import tensorflow as tf
++import time
++import sys
++
++float_dtype = tf.float32
+ 
+ class DummyModelTrain(object):
+     '''
+     This is for testing GPU usage only. This model runs very trivial operations
+-    on GPU therefore its running time is mostly on CPU. Compared to WSDModelTrain,
++    on GPU therefore its running time is mostly on CPU. Compared to WSDModel,
+     this model should run much faster, otherwise you're spending too much time
+     on CPU.
+     '''
+ 
+-    def __init__(self, config, float_dtype):
++    def __init__(self, config):
+         self._x = tf.placeholder(tf.int32, shape=[None, None], name='x')
+         self._y = tf.placeholder(tf.int32, shape=[None], name='y')
+         self._subvocab = tf.placeholder(tf.int32, shape=[None], name='subvocab')
+@@ -39,42 +43,77 @@ class DummyModelTrain(object):
+     def print_device_placement(self):
+         pass
+ 
+-class WSDModelTrain(object):
++class WSDModel(object):
+     """A LSTM WSD model designed for fast training."""
+ 
++    def _build_inputs(self):
++        # the names are for later reference when the model is loaded
++        # they might be used or not, doesn't hurt
++        self._lens = tf.placeholder(tf.int32, shape=[None], name='lens')
+ 
++    def _build_word_embeddings(self):
+         E_words = tf.get_variable("word_embedding", 
+-                [config.vocab_size, config.emb_dims], dtype=float_dtype)
+-        outputs, _ = tf.nn.dynamic_rnn(cell, word_embs, dtype=float_dtype)
++                [self.config.vocab_size, self.config.emb_dims], dtype=float_dtype)
++
++    def _build_lstm_output(self):
++        if self.optimized and self.config.assume_same_lengths:
++            outputs, _ = tf.nn.dynamic_rnn(cell, self._word_embs, 
++                                           dtype=float_dtype)
++            self._lstm_output = outputs[:,-1]
++        else:
++            outputs, _ = tf.nn.dynamic_rnn(cell, self._word_embs, 
++                                           sequence_length=self._lens,
++                                           dtype=float_dtype)
++            last_output_indices = tf.stack([tf.range(tf.shape(self._x)[0]), self._lens-1], axis=1)
++            self._lstm_output = tf.gather_nd(outputs, last_output_indices)
++        self._initial_state = cell.zero_state(tf.shape(self._x)[0], float_dtype)
++
++    def _build_context_embs(self):
+         context_layer_weights = tf.get_variable("context_layer_weights",
+-                [config.hidden_size, config.emb_dims], dtype=float_dtype)
+-        self._predicted_context_embs = tf.matmul(outputs[:,-1], context_layer_weights, 
++                [self.config.hidden_size, self.config.emb_dims], dtype=float_dtype)
++        self._predicted_context_embs = tf.matmul(self._lstm_output, context_layer_weights, 
+                                                  name='predicted_context_embs')
++    
++    def _build_logits(self):
+         E_contexts = tf.get_variable("context_embedding", 
+-                [config.vocab_size, config.emb_dims], dtype=float_dtype)
+-        subcontexts = tf.nn.embedding_lookup(E_contexts, self._subvocab)
+-        pre_probs = tf.matmul(self._predicted_context_embs, tf.transpose(subcontexts))
+-        
++                [self.config.vocab_size, self.config.emb_dims], dtype=float_dtype)
++        if self.optimized and self.config.sampled_softmax:
++            subcontexts = tf.nn.embedding_lookup(E_contexts, self._subvocab)
++            self._logits = tf.matmul(self._predicted_context_embs, tf.transpose(subcontexts))
++        else:
++            self._logits = tf.matmul(self._predicted_context_embs, tf.transpose(E_contexts))
++    
++    def _build_cost(self):
+         self._cost = tf.reduce_mean(
+                 tf.nn.sparse_softmax_cross_entropy_with_logits(
+-                logits=pre_probs, labels=self._y))
+-
++                logits=self._logits, labels=self._y))
++        self._hit_at_100 = tf.reduce_mean(tf.cast(
++                tf.nn.in_top_k(self._logits, self._y, 100), float_dtype))
+         tvars = tf.trainable_variables()
+         grads, _ = tf.clip_by_global_norm(tf.gradients(self._cost, tvars),
+-                                          config.max_grad_norm)
+-        optimizer = tf.train.AdagradOptimizer(config.learning_rate)
++                                          self.config.max_grad_norm)
++        optimizer = tf.train.AdagradOptimizer(self.config.learning_rate)
++        self._global_step = tf.contrib.framework.get_or_create_global_step()
+         self._train_op = optimizer.apply_gradients(zip(grads, tvars),
+-                global_step=tf.contrib.framework.get_or_create_global_step())
+-        self._initial_state = cell.zero_state(tf.shape(self._x)[0], float_dtype)
+-
+-        self.run_options = self.run_metadata = None
++                global_step=self._global_step)
+     
+     def trace_timeline(self):
+         self.run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
+@@ -87,17 +126,20 @@ class WSDModelTrain(object):
+         
+         # resample the batches so that each token has equal chance to become target
+         # another effect is to randomize the order of batches
+-        sentence_lens = np.array([x.shape[1] for x, _, _, in data])
+-        samples = np.random.choice(len(data), size=len(data), 
+-                                   p=sentence_lens/sentence_lens.sum())
++        if self.config.optimized_batches:
++            sentence_lens = np.array([x.shape[1] for x, _, _, _ in data])
++            samples = np.random.choice(len(data), size=len(data), 
++                                       p=sentence_lens/sentence_lens.sum())
++        else:
++            samples = np.random.choice(len(data), size=len(data))
+         for batch_no, batch_id in enumerate(samples):
+-            x, y_all, subvocab = data[batch_id]
++            x, y_all, subvocab, lens = data[batch_id]
+             i =  np.random.randint(x.shape[1])
+             y = y_all[:,i]
+-            old_xi = x[:,i].copy()
++            old_xi = x[:,i].copy() # old_xi might be different from y because of subvocab
+             x[:,i] = target_id
+     
+-            feed_dict = {self._x: x, self._y: y, self._subvocab: subvocab}
++            feed_dict = {self._x: x, self._y: y, self._subvocab: subvocab, self._lens: lens}
+             state = session.run(self._initial_state, feed_dict)
+             c, h = self._initial_state
+             feed_dict[c] = state.c
+@@ -130,64 +172,18 @@ class WSDModelTrain(object):
+             sess.run(self._train_op, feed_dict)
+             print("******** End of device placement ********")
+ 
+
+
+
+
+
+diff --git a/perform_wsd.py b/perform_wsd.py
+index 6e14dc4..2a7a027 100644
+--- a/perform_wsd.py
++++ b/perform_wsd.py
+@@ -1,21 +1,85 @@
+ import numpy as np
++import os
+ import tensorflow as tf
++import json
+ import argparse
+ import pickle
+ import pandas
+ from nltk.corpus import wordnet as wn
++from nltk.corpus.reader.wordnet import WordNetCorpusReader
+ from scipy import spatial
++import morpho_utils
++import tensor_utils as utils
+ 
+ parser = argparse.ArgumentParser(description='Perform WSD using LSTM model')
+ parser.add_argument('-m', dest='model_path', required=True, help='path to model trained LSTM model')
+-# model_path = '/var/scratch/mcpostma/wsd-dynamic-sense-vector/output/lstm-wsd-small'
+ parser.add_argument('-v', dest='vocab_path', required=True, help='path to LSTM vocabulary')
+-# vocab_path = '/var/scratch/mcpostma/wsd-dynamic-sense-vector/output/gigaword.1m-sents-lstm-wsd.index.pkl'
+ parser.add_argument('-c', dest='wsd_df_path', required=True, help='input path to dataframe wsd competition')
++parser.add_argument('-l', dest='log_path', required=True, help='path where exp settings are stored')
+ parser.add_argument('-s', dest='sense_embeddings_path', required=True, help='path where sense embeddings are stored')
+ parser.add_argument('-o', dest='output_path', required=True, help='path where output wsd will be stored')
++parser.add_argument('-r', dest='results', required=True, help='path where accuracy will be reported')
++parser.add_argument('-g', dest='gran', required=True, help='sensekey | synset')
++parser.add_argument('-f', dest='mfs_fallback', required=True, help='True or False')
++parser.add_argument('-t', dest='path_case_freq', help='path to pickle with case freq')
++parser.add_argument('-a', dest='use_case_strategy', help='set to True to use morphological strategy case')
++parser.add_argument('-p', dest='path_plural_freq', help='path to pickle with plural freq')
++parser.add_argument('-b', dest='use_number_strategy', help='set to True to use morphological strategy number')
++parser.add_argument('-y', dest='path_lp', help='path to lp output')
++parser.add_argument('-z', dest='use_lp', help='set to True to use label propagation') 
++
++
+ args = parser.parse_args()
++args.mfs_fallback = args.mfs_fallback == 'True'
++case_strategy = args.use_case_strategy == 'True'
++number_strategy = args.use_number_strategy == 'True'
++lp_strategy = args.use_lp == 'True'
++
++case_freq = pickle.load(open(args.path_case_freq, 'rb'))
++plural_freq = pickle.load(open(args.path_plural_freq, 'rb'))
++lp_info = dict()
++
++the_wn_version = '30'
++# load relevant wordnet
++if '171' in args.wsd_df_path:
++    the_wn_version = '171'
++    cwd = os.path.dirname(os.path.realpath(__file__))
++    path_to_wn_dict_folder = os.path.join(cwd, 'scripts', 'wordnets', '171', 'WordNet-1.7.1', 'dict')
++    wn = WordNetCorpusReader(path_to_wn_dict_folder, None)
++
++
++with open(args.sense_embeddings_path + '.freq', 'rb') as infile:
++    meaning_freqs = pickle.load(infile)
++
++with open(args.log_path, 'w') as outfile:
++    json.dump(args.__dict__, outfile)
++
++
++def lp_output(row, lp_info, candidate_synsets, debug=False):
++    target_lemma = row['target_lemma']
++    target_pos = row['pos']
+ 
++    key = (target_lemma, target_pos)
++
++    if key not in lp_info:
++        if debug:
++            print(target_lemma, target_pos, 'not in lp_info')
++        return None
++
++    lp_index = row['lp_index']
++    if lp_index is None:
++        print('lp_index is None')
++        return None
++
++    sensekey = lp_info[(target_lemma, target_pos)][lp_index]
++    synset_identifier = None
++
++    for synset in candidate_synsets:
++        if any([lemma.key() == sensekey
++                for lemma in synset.lemmas()]):
++            synset_identifier = synset2identifier(synset, '30')
++
++    return synset_identifier
+ 
+ def synset2identifier(synset, wn_version):
+     """
+@@ -33,7 +97,7 @@ def synset2identifier(synset, wn_version):
+     offset_8_char = offset.zfill(8)
+ 
+     pos = synset.pos()
+-    if pos == 'j':
++    if pos in {'s', 'j'}:
+         pos = 'a'
+ 
+     identifier = 'eng-{wn_version}-{offset_8_char}-{pos}'.format_map(locals())
+@@ -64,14 +128,14 @@ def extract_sentence_wsd_competition(row):
+         sentence_tokens.append(sentence_token.text)
+ 
+     assert len(sentence_tokens) >= 2
+-    assert pos is not None
+-    assert lemma is not None
+-    assert target_index is not None
++    #assert pos is not None # only needed for sem2013-aw
++    #assert lemma is not None, (lemma, pos)
++    #assert target_index is not None
+ 
+     return target_index, sentence_tokens, lemma, pos
+ 
+ 
+-def score_synsets(target_embedding, candidate_synsets, sense_embeddings, instance_id, lemma, pos):
++def score_synsets(target_embedding, candidate_synsets, sense_embeddings, instance_id, lemma, pos, gran, synset2higher_level):
+     """
+     perform wsd
+ 
+@@ -85,30 +149,46 @@ def score_synsets(target_embedding, candidate_synsets, sense_embeddings, instanc
+     """
+     highest_synsets = []
+     highest_conf = 0.0
++    candidate_freq = dict()
++    strategy = 'lstm'
++
++    for synset in candidate_synsets:
++        if gran == 'synset':
++            candidate = synset
++            candidate_freq[synset] = meaning_freqs[candidate]
++        elif gran in {'sensekey', 'blc20', 'direct_hypernym'}:
++            candidate = None
++            if synset in synset2higher_level:
++                candidate = synset2higher_level[synset]
++                candidate_freq[synset] = meaning_freqs[candidate]
++                candidate_freq[synset] = meaning_freqs[candidate]
+ 
+-    for candidate in candidate_synsets:
+         if candidate not in sense_embeddings:
+-            print('%s %s %s: candidate %s missing in sense embeddings' % (instance_id, lemma, pos, candidate))
++            #print('%s %s %s: candidate %s missing in sense embeddings' % (instance_id, lemma, pos, candidate))
+             continue 
+ 
+         cand_embedding = sense_embeddings[candidate]
+         sim = 1 - spatial.distance.cosine(cand_embedding, target_embedding)
+ 
+         if sim == highest_conf:
+-            highest_synsets.append(candidate)
++            highest_synsets.append(synset)
+         elif sim > highest_conf:
+-            highest_synsets = [candidate]
++            highest_synsets = [synset]
+             highest_conf = sim
+ 
+     if len(highest_synsets) == 1:
+         highest_synset = highest_synsets[0]
+     elif len(highest_synsets) >= 2:
+         highest_synset = highest_synsets[0]
+-        print('%s %s %s: 2> synsets with same conf %s: %s' % (instance_id, lemma, pos, highest_conf, highest_synsets))
++        #print('%s %s %s: 2> synsets with same conf %s: %s' % (instance_id, lemma, pos, highest_conf, highest_synsets))
+     else:
+-        highest_synset = None
+-        print('%s: no highest synset' % instance_id)
+-    return highest_synset
++        if args.mfs_fallback:
++            highest_synset = candidate_synsets[0]
++            #print('%s: no highest synset -> mfs' % instance_id)
++            strategy = 'mfs_fallback'
++        else:
++            highest_synset = None
++    return highest_synset, candidate_freq, strategy
+ 
+ 
+ # load wsd competition dataframe
+@@ -117,7 +197,11 @@ wsd_df = pandas.read_pickle(args.wsd_df_path)
+ # add output column
+ wsd_df['lstm_output'] = [None for _ in range(len(wsd_df))]
+ wsd_df['lstm_acc'] = [None for _ in range(len(wsd_df))]
+-
++wsd_df['emb_freq'] = [None for _ in range(len(wsd_df))]
++wsd_df['#_cand_synsets'] = [None for _ in range(len(wsd_df))]
++wsd_df['#_new_cand_synsets'] = [None for _ in range(len(wsd_df))]
++wsd_df['gold_in_new_cand_synsets'] = [None for _ in range(len(wsd_df))]
++wsd_df['wsd_strategy'] = [None for _ in range(len(wsd_df))]
+ 
+ # load sense embeddings
+ with open(args.sense_embeddings_path, 'rb') as infile:
+@@ -130,8 +214,9 @@ vocab = np.load(args.vocab_path)
+ with tf.Session() as sess:  # your session object
+     saver = tf.train.import_meta_graph(args.model_path + '.meta', clear_devices=True)
+     saver.restore(sess, args.model_path)
+-    predicted_context_embs = sess.graph.get_tensor_by_name('Model/predicted_context_embs:0')
+-    x = sess.graph.get_tensor_by_name('Model/x:0')
++    x, predicted_context_embs, lens = utils.load_tensors(sess)
++    #predicted_context_embs = sess.graph.get_tensor_by_name('Model/predicted_context_embs:0')
++    #x = sess.graph.get_tensor_by_name('Model/Placeholder:0')
+ 
+     for row_index, row in wsd_df.iterrows():
+         target_index, sentence_tokens, lemma, pos =  extract_sentence_wsd_competition(row)
+@@ -139,25 +224,100 @@ with tf.Session() as sess:  # your session object
+         target_id = vocab['<target>']
+         sentence_as_ids = [vocab.get(w) or vocab['<unkn>'] for w in sentence_tokens]
+         sentence_as_ids[target_index] = target_id
+-        target_embedding = sess.run(predicted_context_embs, {x: [sentence_as_ids]})[0]
+ 
+-        # load candidate synsets
+-        synsets = wn.synsets(lemma, pos=pos)
+-        candidate_synsets = {synset2identifier(synset, wn_version='30')
+-                             for synset in synsets}
++        target_embeddings = sess.run(predicted_context_embs, {x: [sentence_as_ids],
++                                                              lens: [len(sentence_as_ids)]})
++        for target_embedding in target_embeddings:
++            break
++
++        #target_embedding = sess.run(predicted_context_embs, {x: [sentence_as_ids]})[0]
++
++        # load token object
++        token_obj = row['tokens'][0]
++
++        # morphology reduced polysemy
++        pos = row['pos']
++        if the_wn_version in {'171'}:
++            pos = None
++       
++   
++        candidate_synsets, \
++        new_candidate_synsets, \
++        gold_in_candidates = morpho_utils.candidate_selection(wn,
++                                                              token=token_obj.text,
++                                                              target_lemma=row['target_lemma'],
++                                                              pos=row['pos'],
++                                                              morphofeat=token_obj.morphofeat,
++                                                              use_case=case_strategy,
++                                                              use_number=number_strategy,
++                                                              gold_lexkeys=row['lexkeys'],
++                                                              case_freq=case_freq,
++                                                              plural_freq=plural_freq,
++                                                              debug=False)
++
++        the_chosen_candidates = [synset2identifier(synset, wn_version=the_wn_version)
++                                 for synset in new_candidate_synsets]
++
++        print()
++        print(the_chosen_candidates, gold_in_candidates)
++        # get mapping to higher abstraction level
++        synset2higher_level = dict()
++        if args.gran in {'sensekey', 'blc20', 'direct_hypernym'}:
++            label = 'synset2%s' % args.gran
++            synset2higher_level = row[label]
++
++        # determine wsd strategy used
++        if len(candidate_synsets) == 1:
++            wsd_strategy = 'monosemous'
++        elif len(new_candidate_synsets) == 1:
++            wsd_strategy = 'morphology_solved'
++        elif len(candidate_synsets) == len(new_candidate_synsets):
++            wsd_strategy = 'lstm'
++        elif len(new_candidate_synsets) < len(candidate_synsets):
++            wsd_strategy = 'morphology+lstm'
++
++        # possibly include label propagation strategy
++        if lp_strategy:
++            lp_result = lp_output(row, lp_info, new_candidate_synsets, debug=False)
++
++            if lp_result:
++                the_chosen_candidates = [lp_result]
++                wsd_strategy = 'lp'
+ 
+         # perform wsd
+-        if len(candidate_synsets) >= 2:
+-            chosen_synset = score_synsets(target_embedding, candidate_synsets, sense_embeddings, instance_id, lemma, pos)
++        if len(the_chosen_candidates) >= 2:
++            chosen_synset, \
++            candidate_freq, \
++            strategy = score_synsets(target_embedding,
++                                     the_chosen_candidates,
++                                     sense_embeddings,
++                                     instance_id,
++                                     lemma,
++                                     pos,
++                                     args.gran,
++                                     synset2higher_level)
++
++            #if strategy == 'mfs_fallback':
++            #    wsd_strategy = 'mfs_fallback'
++
+         else:
+-            chosen_synset = candidate_synsets.pop()
++            chosen_synset = None
++            if the_chosen_candidates:
++            	chosen_synset = the_chosen_candidates[0]
++            candidate_freq = dict()
+ 
+         # add to dataframe
+         wsd_df.set_value(row_index, col='lstm_output', value=chosen_synset)
++        wsd_df.set_value(row_index, col='#_cand_synsets', value=len(candidate_synsets))
++        wsd_df.set_value(row_index, col='#_new_cand_synsets', value=len(new_candidate_synsets))
++        wsd_df.set_value(row_index, col='gold_in_new_cand_synsets', value=gold_in_candidates)
++        wsd_df.set_value(row_index, col='wsd_strategy', value=wsd_strategy)
+ 
+         # score it
+-        lstm_acc = chosen_synset in row['wn30_engs']
++        print(chosen_synset, row['source_wn_engs'])
++        lstm_acc = chosen_synset in row['source_wn_engs'] # used to be wn30_engs
+         wsd_df.set_value(row_index, col='lstm_acc', value=lstm_acc)
++        wsd_df.set_value(row_index, col='emb_freq', value=candidate_freq)        
+         
+         if lstm_acc:
+             num_correct += 1
+@@ -167,6 +327,9 @@ print(num_correct)
+ # save it
+ wsd_df.to_pickle(args.output_path)
+ 
++with open(args.results, 'w') as outfile:
++    outfile.write('%s' % num_correct)
++
+ 
+ 
+ 
+diff --git a/prepare-lstm-wsd.py b/prepare-lstm-wsd.py
+index f3e4d1b..52db01c 100644
+--- a/prepare-lstm-wsd.py
++++ b/prepare-lstm-wsd.py
+@@ -7,6 +7,7 @@ Read a simple text file (one sentence per line) and produce these files:
+ - <fname>.train.npz: training batches (each batch contains roughly the same
+ number of tokens but differing number of sentences depends on sentence length)
+ - <fname>.dev.npz: development dataset (as big as one epoch)
++- 
+ 
+ @author: Minh Le
+ '''
+@@ -20,23 +21,25 @@ import pickle
+ import re
+ import numpy as np
+ import subprocess
+-from tensorflow.contrib.labeled_tensor import batch
++from random import Random
++from collections import Counter
++from utils import progress, count_lines_fast
++from configs import preprocessed_gigaword_path, output_dir
++from version import version
+ 
+ dev_sents = 20000 # absolute maximum
+ dev_portion = 0.01 # relative maximum
+-batch_size = 128000 # words
++# if you get OOM (out of memory) error, reduce this number
++batch_size = 60000 # words
+ vocab_size = 10**6
+ min_count = 5
+ 
+-special_symbols = ['<target>', '<unkn>', '<pad>']
++inp_path = preprocessed_gigaword_path
++# inp_path = 'preprocessed-data/gigaword_1m-sents.txt' # for debugging    
++out_dir = os.path.join('preprocessed-data', version)
++out_path = os.path.join(out_dir, 'gigaword-for-lstm-wsd')
+ 
+-def progress(it):
+-    start = time()
+-    for i, val in enumerate(it):
+-        yield(val)
+-        if (i+1) % 1000000 == 0:
+-            sys.stderr.write('processed %d items, elapsed time: %.1f minutes...\n' 
+-                             %(i+1, (time()-start)/60))
++special_symbols = ['<target>', '<unkn>', '<pad>']
+ 
+ def _build_vocab(filename):
+     sys.stderr.write('Building vocabulary...\n')
+@@ -55,87 +58,146 @@ def _build_vocab(filename):
+     return word2id, words
+ 
+ def sort_sentences(inp_path, out_path):
++    start = time()
+     cmd = ('cat %s | python3 scripts/sentlen.py --min 6 --max 100 '
+-           '| sort -T output -k1,1g -k2 | uniq > %s'
+-           %(inp_path, out_path))
++           '| sort -T %s -k1,1g -k2 | uniq > %s'
++           %(inp_path, output_dir, out_path))
+     sys.stderr.write('%s\n' %cmd)
+     status = subprocess.call(cmd, shell=True)
++    sys.stderr.write('sorting finished after %.1f minutes...\n' %((time()-start)/60))
+     assert status == 0
+ 
+-def lookup_and_iter_sents(filename, word_to_id):
++def lookup_and_iter_sents(filename, word2id, include_ids=None, exclude_ids=None):
+     unkn_id = word2id['<unkn>']
+     with codecs.open(filename, 'r', 'utf-8') as f:
+-        for line in f:
+-            words = line.strip().split()
+-            yield [word_to_id.get(word) or unkn_id for word in words]
++        for sent_id, line in enumerate(f):
++            if ((include_ids is None or sent_id in include_ids) and 
++                (exclude_ids is None or sent_id not in exclude_ids)):
++                words = line.strip().split()
++                yield [word2id.get(word) or unkn_id for word in words]
+             
+-class PadFunc(object):
+-    
+-    dry_run=False
+-    
+-    def __init__(self):
+-        self.total = 0
+-        self.pads = 0
+-    def __call__(self, sents, max_len, pad_id):
+-        if self.dry_run:
+-            arr = np.empty(0)
+-            value_count = sum(1 for s in sents for _ in s)
+-            size = len(sents) * max_len
+-        else:
+-            arr = np.zeros((len(sents), max_len), dtype=np.int32)
+-            size = arr.size
+-            arr.fill(pad_id)
+-            value_count = 0
+-            for i, s in enumerate(sents):
+-                for j, v in enumerate(s):
+-                    arr[i,j] = v
+-                    value_count += 1
+-        self.pads += (size - value_count) 
+-        self.total += size
+-        return arr
+-
+-def pad_batches(inp_path, word2id):
++def pad(sents, max_len, pad_id):
++    arr = np.empty((len(sents), max_len), dtype=np.int32)
++    arr.fill(pad_id)
++    for i, s in enumerate(sents):
++        arr[i, :len(s)] = s
++    return arr
++
++def pad_batches(inp_path, word2id, include_ids, exclude_ids, max_sents=-1):
+     sys.stderr.write('Dividing and padding...\n')
+-    pad = PadFunc()
+     pad_id = word2id['<pad>']
+-    dev = []
+     batches = {}
+-    last_max_len = 0
+-    last_batch = []
+-    with open(inp_path) as f: total_sents = sum(1 for line in f)
+-    for sent in progress(lookup_and_iter_sents(inp_path, word2id)):
+-        if (len(dev) < dev_sents and len(dev) < dev_portion*total_sents 
+-                and np.random.rand() < 0.01):
+-            dev.append(sent)
+-        else:
+-            last_max_len = max(last_max_len, len(sent))
+-            last_batch.append(sent)
+-            if len(last_batch)*last_max_len >= batch_size:
+-                batches['batch%d' %len(batches)] = pad(last_batch, last_max_len, pad_id)
+-                last_max_len = 0
+-                last_batch = []
+-    if last_max_len > 0:
+-        batches['batch%d' %len(batches)] = pad(last_batch, last_max_len, pad_id)
+-    dev_lens = np.array([len(s) for s in dev], dtype=np.int32)
+-    dev_padded = PadFunc()(dev, max(dev_lens), pad_id)
++    sent_lens = []
++    curr_max_len = 0
++    curr_batch = []
++    batch_id = 0
++    for sent in progress(lookup_and_iter_sents(inp_path, word2id,
++                                               include_ids, exclude_ids)):
++        new_size = (len(curr_batch)+1) * max(curr_max_len,len(sent))
++        if new_size > batch_size or (max_sents > 0 and len(curr_batch) >= max_sents):
++            batches['batch%d' %batch_id] = pad(curr_batch, curr_max_len, pad_id)
++            batches['lens%d' %batch_id] = np.array([len(s) for s in curr_batch], dtype=np.int32)
++            batch_id += 1
++            curr_max_len = 0
++            curr_batch = []
++        curr_max_len = max(curr_max_len, len(sent))
++        curr_batch.append(sent)
++        sent_lens.append(len(sent))
++    if curr_batch:
++        batches['batch%d' %batch_id] = pad(curr_batch, curr_max_len, pad_id)
++        batches['lens%d' %batch_id] = np.array([len(s) for s in curr_batch], dtype=np.int32)
++        batch_id += 1 # important to count num batches correctly
++    sent_lens = np.array(sent_lens, dtype=np.int32)
+     sys.stderr.write('Dividing and padding... Done.\n')
+-    sizes = np.array([b.size for b in batches.values()])
+-    if len(batches) >= 2:
++    sizes = np.array([batches['batch%d'%i].size for i in range(batch_id)])
++    if batch_id >= 2:
+         sys.stderr.write('Divided into %d batches (%d elements each, std=%d, '
+                          'except last batch of %d).\n'
+-                         %(len(batches), sizes[:-1].mean(), sizes[:-1].std(), sizes[-1]))
++                         %(batch_id, sizes[:-1].mean(), sizes[:-1].std(), sizes[-1]))
+     else:
+-        assert len(batches) == 1
++        assert batch_id == 1
+         sys.stderr.write('Created 1 batch of %d elements.\n' %sizes[0])
+-    sys.stderr.write('Added %d elements as padding (%.2f%%).\n' 
+-                     %(pad.pads, pad.pads*100.0/pad.total))
+-    sys.stderr.write('Consumed roughly %.2f GiB.\n' 
+-                     %(pad.total*4/float(2**30)))
+-    return batches, dev_padded, dev_lens
++    sys.stderr.write('Sentence lengths: %.5f (std=%.5f)\n' 
++                     %(sent_lens.mean(), sent_lens.std()))
++    return batches
+ 
+-if __name__ == '__main__':
+-    inp_path, out_path = sys.argv[1:]
++
++def shuffle_and_pad_batches(inp_path, word2id, dev_sent_ids):
++    sys.stderr.write('Reading lengths...\n')
++    lens = []
++    with codecs.open(inp_path, 'r', 'utf-8') as f:
++        for line in progress(f, label='sentences'):
++            # this is different from counting the blank spaces because some words
++            # are separated by double spaces and there might be an additional
++            # whitespace at the end of a line
++            lens.append(len(line.strip().split()))
++    lens = np.array(lens, dtype=np.int32)
++    sys.stderr.write('Reading lengths... Done.\n')
++    
++    sys.stderr.write('Calculating batch shapes...\n')
++    indices = list(range(len(lens)))
++    rng = Random(29)
++    rng.shuffle(indices)
++    total_sents = len(lens)
++    batches = {}
++    curr_max_len = 0
++    curr_batch_lens = []
++    sent2batch = {}
++    batch_id = 0
++    for sent_id in progress(indices, label='sentences'):
++        l = lens[sent_id]
++        if sent_id not in dev_sent_ids:
++            new_size = (len(curr_batch_lens)+1) * max(curr_max_len,l)
++            if new_size >= batch_size:
++                batches['batch%d' %batch_id] = \
++                        np.empty((len(curr_batch_lens), max(curr_batch_lens)), dtype=np.int32)
++                batches['lens%d' %batch_id] = np.array(curr_batch_lens, dtype=np.int32)
++                batch_id += 1
++                curr_max_len = 0
++                curr_batch_lens = []
++            curr_max_len = max(curr_max_len, l)
++            curr_batch_lens.append(l)
++            sent2batch[sent_id] = 'batch%d' %batch_id
++    if curr_batch_lens:
++        batches['batch%d' %batch_id] = \
++                np.empty((len(curr_batch_lens), max(curr_batch_lens)), dtype=np.int32)
++        batches['lens%d' %batch_id] = np.array(curr_batch_lens, dtype=np.int32)
++        batch_id += 1 # important to count num batches correctly
++    sys.stderr.write('Calculating batch shapes... Done.\n')
+     
++    sys.stderr.write('Dividing and padding...\n')
++    pad_id = word2id['<pad>']
++    for i in range(batch_id): batches['batch%d'%i].fill(pad_id)
++    nonpad_count = 0
++    sent_counter = Counter()
++    for sent_id, sent in progress(enumerate(lookup_and_iter_sents(inp_path, word2id)), label='sentences'):
++        assert lens[sent_id] == len(sent)
++        batch_name = sent2batch.get(sent_id)
++        if batch_name is not None: # could be in dev set
++            batches[batch_name][sent_counter[batch_name],:len(sent)] = sent
++            nonpad_count += len(sent)
++            sent_counter[batch_name] += 1
++    # check that we filled all arrays
++    for batch_name in sent_counter:
++        assert sent_counter[batch_name] == batches[batch_name].shape[0]
++    sys.stderr.write('Dividing and padding... Done.\n')
++    
++    sizes = np.array([batches['batch%d'%i].size for i in range(batch_id)])
++    if batch_id >= 2:
++        sys.stderr.write('Divided into %d batches (%d elements each, std=%d, '
++                         'except last batch of %d).\n'
++                         %(batch_id, sizes[:-1].mean(), sizes[:-1].std(), sizes[-1]))
++    else:
++        assert batch_id == 1
++        sys.stderr.write('Created 1 batch of %d elements.\n' %sizes[0])
++    total = sum(sizes)
++    pad_count = total - nonpad_count
++    sys.stderr.write('Sentence lengths: %.5f (std=%.5f)\n' 
++                     %(lens.mean(), lens.std()))
++    return batches
++
++def run():
++    os.makedirs(out_dir, exist_ok=True)
+     index_path = out_path + '.index.pkl'
+     if os.path.exists(index_path):
+         sys.stderr.write('Reading vocabulary from %s... ' %index_path)
+@@ -146,17 +208,43 @@ if __name__ == '__main__':
+         word2id, words = _build_vocab(inp_path)
+         with open(index_path, 'wb') as f: pickle.dump(word2id, f)
+ 
+-    sorted_sents_path = inp_path + '.sorted'
++    sorted_sents_path = out_path + '.sorted'
+     if os.path.exists(sorted_sents_path):
+         sys.stderr.write('Sentences are already sorted at %s\n' %sorted_sents_path)
+     else:
+         sort_sentences(inp_path, sorted_sents_path)
++        
++    total_sents = count_lines_fast(sorted_sents_path)
++    real_num_dev_sents = int(min(dev_sents, dev_portion*total_sents))
++    np.random.seed(918)
++    dev_sent_ids = set(np.random.choice(total_sents, size=real_num_dev_sents, replace=False))
+     
+     train_path = out_path + '.train.npz'
+     dev_path = out_path + '.dev.npz'
+-    if os.path.exists(train_path):
+-        sys.stderr.write('Result already exists: %s. Skipped.\n' %train_path)
++    shuffled_train_path = out_path + '-shuffled.train.npz'
++    if os.path.exists(shuffled_train_path):
++        sys.stderr.write('Result already exists: %s. Skipped.\n' %shuffled_train_path)
+     else:
+-        batches, dev_data, dev_lens = pad_batches(sorted_sents_path, word2id)
++        print("- Training set:")
++        batches = pad_batches(sorted_sents_path, word2id, None, dev_sent_ids)
+         np.savez(train_path, **batches)
+-        np.savez(dev_path, data=dev_data, lens=dev_lens)
++        print("- Development set:")
++        batches = pad_batches(sorted_sents_path, word2id, dev_sent_ids, None, 768)
++        np.savez(dev_path, **batches)
++        print("- Shuffled training set:")
++        batches = shuffle_and_pad_batches(sorted_sents_path, word2id, dev_sent_ids)
++        np.savez(shuffled_train_path, **batches)
++            
++    for percent in (1, 10, 25, 50, 75):
++        num_lines = int(percent / 100.0 * total_sents)
++        sampled_ids = set(np.random.choice(total_sents, size=num_lines, replace=False))
++        pc_train_path = out_path + ('_%02d-pc.train.npz' %percent)
++        if os.path.exists(pc_train_path):
++            sys.stderr.write('%02d%% dataset already exists: %s. Skipped.\n' %pc_train_path)
++        else:
++            print("- Reduced training set (%02d%%):" %percent)
++            batches = pad_batches(sorted_sents_path, word2id, sampled_ids, dev_sent_ids)
++            np.savez(pc_train_path, **batches)
++
++if __name__ == '__main__':
++    run()
+diff --git a/process-gigaword.py b/process-gigaword.py
+index e568001..7bf2b0d 100644
+--- a/process-gigaword.py
++++ b/process-gigaword.py
+@@ -2,9 +2,17 @@ import os
+ import gzip
+ from bs4 import BeautifulSoup
+ import spacy
+-nlp = spacy.load('en_default')
++from configs import gigaword_path, preprocessed_gigaword_path
++import codecs
++from utils import progress
++from version import version
+ import sys
+ 
++def custom_pipeline(nlp):
++    return (nlp.tagger, nlp.parser)
++
++nlp = spacy.load('en_default', create_pipeline=custom_pipeline)
++
+ def iter_paragraphs(paths):
+     for path in paths:
+         with gzip.open(path) as f:
+@@ -13,7 +21,6 @@ def iter_paragraphs(paths):
+         paras = soup.find_all('p')
+         for p in paras: yield p.text.strip()
+ 
+-
+ def iter_files(root_dir):
+     for root, dirs, files in os.walk(root_dir):
+         for fname in files:
+@@ -21,21 +28,24 @@ def iter_files(root_dir):
+                 yield os.path.join(root, fname)
+ 
+ def iter_sents(paragraphs):
+-    for i, doc in enumerate(nlp.pipe(paragraphs, batch_size=10000, n_threads=32)):
+-        assert isinstance(doc, spacy.tokens.doc.Doc) and doc.is_parsed
++    for doc in nlp.pipe(paragraphs, batch_size=10000):
+         for sent in doc.sents:
+             yield [str(tok).strip() for tok in sent]
+-        if (i+1) % 10000 == 0:
+-            sys.stderr.write('%10d' %(i+1))
+-        if (i+1) % 100000 == 0:
+-            sys.stderr.write('\n')
+ 
+-gigaword_path = 'data/gigaword'
+-example_file = 'data/gigaword/gigaword_eng_5_d1/data/afp_eng/afp_eng_200112.gz'
++
++# example_file = 'data/gigaword/gigaword_eng_5_d1/data/afp_eng/afp_eng_200112.gz'
+ 
+ if __name__ == '__main__':
+-    for sent in iter_sents(iter_paragraphs(iter_files(gigaword_path))):
+-        for tok in sent:
+-            sys.stdout.write(tok)
+-            sys.stdout.write(' ')
+-        sys.stdout.write('\n')
++    dir_ = os.path.join('preprocessed-data', version)
++    os.makedirs(dir_, exist_ok=True)
++    preprocessed_gigaword_path = os.path.join(dir_, 'gigaword.txt')
++    sys.stderr.write('Writing to %s\n' %preprocessed_gigaword_path)
++    with codecs.open(preprocessed_gigaword_path, 'w', 'utf-8') as f:
++        paths = list(iter_files(gigaword_path))
++        paths.sort() # remove difference between machines
++        paths = progress(paths, ticks=1, label='files', max_=len(paths))
++        for sent in iter_sents(iter_paragraphs(paths)):
++            for tok in sent:
++                f.write(tok)
++                f.write(' ')
++            f.write('\n')
+diff --git a/scripts/semcor_format2LSTM_input.py b/scripts/semcor_format2LSTM_input.py
+index dfc369f..3990f55 100644
+--- a/scripts/semcor_format2LSTM_input.py
++++ b/scripts/semcor_format2LSTM_input.py
+@@ -4,7 +4,7 @@ from nltk.corpus import wordnet as wn
+ from lxml import html, etree
+ from collections import defaultdict
+ import wn_utils
+-
++from datetime import datetime
+ 
+ def get_lemma_pos_of_sensekey(sense_key):
+     """
+@@ -77,6 +77,7 @@ def load_instance_id2offset(mapping_path, sensekey2offset, debug=False):
+     :return: instance_id -> offset
+     """
+     instance_id2offset = dict()
++    instance_id2sensekeys = dict()
+ 
+     more_than_one_offset = 0
+     no_offsets = 0
+@@ -85,6 +86,8 @@ def load_instance_id2offset(mapping_path, sensekey2offset, debug=False):
+         for line in infile:
+             instance_id, *sensekeys = line.strip().split()
+ 
++            instance_id2sensekeys[instance_id] = sensekeys
++
+             offsets = {sensekey2offset[sensekey]
+                        for sensekey in sensekeys
+                        if sensekey in sensekey2offset}
+@@ -104,18 +107,26 @@ def load_instance_id2offset(mapping_path, sensekey2offset, debug=False):
+                 no_offsets += 1
+ 
+ 
+-    return instance_id2offset
++    return instance_id2offset, instance_id2sensekeys
+ 
+ 
+ # experiment settings
+ wn_version = '30'
+ corpora_to_include = ['semcor',
+-                         #'mun'
++                      #'mun'
+                       ]  # semcor | mun
+ 
+ accepted_pos = {'NOUN'}
+ entailment_setting = 'any_hdn'  # lemma_hdn | any_hdn
+-lemma2annotations = defaultdict(dict)
++#lemma2annotations = defaultdict(dict)
++
++
++
++#path_wn20_to_wn30 = '/Users/marten/Downloads/mappings-upc-2007/mapping-20-30/wn20-30.noun'
++#path_wn20_to_domain = '/Users/marten/git/semantic_class_manager/resources/wn-domains-3.2/wn-domains-3.2-20070223'
++#wn30_domain, domain_wn30 = wn_utils.get_synset2domain(path_wn20_to_domain,
++#                                                      path_wn20_to_wn30)
++
+ 
+ if wn_version == '30':
+     path_to_wn_dict_folder = str(wn._get_root()) # change this for other wn versions
+@@ -129,12 +140,15 @@ elif corpora_to_include == ['semcor']:
+     input_xml_path = '../data/WSD_Training_Corpora/SemCor/semcor.data.xml'
+     input_mapping_path = '../data/WSD_Training_Corpora/SemCor/semcor.gold.key.txt'
+ 
++sensekey_output_path = 'sensekey-' + '_'.join(corpora_to_include) + '.txt'
+ synset_output_path = 'synset-' + '_'.join(corpora_to_include) + '.txt'
+ hdn_output_path = '-'.join(['hdn',
+                             '_'.join(corpora_to_include),
+                             '_'.join(accepted_pos),
+                             entailment_setting]) + '.txt'
+ 
++#domain_output_path = 'domain-' + '_'.join(corpora_to_include) + '.txt'
++#domain_mapping_path = domain_output_path + '.mapping'
+ 
+ # precompute all hdns
+ lemma_pos2offsets = wn_utils.load_lemma_pos2offsets(path_to_wn_index_sense)
+@@ -172,14 +186,18 @@ my_wn_reader = WordNetCorpusReader(path_to_wn_dict_folder, None)
+ sensekey2offset = load_mapping_sensekey2offset(path_to_wn_index_sense,
+                                                wn_version)
+ 
+-instance_id2offset = load_instance_id2offset(input_mapping_path,
+-                                             sensekey2offset,
+-                                             debug=False)
++instance_id2offset, instance_id2sensekeys = load_instance_id2offset(input_mapping_path,
++                                                                    sensekey2offset,
++                                                                    debug=False)
+ 
+ my_html_tree = html.parse(input_xml_path)
+ 
+-hdn_outfile = open(hdn_output_path, 'w')
++sensekey_outfile = open(sensekey_output_path, 'w')
+ synset_outfile = open(synset_output_path, 'w')
++#domain_outfile = open(domain_output_path, 'w')
++hdn_outfile = open(hdn_output_path, 'w')
++
++domain2freq = defaultdict(int)
+ 
+ for corpus_node in my_html_tree.xpath('body/corpus'):
+ 
+@@ -191,11 +209,16 @@ for corpus_node in my_html_tree.xpath('body/corpus'):
+         for sent_node in corpus_node.xpath('text/sentence'):
+ 
+             sentence_tokens = []
++            sensekey_annotations = []
+             synset_annotations = []
+             hdn_annotations = []
++            domain_annotations = []
+ 
+             for child_el in sent_node.getchildren():
+ 
++                if child_el.sourceline % 10000 == 0:
++                    print(child_el.sourceline, datetime.now())
++
+                 lemma = child_el.get('lemma')
+                 token = child_el.text
+                 pos = child_el.get('pos')
+@@ -204,8 +227,11 @@ for corpus_node in my_html_tree.xpath('body/corpus'):
+                 assert token is not None
+ 
+                 sentence_tokens.append(token)
++
++                sent_sensekey_annotations = []
+                 sent_synset_annotations = []
+                 sent_hdn_annotations = []
++                sent_domain_annotations = []
+ 
+                 if all([child_el.tag == 'instance',
+                         pos in accepted_pos]):
+@@ -214,13 +240,20 @@ for corpus_node in my_html_tree.xpath('body/corpus'):
+                     synset_id = instance_id2offset[instance_id]
+ 
+                     # update counter for logging purposes
+-                    if synset_id not in lemma2annotations[lemma]:
+-                        lemma2annotations[lemma][synset_id] = {'hdn': 0, 'synset': 0}
++                    #if synset_id not in lemma2annotations[lemma]:
++                    #    lemma2annotations[lemma][synset_id] = {'hdn': 0, 'synset': 0}
++                    #lemma2annotations[lemma][synset_id]['synset'] += 1
+ 
+-                    lemma2annotations[lemma][synset_id]['synset'] += 1
++                    sent_synset_annotations.append(synset_id)
+ 
++                    sensekeys = instance_id2sensekeys[instance_id]
++                    for sensekey in sensekeys:
++                        sent_sensekey_annotations.append(sensekey)
+ 
+-                    sent_synset_annotations.append(synset_id)
++                    #if synset_id in wn30_domain:
++                    #    domain = wn30_domain[synset_id]
++                    #    domain2freq[domain] += 1
++                    #    sent_domain_annotations.append(domain)
+ 
+                     # option lemma-based hdn
+                     if entailment_setting == 'lemma_hdn':
+@@ -234,21 +267,26 @@ for corpus_node in my_html_tree.xpath('body/corpus'):
+                             hdn = graph_info[synset_id]['under_lcs']
+ 
+                             if hdn is not None:
+-                                sent_hdn_annotations.append(hdn)
+-
+-                                lemma2annotations[lemma][synset_id]['hdn'] += 1
++                                sent_hdn_annotations.append('%s__%s' % (synset_id, hdn))
++                                #lemma2annotations[lemma][synset_id]['hdn'] += 1
+ 
+ 
+                     elif entailment_setting == 'any_hdn':
+                         hypernyms = sy_id2hypernyms[synset_id]
+                         for hypernym in hypernyms:
+                             if hypernym in all_hdns:
+-                                sent_hdn_annotations.append(hypernym)
+-
+-                                lemma2annotations[lemma][synset_id]['hdn'] += 1
++                                sent_hdn_annotations.append('%s_%s' % (synset_id, hypernym))
++                                #lemma2annotations[lemma][synset_id]['hdn'] += 1
+ 
++                sensekey_annotations.append(sent_sensekey_annotations)
+                 synset_annotations.append(sent_synset_annotations)
+                 hdn_annotations.append(sent_hdn_annotations)
++                #domain_annotations.append(sent_domain_annotations)
++
++
++            for sensekey_sentence in wn_utils.generate_training_instances(sentence_tokens,
++                                                                          sensekey_annotations):
++                sensekey_outfile.write(sensekey_sentence + '\n')
+ 
+             for synset_sentence in wn_utils.generate_training_instances(sentence_tokens,
+                                                                         synset_annotations):
+@@ -258,28 +296,39 @@ for corpus_node in my_html_tree.xpath('body/corpus'):
+                                                                      hdn_annotations):
+                 hdn_outfile.write(hdn_sentence + '\n')
+ 
+-hdn_outfile.close()
++            #for domain_sentence in wn_utils.generate_training_instances(sentence_tokens,
++            #                                                            domain_annotations):
++            #    domain_outfile.write(domain_sentence + '\n')
++
++
++sensekey_outfile.close()
+ synset_outfile.close()
++hdn_outfile.close()
++#domain_outfile.close()
+ 
+ 
+ per_lemma = []
+-per_synset = []
++per_sensekey = []
+ per_hdn = []
++synset2freq = defaultdict(int)
+ meanings = set()
+ 
+-for lemma, info in lemma2annotations.items():
+-    lemma_count = 0
+-    for sy_id, sy_info in info.items():
+-        lemma_count += sy_info['synset']
+-        per_synset.append(sy_info['synset'])
+-        per_hdn.append(sy_info['hdn'])
+-
+-        meanings.add(sy_id)
+-
+-    per_lemma.append(lemma_count)
+-
+-print('number of unique lemmas: %s' % len(lemma2annotations))
+-print('number of unique meanings: %s' % len(meanings))
+-print('min avg max lemma', min(per_lemma), round(sum(per_lemma) / len(per_lemma), 2), max(per_lemma))
+-print('min avg max synset', min(per_synset), round(sum(per_synset) / len(per_synset), 2), max(per_synset))
+-print('min avg max hdn', min(per_hdn), round(sum(per_hdn) / len(per_hdn), 2), max(per_hdn))
++#for lemma, info in lemma2annotations.items():
++#    lemma_count = 0
++#    for sy_id, sy_info in info.items():
++#        lemma_count += sy_info['synset']
++#        per_sensekey.append(sy_info['synset'])
++#        per_hdn.append(sy_info['hdn'])
++#
++#        synset2freq[sy_id] += sy_info['synset']
++#        meanings.add(sy_id)
++#
++#    per_lemma.append(lemma_count)
++
++#print('number of unique lemmas: %s' % len(lemma2annotations))
++#print('number of unique meanings: %s' % len(meanings))
++#print('# min avg max total lemma', len(per_lemma), min(per_lemma), round(sum(per_lemma) / len(per_lemma), 2), max(per_lemma), sum(per_lemma))
++#print('# min avg max total sensekey', len(per_sensekey), min(per_sensekey), round(sum(per_sensekey) / len(per_sensekey), 2), max(per_sensekey), sum(per_sensekey))
++#print('# min avg max total synset', len(synset2freq), min(synset2freq.values()), round(sum(synset2freq.values()) / len(synset2freq), 2), max(synset2freq.values()), sum(synset2freq.values()))
++#print('# min avg max total hdn', len(per_hdn), min(per_hdn), round(sum(per_hdn) / len(per_hdn), 2), max(per_hdn), sum(per_hdn))
++#print('# min avg max total domain', len(domain2freq), min(domain2freq.values()), round(sum(domain2freq.values()) / len(domain2freq), 2), max(domain2freq.values()), sum(domain2freq.values()))
+diff --git a/scripts/wn_utils.py b/scripts/wn_utils.py
+index a3f69bf..8acdd47 100644
+--- a/scripts/wn_utils.py
++++ b/scripts/wn_utils.py
+@@ -1,8 +1,154 @@
+-import nltk
+ import itertools
+ from collections import defaultdict
+ 
+ 
++def candidate_selection(wn,
++                        token,
++                        target_lemma,
++                        pos,
++                        use_case=False,
++                        use_number=False,
++                        gold_lexkeys=set(),
++                        case_freq=None,
++                        plural_freq=None,
++                        debug=False):
++    """
++    return candidate synsets of a token
++
++    :param str targe_lemma: a token, e.g. Congress
++    :param str pos: supported: n
++
++    :param bool use_case: if set to True,
++    only synsets are returned that contain the token in upper case
++    :param str gold_lexkeys: {'congress%1:14:00::'}
++
++    :rtype: tuple
++    :return: (candidate_synsets, 
++              new_candidate_synsets,
++              gold_in_candidates)
++    """
++    # assertions on input arguments
++    if use_case:
++        assert case_freq is not None, 'case_freq should not be None'
++
++    if use_number:
++        assert plural_freq is not None, 'plural_freq should not be None'
++
++    apply_morph_strategy = True
++
++    # check if candidate_synsets without morphological information is monosemous
++    candidate_synsets = wn.synsets(target_lemma, pos)
++    if len(candidate_synsets) == 1:
++        apply_morph_strategy = False
++
++    new_candidate_synsets = []
++    gold_in_candidates = False
++
++    if debug:
++        print(candidate_synsets)
++
++    for synset in candidate_synsets:
++
++        add = False
++
++        if all([use_number,
++                apply_morph_strategy]):
++
++            key = (target_lemma.lower(), pos)
++            lemma_plural_freq = dict()
++            if key in plural_freq:
++                lemma_plural_freq = plural_freq[(target_lemma.lower(), pos)]
++
++            plural_match = False
++            for lemma in synset.lemmas():
++                if lemma.key() in lemma_plural_freq:
++                    plural_match = True
++
++            if plural_match:
++                add = True
++
++        if all([use_case,
++                apply_morph_strategy]):
++
++            # check synset_lemma
++            capital_lemma_match = any([lemma.name() == token
++                                       for lemma in synset.lemmas()])
++
++            # check sense annotated corpus
++            key = (target_lemma.lower(), pos)
++            lemma_case_freq = dict()
++            if key in case_freq:
++                lemma_case_freq = case_freq[(target_lemma.lower(), pos)]
++
++            freq_match = False
++            for lemma in synset.lemmas():
++                if lemma.key() in lemma_case_freq:
++                    freq_match = True
++
++            if any([capital_lemma_match,  # whether lemma matches with token
++                    freq_match]):  # whether lemma of sensekey is used with capital
++                add = True
++
++        if add:
++            new_candidate_synsets.append(synset)
++
++            # check if gold in candidate
++            lexkeys = {lemma.key() for lemma in synset.lemmas()}
++            if any(gold_key in lexkeys
++                   for gold_key in gold_lexkeys):
++                gold_in_candidates = True
++
++    # if no synsets remain, use original ones
++    if not new_candidate_synsets:
++        new_candidate_synsets = candidate_synsets
++
++    return candidate_synsets, new_candidate_synsets, gold_in_candidates
++
++
++
++def get_synset2domain(path_wn20_to_domain,
++                      path_wn20_to_wn30):
++    """
++    create mapping between wn30 and domain and vice versa
++
++    :param str path_wn20_to_domain: wn-domains-3.2-20070223 file
++    :param str path_wn20_to_wn30: wn20-30.noun file from upc mappings
++
++    :rtype: tuple
++    :return: (wn30_domain, domain_wn30)
++    """
++    wn30_domain = dict()
++    domain_wn30 = defaultdict(set)
++
++    wn20_wn30 = dict()
++    with open(path_wn20_to_wn30) as infile:
++        for line in infile:
++            split = line.strip().split()
++            if len(split) == 3:
++                offset_20, *values = line.strip().split()
++                offset_30 = ''
++                conf = 0.0
++                for index in range(0, len(values), 2):
++                    an_offset = values[index]
++                    a_conf = float(values[index + 1])
++                    if a_conf > conf:
++                        offset_30 = an_offset
++                        conf = a_conf
++                wn20_wn30[offset_20 + '-n'] = offset_30 + '-n'
++
++    with open(path_wn20_to_domain) as infile:
++        for line in infile:
++            sy_id, domain = line.strip().split('\t')
++            if all([sy_id in wn20_wn30,
++                    sy_id.endswith('n')]):
++                wn30 = wn20_wn30[sy_id]
++
++                wn30_domain['eng-30-' + wn30] = domain
++                domain_wn30[domain].add('eng-30-' + wn30)
++
++    return wn30_domain, domain_wn30
++
++
+ def generate_training_instances(sentence_lemmas, annotations):
+     """
+     given the lemmas in a sentence with its annotations (can be more than one)
+@@ -37,6 +183,68 @@ def generate_training_instances(sentence_lemmas, annotations):
+     
+     return instances
+ 
++
++def generate_training_instances_v2(sentence_tokens,
++                                   sentence_lemmas,
++                                   sentence_pos,
++                                   annotations):
++    """
++    given the lemmas in a sentence with its annotations (can be more than one)
++    generate all training instances for that sentence
++
++    e.g. 
++    sentence_tokens = ['the', 'man',            'meets',   'women']
++    sentence_lemmas = ['the', 'man',            'meet',    'woman']
++    sentence_pos    = ['',    'n',              'v',       'n']
++    annotations =     [[],    ['1', '2' ],      ['4'],     ['5', '6']]
++
++    would result in
++    ('man', 'n', '1', ['the', 'man', 'meets', 'women'], 'the man---1 meets women', 1)
++    ('man', 'n', '2', ['the', 'man', 'meets', 'women'], 'the man---2 meets women', 1)
++    ('meet', 'v', '4', ['the', 'man', 'meets', 'women'], 'the man meets---4 women', 2)
++    ('woman', 'n', '5', ['the', 'man', 'meets', 'women'], 'the man meets women---5', 3)
++    ('woman', 'n', '6', ['the', 'man', 'meets', 'women'], 'the man meets women---6', 3)
++
++    :param list sentence_tokens: see above
++    :param list sentence_lemmas: see above
++    :param list sentence_pos: see above
++    :param list annotations: see above
++
++    :rtype: generator
++    :return: generator of (target_lemma, 
++                           target_pos, 
++                           token_annotation, 
++                           sentence_tokens, 
++                           training_example, 
++                           target_index)
++    """
++    for target_index, token_annotations in enumerate(annotations):
++
++        target_lemma = sentence_lemmas[target_index]
++        target_pos = sentence_pos[target_index]
++
++        for token_annotation in token_annotations:
++
++            if token_annotation is None:
++                continue
++
++            a_sentence = []
++            for index, token in enumerate(sentence_tokens):
++
++                if index == target_index:
++                    a_sentence.append(token + '---' + token_annotation)
++                else:
++                    a_sentence.append(token)
++
++            training_example = ' '.join(a_sentence)
++
++            yield (target_lemma,
++                   target_pos,
++                   token_annotation,
++                   sentence_tokens,
++                   training_example,
++                   target_index)
++
+ def load_lemma_pos2offsets(path_to_index_sense):
+     '''
+     given with index.sense from wordnet distributions such as
+@@ -157,8 +365,11 @@ def synsets_graph_info(wn_instance, wn_version, lemma, pos):
+     synsets = set(synsets)
+ 
+     if len(synsets) == 1:
+-        target_sy_iden = synset2identifier(synsets.pop(), wn_version)
++        sy_obj = synsets.pop()
++        target_sy_iden = synset2identifier(sy_obj, wn_version)
+         sy_id2under_lcs_info[target_sy_iden] = {'under_lcs': None,
++                                                'under_lcs_obj': None,
++                                                'sy_obj' : sy_obj,
+                                                 'path_to_under_lcs': []}
+         return sy_id2under_lcs_info
+ 
+@@ -199,6 +410,28 @@ def synsets_graph_info(wn_instance, wn_version, lemma, pos):
+                                                for synset in path_to_under_lcs]
+ 
+                     sy_id2under_lcs_info[target_sy_iden] = {'under_lcs': under_lcs_iden,
++                                                            'under_lcs_obj': under_lcs,
++                                                            'sy_obj' : sy1,
+                                                             'path_to_under_lcs': path_to_under_lcs_idens}
+ 
+     return sy_id2under_lcs_info
++
++
++def get_synset2sensekeys(wn, target_lemma, pos):
++    """
++
++    :param str target_lemma: e.g. cat
++    :param str pos: n v a r
++
++    :rtype: dict
++    :return: mapping from synset identifier -> sensekey
++
++    """
++    synset2sensekeys = dict()
++    for synset in wn.synsets(target_lemma, pos):
++        sy_id = synset2identifier(synset, '30')
++        for lemma in synset.lemmas():
++            if lemma.key().startswith(target_lemma + '%'):
++                synset2sensekeys[sy_id] = lemma.key()
++
++    return synset2sensekeys
+diff --git a/test-lstm.py b/test-lstm.py
+index 80d9033..85ab1c5 100644
+--- a/test-lstm.py
++++ b/test-lstm.py
+@@ -3,17 +3,20 @@ import tensorflow as tf
+ from collections import defaultdict 
+ import argparse
+ import pickle
++from datetime import datetime
+ 
+ parser = argparse.ArgumentParser(description='Trains meaning embeddings based on precomputed LSTM model')
+ parser.add_argument('-m', dest='model_path', required=True, help='path to model trained LSTM model')
+-# model_path = '/var/scratch/mcpostma/wsd-dynamic-sense-vector/output/lstm-wsd-small'
++# model_path = 'output/lstm-wsd-small'
+ parser.add_argument('-v', dest='vocab_path', required=True, help='path to LSTM vocabulary')
+-#vocab_path = '/var/scratch/mcpostma/wsd-dynamic-sense-vector/output/gigaword.1m-sents-lstm-wsd.index.pkl'
++#vocab_path = 'gigaword.1m-sents-lstm-wsd.index.pkl'
+ parser.add_argument('-i', dest='input_path', required=True, help='input path with sense annotated sentences')
+ parser.add_argument('-o',dest='output_path', required=True, help='path where sense embeddings will be stored')
+ parser.add_argument('-t', dest='max_lines', required=True, help='maximum number of lines you want to train on')
+ args = parser.parse_args()
+ 
++print('loaded arguments for training meaning embeddings')
++
+ def ctx_embd_input(sentence):
+     """
+     given a annotated sentence, return
+@@ -39,21 +42,31 @@ def ctx_embd_input(sentence):
+     return tokens, annotation_indices    
+     
+ vocab = np.load(args.vocab_path)
++print('loaded vocab')
++
+ synset2context_embds = defaultdict(list)
+-  
++meaning_freqs = defaultdict(int)
++
+ with tf.Session() as sess:  # your session object
+     saver = tf.train.import_meta_graph(args.model_path + '.meta', clear_devices=True)
+     saver.restore(sess, args.model_path)
+     predicted_context_embs = sess.graph.get_tensor_by_name('Model/predicted_context_embs:0')
+-    x = sess.graph.get_tensor_by_name('Model/x:0')
++    x = sess.graph.get_tensor_by_name('Model/Placeholder:0') 
+ 
+     with open(args.input_path) as infile:
+         for counter, line in enumerate(infile):
+             if counter >= int(args.max_lines):
+                 break
++            if counter % 1000 == 0:
++                print(counter, datetime.now())
+             sentence = line.strip()
+             tokens, annotation_indices = ctx_embd_input(sentence)
+             for index, synset_id in annotation_indices:
++                
++                #if '_' in synset_id:
++                #    base_synset, synset_id = synset_id.split('_')
++
++                meaning_freqs[synset_id] += 1
+                 target_id = vocab['<target>']
+                 sentence_as_ids = [vocab.get(w) or vocab['<unkn>'] for w in tokens]
+                 sentence_as_ids[index] = target_id
+@@ -68,3 +81,6 @@ for synset, embeddings in synset2context_embds.items():
+ 
+ with open(args.output_path, 'wb') as outfile:
+     pickle.dump(synset2avg_embedding, outfile)
++
++with open(args.output_path + '.freq', 'wb') as outfile:
++    pickle.dump(meaning_freqs, outfile)
+
+
+
+
+
+
+
+
+diff --git a/das5/train-lstm-wsd-full-data-google-model.job b/das5/train-lstm-wsd-full-data-google-model.job
+new file mode 100755
+index 0000000..3c35b70
+--- /dev/null
++++ b/das5/train-lstm-wsd-full-data-google-model.job
+@@ -0,0 +1,17 @@
++#!/bin/bash
++#SBATCH --time=72:00:00
++#SBATCH -C TitanX
++#SBATCH --gres=gpu:1
++
++module load cuda80/toolkit
++module load cuda80/blas
++module load cuda80
++module load cuDNN
++
++echo -n 'Started: ' && date
++
++python3 -u train-lstm-wsd.py --model google \
++        --data_path output/gigaword-lstm-wsd \
++        --save_path output/lstm-wsd-gigaword-google
++
++echo -n 'Finished: ' && date
+diff --git a/das5/train-lstm-wsd-full-data-large-model.job b/das5/train-lstm-wsd-full-data-large-model.job
+new file mode 100755
+index 0000000..aca457d
+--- /dev/null
++++ b/das5/train-lstm-wsd-full-data-large-model.job
+@@ -0,0 +1,18 @@
++#!/bin/bash
++#SBATCH --time=72:00:00
++#SBATCH -C TitanX
++#SBATCH --gres=gpu:1
++
++module load cuda80/toolkit
++module load cuda80/blas
++module load cuda80
++module load cuDNN
++
++echo -n 'Started: ' && date
++
++python3 -u train-lstm-wsd.py --model large \
++        --data_path output/gigaword-lstm-wsd \
++        --save_path output/lstm-wsd-gigaword-large
++
++echo -n 'Finished: ' && date
++    
+\ No newline at end of file
+
+
+
+
+
+diff --git a/train-lstm-wsd-full-data-google-model.job b/train-lstm-wsd-full-data-google-model.job
+deleted file mode 100755
+index 3c35b70..0000000
+--- a/train-lstm-wsd-full-data-google-model.job
++++ /dev/null
+@@ -1,17 +0,0 @@
+-#!/bin/bash
+-#SBATCH --time=72:00:00
+-#SBATCH -C TitanX
+-#SBATCH --gres=gpu:1
+-
+-module load cuda80/toolkit
+-module load cuda80/blas
+-module load cuda80
+-module load cuDNN
+-
+-echo -n 'Started: ' && date
+-
+-python3 -u train-lstm-wsd.py --model google \
+-        --data_path output/gigaword-lstm-wsd \
+-        --save_path output/lstm-wsd-gigaword-google
+-
+-echo -n 'Finished: ' && date
+diff --git a/train-lstm-wsd-full-data-large-model.job b/train-lstm-wsd-full-data-large-model.job
+deleted file mode 100755
+index aca457d..0000000
+--- a/train-lstm-wsd-full-data-large-model.job
++++ /dev/null
+@@ -1,18 +0,0 @@
+-#!/bin/bash
+-#SBATCH --time=72:00:00
+-#SBATCH -C TitanX
+-#SBATCH --gres=gpu:1
+-
+-module load cuda80/toolkit
+-module load cuda80/blas
+-module load cuda80
+-module load cuDNN
+-
+-echo -n 'Started: ' && date
+-
+-python3 -u train-lstm-wsd.py --model large \
+-        --data_path output/gigaword-lstm-wsd \
+-        --save_path output/lstm-wsd-gigaword-large
+-
+-echo -n 'Finished: ' && date
+-    
+\ No newline at end of file
+diff --git a/train-lstm-wsd.py b/train-lstm-wsd.py
+index f6871ee..6131dc9 100644
+--- a/train-lstm-wsd.py
++++ b/train-lstm-wsd.py
+@@ -14,149 +14,47 @@ import numpy as np
+ import tensorflow as tf
+ from tensorflow.python.client import timeline
+ import sys
+-from model import WSDModelTrain, WSDModelEvaluate, DummyModelTrain
++from model import WSDModel, train_model
++from configs import get_config
++import random
+ 
+ flags = tf.flags
+ logging = tf.logging
+ 
++flags.DEFINE_integer("seed", 192, 
++                     "A random seed to make sure the experiment is repeatable")
+ flags.DEFINE_string("model", "small",
+-    "A type of model. Possible options are: small, medium, large, google.")
++                    "A type of model. Possible options are: small, medium, large, google.")
+ flags.DEFINE_string("data_path", None,
+-                    "Where the training/test data is stored.")
++                    "Where the training/valid data is stored.")
++flags.DEFINE_string("dev_path", '',
++                    "Where the valid data is stored, if it cannot be inferred from data_path.")
++flags.DEFINE_string("vocab_path", '',
++                    "Where the vocabulary is stored, if it cannot be inferred from data_path.")
+ flags.DEFINE_string("save_path", None,
+                     "Model output directory.")
+-flags.DEFINE_bool("use_fp16", False,
+-                  "Train using 16-bit floats instead of 32bit floats")
+ flags.DEFINE_bool("trace_timeline", False,
+                   "Trace execution time to find out bottlenecks.")
+ FLAGS = flags.FLAGS
+ 
+-
+-def data_type():
+-  return tf.float16 if FLAGS.use_fp16 else tf.float32
+-
+-
+-class SmallConfig(object):
+-  """Small config."""
+-  init_scale = 0.1
+-  learning_rate = 0.1
+-  max_grad_norm = 5
+-  hidden_size = 100
+-  max_epoch = 100
+-  emb_dims = 10
+-
+-
+-class MediumConfig(object):
+-  """Medium config."""
+-  init_scale = 0.05
+-  learning_rate = 0.1
+-  max_grad_norm = 5
+-  hidden_size = 200
+-  max_epoch = 500
+-  emb_dims = 100
+-
+-
+-class LargeConfig(object):
+-  """Large config."""
+-  init_scale = 0.04
+-  learning_rate = 0.1
+-  max_grad_norm = 10
+-  hidden_size = 512
+-  max_epoch = 1000
+-  emb_dims = 128
+-
+-
+-class GoogleConfig(object):
+-  """Large config."""
+-  init_scale = 0.04
+-  learning_rate = 0.1
+-  max_grad_norm = 5
+-  hidden_size = 2048
+-  max_epoch = 2000
+-  emb_dims = 512
+-
+-
+-class TestConfig(object):
+-  """Tiny config, for testing."""
+-  init_scale = 0.1
+-  learning_rate = 0.1
+-  max_grad_norm = 1
+-  hidden_size = 2
+-  max_epoch = 1
+-  batch_size = 20
+-
+-def get_config():
+-  if FLAGS.model == "small":
+-    return SmallConfig()
+-  elif FLAGS.model == "medium":
+-    return MediumConfig()
+-  elif FLAGS.model == "large":
+-    return LargeConfig()
+-  elif FLAGS.model == "google":
+-    return GoogleConfig()
+-  elif FLAGS.model == "test":
+-    return TestConfig()
+-  else:
+-    raise ValueError("Invalid model: %s", FLAGS.model)
+-    
+-def load_data():
+-    sys.stderr.write('Loading data...\n')
+-    full_vocab = np.load(FLAGS.data_path + '.index.pkl')
+-    train = np.load(FLAGS.data_path + '.train.npz')
+-    train_batches = []
+-    num_batches = len(train.keys())
+-    for i in range(num_batches):
+-        sentences = train['batch%d' %i]
+-        batch_vocab, inverse = np.unique(sentences, return_inverse=True)
+-        outputs = inverse.reshape(sentences.shape)
+-        sys.stderr.write('Batch %d of %d vocab size: %d (%.2f%% of original)\n'
+-                         %(i, num_batches, batch_vocab.size, batch_vocab.size*100.0/len(full_vocab)))
+-        train_batches.append((sentences, outputs, batch_vocab))
+-    dev = np.load(FLAGS.data_path + '.dev.npz')
+-    sys.stderr.write('Loading data... Done.\n')
+-    return full_vocab, train_batches, dev['data'], dev['lens']
+-
+ def main(_):
++    random.seed(FLAGS.seed)
++    np.random.seed(random.randint(0, 10**6))
++    tf.set_random_seed(random.randint(0, 10**6))
+     if not FLAGS.data_path:
+         raise ValueError("Must set --data_path to the base path of "
+                          "prepared input (e.g. output/gigaword)")
+-    vocab, train_batches, dev_data, dev_lens = load_data()
+-    target_id = vocab['<target>']    
+-    config = get_config()
+-    config.vocab_size = len(vocab)
++    config = get_config(FLAGS)
+     with tf.Graph().as_default():
+         initializer = tf.random_uniform_initializer(-config.init_scale,
+                                                     config.init_scale)
+     with tf.variable_scope("Model", reuse=None, initializer=initializer):
+-        m_train = WSDModelTrain(config, data_type())
+-    with tf.variable_scope("Model", reuse=True, initializer=initializer):
+-        m_evaluate = WSDModelEvaluate(config, data_type())
+-    m_train.print_device_placement()
+-    with tf.Session() as session:
+-        saver = tf.train.Saver()
+-        start_time = time.time()
+-        sys.stdout.write("Initializing variables.... ")
+-        session.run(tf.global_variables_initializer())
+-        sys.stdout.write("Done.\n")
+-        best_cost = None
+-        for i in range(config.max_epoch):
+-            # only turn it on after 5 epochs because first epochs spend time 
+-            # on GPU initialization routines
+-            if FLAGS.trace_timeline and i == 5: 
+-                m_train.trace_timeline() # start tracing timeline
+-            print("Epoch #%d:" % (i + 1))
+-#             train_cost = 0 # for debugging
+-            train_cost = m_train.train_epoch(session, train_batches, target_id, verbose=True)
+-            dev_cost, hit_at_100 = m_evaluate.measure_dev_cost(session, dev_data, dev_lens, target_id)
+-            print("Epoch #%d finished:" %(i + 1))
+-            print("\tTrain cost: %.3f" %train_cost)
+-            print("\tDev cost: %.3f, hit@100: %.1f%%" %(dev_cost, hit_at_100))
+-            if best_cost is None or dev_cost < best_cost:
+-                best_cost = dev_cost
+-#                 save_start = time.time()
+-                print("\tSaved best model to %s" %saver.save(session, FLAGS.save_path))
+-#                 print("\tTime on saving: %f sec" %(time.time()-save_start))
+-            print("\tElapsed time: %.1f minutes" %((time.time()-start_time)/60))
++        m_train = WSDModel(config, optimized=True)
++    with tf.variable_scope("Model", reuse=True):
++        m_evaluate = WSDModel(config, reuse_variables=True)
++#     m_train.print_device_placement() # for debugging
++    train_model(m_train, m_evaluate, FLAGS, config)
++
+     if FLAGS.trace_timeline:
+         tl = timeline.Timeline(m_train.run_metadata.step_stats)
+         ctf = tl.generate_chrome_trace_format()

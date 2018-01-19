@@ -11,6 +11,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.linear_model.base import LinearRegression
 import configs
+from configs import SmallConfig, H256P64, LargeConfig, GoogleConfig,\
+    DefaultConfig
 
 ModelPerformance = namedtuple('ModelPerformance', ['name', 'semcor', 'mun'])
 
@@ -118,17 +120,20 @@ def draw_data_size_vs_performance_chart():
     print('Extrapolated data size:')
     print(lr.predict([[0.75], [0.8]]))
 
+def compute_num_params(vocab_size, p, h):
+    return (vocab_size*p*2 + # input and output embeddings
+            p*h + h*h + h + # input gates
+            p*h + h*h + h + # candidate states
+            p*h + h*h + h + # forget gates
+            p*h + h*h + h*h + h + # output gates
+            p*h # context layer
+            )    
+
 def draw_capacity_vs_performance_chart():
     ''' Create figure for paper '''
     df = pd.read_csv('output/capacity_vs_performance.csv')
     vocab_size = configs.DefaultConfig.vocab_size
-    df['num_params'] = (vocab_size*df['p']*2 + # input and output embeddings
-                        df['p']*df['h'] + df['h']*df['h'] + df['h'] + # input gates
-                        df['p']*df['h'] + df['h']*df['h'] + df['h'] + # candidate states
-                        df['p']*df['h'] + df['h']*df['h'] + df['h'] + # forget gates
-                        df['p']*df['h'] + df['h']*df['h'] + df['h']*df['h'] + df['h'] + # output gates
-                        df['p']*df['h'] # context layer
-                        )
+    df['num_params'] = compute_num_params(vocab_size, df['p'], df['h'])
     print(df)
     with PdfPages('output/capacity_vs_performance.pdf') as pdf:
         semcor_handle, = plt.plot(df['num_params'], df['semcor'], label='SemEval13 (T: SemCor)')
@@ -149,8 +154,18 @@ def draw_capacity_vs_performance_chart():
 #     print('Extrapolated data size:')
 #     print(lr.predict([[0.75], [0.8]]))
 
+def report_model_params():
+    v = DefaultConfig.vocab_size
+    models = [SmallConfig, H256P64, LargeConfig, GoogleConfig]
+    table = [['%.0fM' %(v/10**6), m.emb_dims, m.hidden_size, 
+              "%.0fM" %(compute_num_params(v, m.emb_dims, m.hidden_size)/10**6)]
+              for m in models]
+    df = pd.DataFrame(table, columns=['Vocab.', 'p', 'h', '#params'])
+    print(df.to_latex(index=False))
+
 if __name__ == '__main__':
 #     report_wsd_performance_vs_data_size()
 #     variation_experiment()
 #     draw_data_size_vs_performance_chart()
-    draw_capacity_vs_performance_chart()
+#     draw_capacity_vs_performance_chart()
+    report_model_params()

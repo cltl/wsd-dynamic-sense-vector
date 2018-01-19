@@ -104,11 +104,24 @@ This creates a development set for the label propagation:
 a) annotated corpus: pwgc
 b) unannotated corpus: omsti
 
-#### Reproduce variation experiment
+#### Model size experiements
 
-0. `git checkout a453bc1`
-1. Pre-process GigaWord into plain text: `sbatch cartesius/process-gigaword.job`
-2. More preprocessing to make binary files: `sbatch cartesius/prepare-lstm-wsd.job`
+Notice that there was uncertainty about the real version that produce h2048p512
+and h512p128, see `difference-edited.txt` for a comparison with a recent version.
+
+1. h=2048, p=512: `git checkout 354acc1cfdd542142490afe40447cb6f40d2fd7c && ./train-lstm-wsd-full-data-google-model.job`
+2. h=512, p=128: `git checkout 354acc1cfdd542142490afe40447cb6f40d2fd7c && ./train-lstm-wsd-full-data-large-model.job`
+3. h=512, p=64: see `exp-h256p64.sh` in "stability" section
+4. h=100, p=10: see `exp-variation*.job` in "stability" section
+
+#### Reproduce variation/stability experiments
+
+These experiments measure how much the performance is affected by the randomness
+in training. Basically, we train smaller models many times, each time with 
+a different (but fixed) random seed.
+
+1. Pre-process GigaWord into plain text: `git checkout 2b0934c && sbatch cartesius/process-gigaword.job`
+2. More preprocessing to make binary files: `git checkout a453bc1 && sbatch cartesius/prepare-lstm-wsd.job`
 0. `git checkout ce8a024`
 1. Run at the same time: `sbatch cartesius/exp-variation1.job` and `cartesius/sbatch exp-variation2.job`
 0. `git checkout a74bda6`
@@ -118,18 +131,18 @@ b) unannotated corpus: omsti
 2. When everything finishes, do `git checkout 42bc700` 
 3. Run `sbatch cartesius/exp-variation-score.job`
 
-#### Reproduce optimization experiment
+#### Reproduce (training speed) optimization experiment
 
+1. Pre-process GigaWord into plain text (if you haven't done so): `git checkout 2b0934c && sbatch cartesius/process-gigaword.job`
 0. `git checkout a74bda6`
-1. Pre-process GigaWord into plain text (if you haven't done so): `sbatch cartesius/process-gigaword.job`
 2. More preprocessing to make binary files: `sbatch cartesius/prepare-lstm-wsd.job`
 3. `git checkout e93fdb2`
 4. Run in parallel: `sbatch cartesius/exp-optimization{i}.job` where i=1,2,3,4
 
 #### Data size experiment
 
+1. Pre-process GigaWord into plain text (if you haven't done so): `git checkout 2b0934c && sbatch cartesius/process-gigaword.job`
 0. `git checkout a74bda6`
-1. Pre-process GigaWord into plain text (if you haven't done so): `sbatch cartesius/process-gigaword.job`
 2. More preprocessing to make binary files: `sbatch cartesius/prepare-lstm-wsd.job`
 3. `git checkout 4e4a04a`
 4. Run `sbatch cartesius/exp-data-size.job {i}` with i="01",10,25,50,75

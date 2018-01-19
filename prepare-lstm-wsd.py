@@ -24,7 +24,7 @@ import subprocess
 from random import Random
 from collections import Counter
 from utils import progress, count_lines_fast
-from configs import preprocessed_gigaword_path, output_dir
+from configs import output_dir
 from version import version
 
 dev_sents = 20000 # absolute maximum
@@ -34,12 +34,7 @@ batch_size = 60000 # words
 vocab_size = 10**6
 min_count = 5
 
-inp_path = preprocessed_gigaword_path
-# inp_path = 'preprocessed-data/gigaword_1m-sents.txt' # for debugging    
-out_dir = os.path.join('preprocessed-data', version)
-out_path = os.path.join(out_dir, 'gigaword-for-lstm-wsd')
-
-special_symbols = ['<target>', '<unkn>', '<pad>']
+special_symbols = ['<target>', '<unkn>', '<pad>', '<eos>']
 
 def _build_vocab(filename):
     sys.stderr.write('Building vocabulary...\n')
@@ -76,16 +71,17 @@ def lookup_and_iter_sents(filename, word2id, include_ids=None, exclude_ids=None)
                 words = line.strip().split()
                 yield [word2id.get(word) or unkn_id for word in words]
             
-def pad(sents, max_len, pad_id):
-    arr = np.empty((len(sents), max_len), dtype=np.int32)
+def pad(sents, max_len, pad_id, eos_id):
+    arr = np.empty((len(sents), max_len+1), dtype=np.int32)
     arr.fill(pad_id)
     for i, s in enumerate(sents):
         arr[i, :len(s)] = s
+        arr[i, len(s)] = eos_id
     return arr
 
 def pad_batches(inp_path, word2id, include_ids, exclude_ids, max_sents=-1):
     sys.stderr.write('Dividing and padding...\n')
-    pad_id = word2id['<pad>']
+    eos_id, pad_id = word2id['<eos>'], word2id['<pad>']
     batches = {}
     sent_lens = []
     curr_max_len = 0
@@ -95,7 +91,7 @@ def pad_batches(inp_path, word2id, include_ids, exclude_ids, max_sents=-1):
                                                include_ids, exclude_ids)):
         new_size = (len(curr_batch)+1) * max(curr_max_len,len(sent))
         if new_size > batch_size or (max_sents > 0 and len(curr_batch) >= max_sents):
-            batches['batch%d' %batch_id] = pad(curr_batch, curr_max_len, pad_id)
+            batches['batch%d' %batch_id] = pad(curr_batch, curr_max_len, pad_id, eos_id)
             batches['lens%d' %batch_id] = np.array([len(s) for s in curr_batch], dtype=np.int32)
             batch_id += 1
             curr_max_len = 0
@@ -104,7 +100,7 @@ def pad_batches(inp_path, word2id, include_ids, exclude_ids, max_sents=-1):
         curr_batch.append(sent)
         sent_lens.append(len(sent))
     if curr_batch:
-        batches['batch%d' %batch_id] = pad(curr_batch, curr_max_len, pad_id)
+        batches['batch%d' %batch_id] = pad(curr_batch, curr_max_len, pad_id, eos_id)
         batches['lens%d' %batch_id] = np.array([len(s) for s in curr_batch], dtype=np.int32)
         batch_id += 1 # important to count num batches correctly
     sent_lens = np.array(sent_lens, dtype=np.int32)
@@ -150,7 +146,7 @@ def shuffle_and_pad_batches(inp_path, word2id, dev_sent_ids):
             new_size = (len(curr_batch_lens)+1) * max(curr_max_len,l)
             if new_size >= batch_size:
                 batches['batch%d' %batch_id] = \
-                        np.empty((len(curr_batch_lens), max(curr_batch_lens)), dtype=np.int32)
+                        np.empty((len(curr_batch_lens), max(curr_batch_lens)+1), dtype=np.int32)
                 batches['lens%d' %batch_id] = np.array(curr_batch_lens, dtype=np.int32)
                 batch_id += 1
                 curr_max_len = 0
@@ -160,13 +156,13 @@ def shuffle_and_pad_batches(inp_path, word2id, dev_sent_ids):
             sent2batch[sent_id] = 'batch%d' %batch_id
     if curr_batch_lens:
         batches['batch%d' %batch_id] = \
-                np.empty((len(curr_batch_lens), max(curr_batch_lens)), dtype=np.int32)
+                np.empty((len(curr_batch_lens), max(curr_batch_lens)+1), dtype=np.int32)
         batches['lens%d' %batch_id] = np.array(curr_batch_lens, dtype=np.int32)
         batch_id += 1 # important to count num batches correctly
     sys.stderr.write('Calculating batch shapes... Done.\n')
     
     sys.stderr.write('Dividing and padding...\n')
-    pad_id = word2id['<pad>']
+    eos_id, pad_id = word2id['<eos>'], word2id['<pad>']
     for i in range(batch_id): batches['batch%d'%i].fill(pad_id)
     nonpad_count = 0
     sent_counter = Counter()
@@ -174,7 +170,8 @@ def shuffle_and_pad_batches(inp_path, word2id, dev_sent_ids):
         assert lens[sent_id] == len(sent)
         batch_name = sent2batch.get(sent_id)
         if batch_name is not None: # could be in dev set
-            batches[batch_name][sent_counter[batch_name],:len(sent)] = sent
+            batches[batch_name][sent_counter[batch_name], :len(sent)] = sent
+            batches[batch_name][sent_counter[batch_name], len(sent)] = eos_id
             nonpad_count += len(sent)
             sent_counter[batch_name] += 1
     # check that we filled all arrays
@@ -196,8 +193,7 @@ def shuffle_and_pad_batches(inp_path, word2id, dev_sent_ids):
                      %(lens.mean(), lens.std()))
     return batches
 
-def run():
-    os.makedirs(out_dir, exist_ok=True)
+def run(inp_path, out_path):
     index_path = out_path + '.index.pkl'
     if os.path.exists(index_path):
         sys.stderr.write('Reading vocabulary from %s... ' %index_path)
@@ -247,4 +243,9 @@ def run():
             np.savez(pc_train_path, **batches)
 
 if __name__ == '__main__':
-    run()
+    inp_path = 'preprocessed-data/694cb4d/gigaword.txt'
+    #inp_path = 'preprocessed-data/694cb4d/gigaword_1m-sents.txt' # for debugging    
+    out_dir = os.path.join('preprocessed-data', version)
+    os.makedirs(out_dir, exist_ok=True)
+    out_path = os.path.join(out_dir, 'gigaword-for-lstm-wsd')
+    run(inp_path, out_path)

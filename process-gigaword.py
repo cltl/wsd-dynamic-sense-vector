@@ -2,7 +2,7 @@ import os
 import gzip
 from bs4 import BeautifulSoup
 import spacy
-from configs import gigaword_path, preprocessed_gigaword_path
+from configs import gigaword_path
 import codecs
 from utils import progress
 from version import version
@@ -31,7 +31,6 @@ def iter_sents(paragraphs):
     for doc in nlp.pipe(paragraphs, batch_size=10000):
         for sent in doc.sents:
             yield [str(tok).strip() for tok in sent]
-
 
 # example_file = 'data/gigaword/gigaword_eng_5_d1/data/afp_eng/afp_eng_200112.gz'
 
