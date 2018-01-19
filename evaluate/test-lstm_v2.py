@@ -53,6 +53,7 @@ vocab = np.load(args.vocab_path)
 print('loaded vocab')
 
 synset2context_embds = defaultdict(list)
+synset2instances = dict()
 meaning_freqs = defaultdict(int)
 batch_size = int(args.batch_size)
 counter = 0
@@ -82,8 +83,6 @@ with tf.Session() as sess:  # your session object
             sentence_lens = []  # list of ints
             
             for line in n_lines:
-
-
 
                 sentence = line.strip()
                 tokens, annotation_indices = ctx_embd_input(sentence)
@@ -121,10 +120,14 @@ with tf.Session() as sess:  # your session object
 synset2avg_embedding = dict()
 for synset, embeddings in synset2context_embds.items():
     average = sum(embeddings) / len(embeddings)
-    synset2avg_embedding[synset] = average
+    std = np.std(embeddings)
+    synset2avg_embedding[synset] = average, std
 
 with open(args.output_path, 'wb') as outfile:
     pickle.dump(synset2avg_embedding, outfile)
+
+with open(args.output_path + '.instances', 'wb') as outfile:
+    pickle.dump(synset2context_embds, outfile)
 
 with open(args.output_path + '.freq', 'wb') as outfile:
     pickle.dump(meaning_freqs, outfile)
