@@ -24,7 +24,7 @@ import subprocess
 from random import Random
 from collections import Counter
 from utils import progress, count_lines_fast
-from configs import output_dir
+from configs import output_dir, special_symbols
 from version import version
 from tensor_utils import pad
 
@@ -34,8 +34,6 @@ dev_portion = 0.01 # relative maximum
 batch_size = 60000 # words
 vocab_size = 10**6
 min_count = 5
-
-special_symbols = ['<target>', '<unkn>', '<pad>', '<eos>']
 
 def _build_vocab(filename):
     sys.stderr.write('Building vocabulary...\n')

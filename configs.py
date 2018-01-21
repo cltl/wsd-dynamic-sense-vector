@@ -6,8 +6,10 @@ os.makedirs(output_dir, exist_ok=True)
 
 gigaword_path = 'data/gigaword'
 
+special_symbols = ['<target>', '<unkn>', '<pad>', '<eos>']
+
 class DefaultConfig(object):
-    vocab_size = 10**6 + 3
+    vocab_size = 10**6 + len(special_symbols)
     max_grad_norm = 5
     num_senses = 4
     init_scale = 0.1
@@ -15,7 +17,7 @@ class DefaultConfig(object):
     assume_same_lengths = True
     sampled_softmax = True
     optimized_batches = True
-    max_stagnant_count = 5
+    max_stagnant_count = 10
     max_epoch = 100
 #     max_epoch = 1 # for debugging
 
