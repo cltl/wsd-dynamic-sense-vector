@@ -1,4 +1,6 @@
 #!/bin/bash
 #SBATCH --time=24:00:00
 
+echo -n "Started: " && date
 python3 -u prepare-lstm-wsd.py
+echo -n "Finished: " && date

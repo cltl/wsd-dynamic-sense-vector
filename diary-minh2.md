@@ -300,6 +300,28 @@ I'll also need to add it to the evaluation scripts.
 
 ... OK, did it. It's 12:30 am now... 
 
+## Sat 20 Jan
+
+Fixed some problems with training and evaluation scripts and tried to train
+a large model on 1% data. We need to limit the target index to the length
+of the sentence (excluding <eos>) otherwise the task wouldn't make sense
+and the performance on dev set is hurt.
+
+When I look up my data on Cartesius, I found out that everything was wiped out.
+They must have cleaned up their scratch folder at some point. Luckily, I 
+backed up the output of jobs.
+
+When comparing the current version with `2017-11-24-4e4a04a`, the new version
+works better (i.e. the NLL on dev set decreases faster). But that's only for 
+the first 20 epochs. It's 0:24 Sunday now, let's see how it goes tomorrow morning. 
+
+## Sun 21 Jan 
+
+Until epoch 39, it's still running good but then it crashes because there's no
+more disk space. I should stop saving everything :-(
+
+It took me about 15 minutes to clean up my scratch folder. Now I'm using 
+a healthy amount of 293G over the 400G quota.
 
 TODO: docker image
         

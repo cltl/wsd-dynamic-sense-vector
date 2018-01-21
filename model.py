@@ -134,11 +134,15 @@ class WSDModel(object):
             samples = np.random.choice(len(data), size=len(data))
         for batch_no, batch_id in enumerate(samples):
             x, y_all, subvocab, lens = data[batch_id]
-            i =  np.random.randint(x.shape[1])
-            y = y_all[:,i]
-            old_xi = x[:,i].copy() # old_xi might be different from y because of subvocab
-            x[:,i] = target_id
+            batch_size = x.shape[0]
+            # lens is subtracted by 1 to avoid selecting <eos> as target
+            i = np.mod(np.random.randint(1000000, size=batch_size), lens-1)
+            one_to_n = np.arange(batch_size)
+            y = y_all[one_to_n,i]
+            old_xi = x[one_to_n,i].copy() # old_xi might be different from y because of subvocab
+            x[one_to_n,i] = target_id
     
+            # self._lens may be used or not depends on assume_same_lengths option
             feed_dict = {self._x: x, self._y: y, self._subvocab: subvocab, self._lens: lens}
             state = session.run(self._initial_state, feed_dict)
             c, h = self._initial_state
@@ -148,7 +152,7 @@ class WSDModel(object):
             batch_cost, _ = session.run([self._cost, self._train_op], feed_dict,
                                         options=self.run_options, 
                                         run_metadata=self.run_metadata)
-            x[:,i] = old_xi # restore the data
+            x[one_to_n,i] = old_xi # restore the data
     
             total_cost += batch_cost * x.shape[0] # because the cost is averaged
             total_rows += x.shape[0]              # over rows in a batch
@@ -174,13 +178,14 @@ class WSDModel(object):
 
     def measure_dev_cost(self, session, data, target_id):
         # make sure that we measure against the same dataset every time we call this method
-        rng = np.random.RandomState(925) 
+        rng = np.random.RandomState(925)
         total_examples = 0
         total_cost = 0.0
         total_hit = 0.0
         for batch_x, _, _, batch_lens in data:
             batch_size = len(batch_lens)
-            target_indices = np.mod(rng.randint(1000000, size=batch_size), batch_lens)
+            # lens is subtracted by 1 to avoid selecting <eos> as target
+            target_indices = np.mod(rng.randint(1000000, size=batch_size), batch_lens-1)
             one_to_n = np.arange(batch_size)
             batch_y = batch_x[one_to_n, target_indices]
             batch_x[one_to_n, target_indices] = target_id
@@ -261,7 +266,8 @@ def train_model(m_train, m_evaluate, FLAGS, config):
     epoch = tf.get_variable("epoch", initializer=0, dtype=tf.int32, trainable=False)
     inc_epoch = tf.assign_add(epoch, 1)
     
-    saver = tf.train.Saver(max_to_keep=0)
+    saver = tf.train.Saver(max_to_keep=FLAGS.max_to_keep if hasattr(FLAGS, 'max_to_keep') else 1)
+    best_model_saver = tf.train.Saver()
     sv = tf.train.Supervisor(logdir=FLAGS.save_path, saver=saver) #, save_model_secs=60) # for testing
     with sv.managed_session() as sess:
         start_time = time.time()
@@ -274,14 +280,14 @@ def train_model(m_train, m_evaluate, FLAGS, config):
 #             train_cost = 0 # for debugging
             train_cost = m_train.train_epoch(sess, train_batches, target_id, verbose=True)
             print("Epoch #%d finished:" %(i + 1))
-            print("\tTrain cost: %.3f" %train_cost)
+            print("\tTrain cost: %.3f" %train_cost) 
             saver.save(sess, FLAGS.save_path, global_step=i)
             if m_evaluate:
                 dev_cost, hit_at_100 = m_evaluate.measure_dev_cost(sess, dev_batches, target_id)
                 print("\tDev cost: %.3f, hit@100: %.1f%%" %(dev_cost, hit_at_100))
                 if best_cost is None or dev_cost < best_cost:
                     best_cost = dev_cost
-                    save_path = saver.save(sess, FLAGS.save_path + '-best-model')
+                    save_path = best_model_saver.save(sess, FLAGS.save_path + '-best-model')
                     print("\tSaved best model to %s" %save_path)
                     sess.run(reset_stag)
                 else:

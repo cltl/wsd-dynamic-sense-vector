@@ -2,8 +2,8 @@
 ## Setup
 
     pip3 install --user beautifulsoup4 sklearn testfixtures unittest2 pyemd morfessor
-    pip3 install --user pandas==0.20.3
-    pip3 install --user spacy
+    pip3 install --user pandas==0.20.3 seaborn==0.8.1
+    pip3 install --user spacy 
     pip3 install --user https://github.com/explosion/spacy-models/releases/download/en_core_web_md-1.2.1/en_core_web_md-1.2.1.tar.gz
     python3 -m spacy link en_core_web_md en_default
     pip3 install --user nltk
@@ -69,12 +69,6 @@ Train by running:
     cd scripts
     python3 semcor_format2LSTM_input.py
 
-### For LSTM model
-
-1. Pre-process GigaWord into plain text: `sbatch process-gigaword.job`
-2. Train a small LSTM model: `sbatch train-lstm-wsd-small.job`
-3. Use the LSTM model: `python3 test-lstm.py`
-
 ### For word2vec model
 
 1. Pre-process GigaWord into plain text: `python3 process-gigaword.py > output/gigaword.txt`
@@ -96,6 +90,10 @@ Requirements: You'll need at least 64 GB of RAM to run the preparation script.
 0. cd script
 1. bash convert_for_paper.sh 
 The bash file calls the python script sense_annotations2lstm_format.py, which converts the sense annotations into the format needed to train the embeddings at the preferred granularity level (sensekey or synset).
+
+#### Prepare Gigaword for LSTM training with <eos>
+
+1. `git checkout 36b6246 && das5/prepare-lstm-wsd.job`
 
 #### label propagation
 
@@ -120,7 +118,7 @@ These experiments measure how much the performance is affected by the randomness
 in training. Basically, we train smaller models many times, each time with 
 a different (but fixed) random seed.
 
-1. Pre-process GigaWord into plain text: `git checkout 2b0934c && sbatch cartesius/process-gigaword.job`
+1. Pre-process GigaWord into plain text: `git checkout 694cb4d && sbatch cartesius/process-gigaword.job`
 2. More preprocessing to make binary files: `git checkout a453bc1 && sbatch cartesius/prepare-lstm-wsd.job`
 0. `git checkout ce8a024`
 1. Run at the same time: `sbatch cartesius/exp-variation1.job` and `cartesius/sbatch exp-variation2.job`
@@ -133,7 +131,7 @@ a different (but fixed) random seed.
 
 #### Reproduce (training speed) optimization experiment
 
-1. Pre-process GigaWord into plain text (if you haven't done so): `git checkout 2b0934c && sbatch cartesius/process-gigaword.job`
+1. Pre-process GigaWord into plain text (if you haven't done so): `git checkout 694cb4d && sbatch cartesius/process-gigaword.job`
 0. `git checkout a74bda6`
 2. More preprocessing to make binary files: `sbatch cartesius/prepare-lstm-wsd.job`
 3. `git checkout e93fdb2`
@@ -141,7 +139,7 @@ a different (but fixed) random seed.
 
 #### Data size experiment
 
-1. Pre-process GigaWord into plain text (if you haven't done so): `git checkout 2b0934c && sbatch cartesius/process-gigaword.job`
+1. Pre-process GigaWord into plain text (if you haven't done so): `git checkout 694cb4d && sbatch cartesius/process-gigaword.job`
 0. `git checkout a74bda6`
 2. More preprocessing to make binary files: `sbatch cartesius/prepare-lstm-wsd.job`
 3. `git checkout 4e4a04a`

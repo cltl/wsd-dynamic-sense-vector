@@ -15,13 +15,15 @@ preprocess_version="2018-01-19-36b6246"
 percent=$1
 base_dir=output/`python3 version.py`
 mkdir $base_dir 
-base_path=$base_dir/lstm-wsd-gigaword_google
+base_path=$base_dir/lstm-wsd-gigaword_${percent}-pc_large
 
-echo "Training and evaluating Google (h=2048, p=512) on full Gigaword, base_path=$base_path"
+echo "Running experiment on ${percent}% of Gigaword, base_path=$base_path"
 
-python3 -u train-lstm-wsd.py --model google \
-        --data_path preprocessed-data/$preprocess_version/gigaword-for-lstm-wsd \
-        --save_path $base_path --max_to_keep 100 && \
+python3 -u train-lstm-wsd.py --model large \
+        --data_path preprocessed-data/$preprocess_version/gigaword-for-lstm-wsd_${percent}-pc \
+        --dev_path preprocessed-data/$preprocess_version/gigaword-for-lstm-wsd.dev.npz \
+        --vocab_path preprocessed-data/$preprocess_version/gigaword-for-lstm-wsd.index.pkl \
+        --save_path $base_path && \
     cd evaluate && \
     ./evaluate.job ../$base_path-best-model \
             ../preprocessed-data/$preprocess_version/gigaword-for-lstm-wsd.index.pkl \

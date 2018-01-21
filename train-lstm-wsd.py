@@ -35,6 +35,8 @@ flags.DEFINE_string("save_path", None,
                     "Model output directory.")
 flags.DEFINE_bool("trace_timeline", False,
                   "Trace execution time to find out bottlenecks.")
+flags.DEFINE_integer("max_to_keep", 1, 
+                     "Number of models (at different epochs) to keep around")
 FLAGS = flags.FLAGS
 
 def main(_):
