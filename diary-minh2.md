@@ -323,18 +323,7 @@ more disk space. I should stop saving everything :-(
 It took me about 15 minutes to clean up my scratch folder. Now I'm using 
 a healthy amount of 293G over the 400G quota.
 
-TODO: docker image
-        
-5. [x] Try out scikit implementation 
-4. [x] Implement custom kernel ("We found that the graph has about the right density for common senses when ... between 85 to 98.")
-3. [x] measure running time
-3. [x] Build graph and run Scikit label propagation
-4. [x] for 25 Oct: label prop. Semcor + OMSTI
-5. [x] for 25 Oct: list of all experiments for the reproduction paper
-6. [x] save models of every epoch (instead of only the best one)
-6. [x] Read more about label propagation (Zhou et al. 2004)
-7. [x] Hyperparameter tuning of label propagation
-8. [ ] Training creates a lot of models, how to reduce it?
-9. [ ] Send code+data to Jacopo to run
-10. [x] Polish the arxiv paper
-11. [x] Use the same dev set for different sizes of the data.
+## Fri 16 Feb
+
+Meet Jacopo again. Need to retrain models to rerun the analysis with Marten's 
+debugged code.

@@ -87,9 +87,9 @@ Requirements: You'll need at least 64 GB of RAM to run the preparation script.
 
 #### Convert annotated corpora into input format LSTM
 
-0. cd script
-1. bash convert_for_paper.sh 
-The bash file calls the python script sense_annotations2lstm_format.py, which converts the sense annotations into the format needed to train the embeddings at the preferred granularity level (sensekey or synset).
+0. `cd script`
+1. `bash convert_for_paper.sh` 
+The bash file calls the python script `sense_annotations2lstm_format.py`, which converts the sense annotations into the format needed to train the embeddings at the preferred granularity level (sensekey or synset).
 
 #### Prepare Gigaword for LSTM training with <eos>
 
@@ -97,7 +97,7 @@ The bash file calls the python script sense_annotations2lstm_format.py, which co
 
 #### label propagation
 
-After running the sense_annotations2lstm_format.py with omsti as corpus, the output of that run needs to be provided as an argument to pwgc_to_ulm.py.
+After running the `sense_annotations2lstm_format.py` with OMSTI as corpus, the output of that run needs to be provided as an argument to `pwgc_to_ulm.py`.
 This creates a development set for the label propagation:
 a) annotated corpus: pwgc
 b) unannotated corpus: omsti
