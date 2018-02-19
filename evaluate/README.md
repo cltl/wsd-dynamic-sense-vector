@@ -21,10 +21,7 @@ Please run `bash convert_all_sense_annotations.sh`
 
 ## Running experiments
 
-Please run `bash table_2.sh`
+Please run `evaluate_in_parallel.sh` with the correct arguments.
+Please run the bash script to see what these arguments are.
 
-This will create in two folders:
-* experiments_mfs_fallback
-* experiments_no_mfs_fallback
 
-Each folder wil have six folder, each containing information about one experiment. Each folder contains a file called result.json with the results.
