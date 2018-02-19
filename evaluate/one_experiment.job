@@ -1,0 +1,46 @@
+#!/bin/bash
+#BATCH --time=12:00:00
+#SBATCH -C TitanX
+#SBATCH --gres=gpu:1
+
+module load python/3.5.2
+module load cuda80/toolkit
+module load cuda80/blas
+module load cuda80
+module load cuDNN/cuda80/6.0.21
+
+if [ $# -eq 0 ];
+then
+    echo
+    echo "Usage:                    : $0 model_path vocab_path out_dir base emb_setting lp mfs_fallback"
+    echo
+    echo
+    echo "model_path                : path to model"
+    echo "vocab_path                : path to .pkl file"
+    echo "base                      : base path"
+    echo "out dir                   : output dir"
+    echo "emb setting               : sensekey | synset"
+    echo "lp                        : False | True"
+    echo "mfs_fallback              : False | True"
+    exit -1;
+fi
+
+use_case_strategy=False
+use_number_strategy=False
+batch_size=400
+model_path=$1
+vocab_path=$2
+out_dir=$3
+base=$4
+emb_setting=$5
+eval_setting=$5
+mfs_fallback=$7
+
+
+sense_annotations_path="$base.txt"
+wsd_df_in="$base.bin"
+path_case_freq="$base.case_freq"
+path_plural_freq="$base.plural_freq"
+path_lp="$base.lp.out"
+use_lp_strategy=$6
+bash one_full_experiment_v2.sh $out_dir $batch_size $emb_setting $eval_setting $model_path $vocab_path $sense_annotations_path $wsd_df_in $mfs_fallback $path_case_freq $use_case_strategy $path_plural_freq $use_number_strategy $path_lp $use_lp_strategy

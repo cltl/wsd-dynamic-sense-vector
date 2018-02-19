@@ -39,7 +39,11 @@ lp_strategy = args.use_lp == 'True'
 
 case_freq = pickle.load(open(args.path_case_freq, 'rb'))
 plural_freq = pickle.load(open(args.path_plural_freq, 'rb'))
+
+
 lp_info = dict()
+if lp_strategy:
+    lp_info = pickle.load(open(args.path_lp, 'rb'))
 
 the_wn_version = '30'
 # load relevant wordnet
@@ -73,13 +77,7 @@ def lp_output(row, lp_info, candidate_synsets, debug=False):
         print('lp_index is None')
         return None
 
-    sensekey = lp_info[(target_lemma, target_pos)][lp_index]
-    synset_identifier = None
-
-    for synset in candidate_synsets:
-        if any([lemma.key() == sensekey
-                for lemma in synset.lemmas()]):
-            synset_identifier = synset2identifier(synset, '30')
+    synset_identifier = lp_info[(target_lemma, target_pos)][lp_index]
 
     return synset_identifier
 
@@ -150,7 +148,7 @@ def score_synsets(target_embedding, candidate_synsets, sense_embeddings, instanc
     (if 2> options, one is picked)
     """
     highest_synsets = []
-    highest_conf = 0.0
+    highest_conf = -100
     synset_std = None
     candidate_freq = dict()
     strategy = 'lstm'
@@ -165,6 +163,8 @@ def score_synsets(target_embedding, candidate_synsets, sense_embeddings, instanc
                 candidate = synset2higher_level[synset]
                 candidate_freq[synset] = meaning_freqs[candidate]
                 candidate_freq[synset] = meaning_freqs[candidate]
+            else:
+                candidate_freq[synset] = 0
 
         if candidate not in sense_embeddings:
             #print('%s %s %s: candidate %s missing in sense embeddings' % (instance_id, lemma, pos, candidate))
@@ -180,6 +180,8 @@ def score_synsets(target_embedding, candidate_synsets, sense_embeddings, instanc
         elif sim > highest_conf:
             highest_synsets = [potentially_added_synset]
             highest_conf = sim
+
+    assert len(candidate_freq) == len(set(candidate_synsets)), (candidate_freq, candidate_synsets)
 
     if len(highest_synsets) == 1:
         highest_synset, synset_std = highest_synsets[0]
@@ -211,7 +213,7 @@ wsd_df['#_cand_synsets'] = [None for _ in range(len(wsd_df))]
 wsd_df['#_new_cand_synsets'] = [None for _ in range(len(wsd_df))]
 wsd_df['gold_in_new_cand_synsets'] = [None for _ in range(len(wsd_df))]
 wsd_df['wsd_strategy'] = [None for _ in range(len(wsd_df))]
-wsd_df['only_one_embedding'] = [None for _ in range(len(wsd_df))]
+wsd_df['num_embeddings'] = [None for _ in range(len(wsd_df))]
 wsd_df['has_gold_embedding'] = [None for _ in range(len(wsd_df))]
 
 # load sense embeddings
@@ -222,22 +224,26 @@ with open(args.sense_embeddings_path, 'rb') as infile:
 num_correct = 0
 
 vocab = np.load(args.vocab_path)
-target_id, unkn_id, eos_id = vocab['<target>'], vocab['<unkn>'], vocab['<eos>']
 with tf.Session() as sess:  # your session object
     saver = tf.train.import_meta_graph(args.model_path + '.meta', clear_devices=True)
     saver.restore(sess, args.model_path)
     x, predicted_context_embs, lens = utils.load_tensors(sess)
+    #predicted_context_embs = sess.graph.get_tensor_by_name('Model/predicted_context_embs:0')
+    #x = sess.graph.get_tensor_by_name('Model/Placeholder:0')
 
     for row_index, row in wsd_df.iterrows():
         target_index, sentence_tokens, lemma, pos =  extract_sentence_wsd_competition(row)
         instance_id = row['token_ids'][0]
-        sentence_as_ids = [vocab.get(w) or unkn_id for w in sentence_tokens] + [eos_id]
+        target_id = vocab['<target>']
+        sentence_as_ids = [vocab.get(w) or vocab['<unkn>'] for w in sentence_tokens]
         sentence_as_ids[target_index] = target_id
 
         target_embeddings = sess.run(predicted_context_embs, {x: [sentence_as_ids],
                                                               lens: [len(sentence_as_ids)]})
         for target_embedding in target_embeddings:
             break
+
+        #target_embedding = sess.run(predicted_context_embs, {x: [sentence_as_ids]})[0]
 
         # load token object
         token_obj = row['tokens'][0]
@@ -281,7 +287,9 @@ with tf.Session() as sess:  # your session object
 
         # possibly include label propagation strategy
         if lp_strategy:
-            lp_result = lp_output(row, lp_info, new_candidate_synsets, debug=False)
+            lp_result = lp_output(row, lp_info, new_candidate_synsets, debug=True)
+
+            print(lp_result, row['lp_index'], row['target_lemma'])
 
             if lp_result:
                 the_chosen_candidates = [lp_result]
@@ -292,14 +300,14 @@ with tf.Session() as sess:  # your session object
             chosen_synset, \
             candidate_std, \
             candidate_freq, \
-            strategy = score_synsets(target_embedding,
-                                     the_chosen_candidates,
-                                     sense_embeddings,
-                                     instance_id,
-                                     lemma,
-                                     pos,
-                                     args.gran,
-                                     synset2higher_level)
+            wsd_strategy = score_synsets(target_embedding,
+                                         the_chosen_candidates,
+                                         sense_embeddings,
+                                         instance_id,
+                                         lemma,
+                                         pos,
+                                         args.gran,
+                                         synset2higher_level)
 
             #if strategy == 'mfs_fallback':
             #    wsd_strategy = 'mfs_fallback'
@@ -324,25 +332,20 @@ with tf.Session() as sess:  # your session object
         lstm_acc = chosen_synset in row['source_wn_engs'] # used to be wn30_engs
 
 
-        only_one_embedding = False
-        has_gold_embedding = True
+        has_gold_embedding = False
 
-        if wsd_strategy != 'monosemous':
-            num_embeddings = 0
-            has_gold_embedding = False
+        for source_wn_eng in row['source_wn_engs']:
+            if source_wn_eng in candidate_freq:
+                if candidate_freq[source_wn_eng]:
+                    has_gold_embedding = True
 
-            for source_wn_eng in row['source_wn_engs']:
-                if source_wn_eng in candidate_freq:
-                    if candidate_freq[source_wn_eng]:
-                        has_gold_embedding = True
-            for synset_id, freq in candidate_freq.items():
-                if freq:
-                    num_embeddings += 1
-
-            only_one_embedding = num_embeddings == 1
+        num_embeddings = 0
+        for synset_id, freq in candidate_freq.items():
+            if synset_id in sense_embeddings:
+                num_embeddings += 1
 
         wsd_df.set_value(row_index, col='has_gold_embedding', value=has_gold_embedding)
-        wsd_df.set_value(row_index, col='only_one_embedding', value=only_one_embedding)
+        wsd_df.set_value(row_index, col='num_embeddings', value=num_embeddings)
         wsd_df.set_value(row_index, col='lstm_acc', value=lstm_acc)
         wsd_df.set_value(row_index, col='emb_freq', value=candidate_freq)
         wsd_df.set_value(row_index, col='wsd_strategy', value=wsd_strategy)
@@ -369,12 +372,12 @@ with open(output_path_json, 'w') as outfile:
 
 
 # write tsne visualizations
-visualize = True
+visualize = False
 if visualize:
     output_folder = args.results.replace('/results.txt', '')
     tsne_utils.create_tsne_visualizations(output_folder,
                                           correct={False, True},
                                           meanings=True,
                                           instances=True,
-                                          polysemy=range(2, 3),
-                                          num_embeddings=range(2, 100))
+                                          polysemy=range(2, 1000),
+                                          num_embeddings=range(2, 1000))

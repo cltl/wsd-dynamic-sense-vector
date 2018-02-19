@@ -7,8 +7,13 @@ import pickle
 from nltk.corpus.reader.wordnet import WordNetCorpusReader
 from nltk.corpus import wordnet as wn
 
-from spacy.en import English
-nlp = English()
+
+try:
+    from spacy.en import English
+    nlp = English()
+except ModuleNotFoundError:
+    import spacy
+    nlp = spacy.load('en')
 
 
 import mapping_utils
@@ -72,24 +77,25 @@ if args.wn_version == '171':
     path_to_wn_dict_folder = os.path.join(cwd, 'resources', 'wordnet_171', 'WordNet-1.7.1', 'dict')
     path_to_wn_index_sense = os.path.join(path_to_wn_dict_folder, 'index.sense')
     wn = WordNetCorpusReader(path_to_wn_dict_folder, None)
-    
+
 
 # output path
-base_output_path = os.path.join(args.output_folder, 
+base_output_path = os.path.join(args.output_folder,
                                 args.abstraction_level + '-' + args.wn_version + '_' + '_'.join(corpora_to_include))
 output_path = base_output_path + '.txt'
 log_path = base_output_path + '.log'
 stats_path = base_output_path + '.stats'
-lp_path = base_output_path + '.lp'
-gold_lp_path = base_output_path + 'lp_gold'
+
+lp_dev_path = base_output_path + '.lp_dev' # without test instances
+gold_lp_dev_path = base_output_path + '.lp_dev_gold' # without test instances with gold labels
+lp_path = base_output_path + '.lp' # with test instances as input for wsd
+
 df_output_path = base_output_path + '.bin'
 case_freq_path = base_output_path + '.case_freq'
 plural_freq_path = base_output_path + '.plural_freq'
 
 
 print('end postprocessing command line args', datetime.now())
-
-
 print('start loading instance_id mappings', datetime.now())
 
 corpora_to_include = set(corpora_to_include)
@@ -103,8 +109,9 @@ sensekey2offset = mapping_utils.load_mapping_sensekey2offset(path_to_wn_index_se
 
 instance_id2offset, instance_id2sensekeys = mapping_utils.load_instance_id2offset(input_mapping_path,
                                                                                   sensekey2offset,
-                                                                                  args.wn_version,
-                                                                                  debug=False)
+                                                                                  args.wn_version   )
+
+print('# instance ids', len(instance_id2offset))
 
 if args.abstraction_level in {'sensekey', 'synset'}:
 
@@ -136,8 +143,10 @@ df = pandas.read_pickle(args.competition_df)
 column_name = 'synset2%s' % args.abstraction_level
 df[column_name] = [None for index, row in df.iterrows()]
 
-target_lemmas = set()
+sensekey_annotations = set()
+synset_annotations = set()
 target_lemmas_pos = set()
+annotation2lemma_pos = defaultdict(set)
 
 if args.abstraction_level == 'blc20':
     blc_20_obj = BLC(20, 'all')
@@ -145,12 +154,26 @@ if args.abstraction_level == 'blc20':
 
 for index, row in df.iterrows():
 
+    synsets = wn.synsets(row['target_lemma'], row['pos'])
+    for synset in synsets:
+        synset_id = mapping_utils.synset2identifier(synset, args.wn_version)
+        synset_annotations.add(synset_id)
+
+        if args.abstraction_level == 'synset':
+            annotation2lemma_pos[synset_id].add((row['target_lemma'], row['pos']))
+
+
+    sy2sensekeys = wn_utils.get_synset2sensekeys(wn, args.wn_version, row['target_lemma'], row['pos'], debug=True)
+    the_sensekeys = sy2sensekeys.values()
+    sensekey_annotations.update(set(the_sensekeys))
+
     if args.abstraction_level == 'sensekey':
-        sy2sensekeys = wn_utils.get_synset2sensekeys(wn, row['target_lemma'], row['pos'])
         df.set_value(index, column_name, sy2sensekeys)
 
+        for sensekey in the_sensekeys:
+            annotation2lemma_pos[sensekey].add((row['target_lemma'], row['pos']))
+
     elif args.abstraction_level == 'direct_hypernym':
-        synsets = wn.synsets(row['target_lemma'], row['pos'])
 
         sy2hypernyms = dict()
         for synset in synsets:
@@ -169,8 +192,24 @@ for index, row in df.iterrows():
             sy2blc20[synset_id] = blc20_id
         df.set_value(index, column_name, sy2blc20)
 
-    target_lemmas.add(row['target_lemma'])
     target_lemmas_pos.add((row['target_lemma'], row['pos']))
+
+if args.abstraction_level == 'sensekey':
+    accepted_annotations = sensekey_annotations
+elif args.abstraction_level == 'synset':
+    accepted_annotations = synset_annotations
+
+
+
+
+# load instance ids which need to be included
+needed_instances = set()
+for instance_id, sensekeys in instance_id2sensekeys.items():
+    if any([sensekey in sensekey_annotations
+            for sensekey in sensekeys]):
+        needed_instances.add(instance_id)
+
+print('# instances needed to be added', len(needed_instances))
 
 
 print('finished updating df', datetime.now())
@@ -192,6 +231,8 @@ lp_gold = defaultdict(list)
 lemma_lower_pos2meaning2freq_uppercase = dict()
 lemma_lower_pos2meaning2freq_plural = dict()
 
+
+added_token_annotations = set()
 
 for corpus_node in my_html_tree.xpath('body/corpus'):
 
@@ -230,11 +271,17 @@ for corpus_node in my_html_tree.xpath('body/corpus'):
                         pos in accepted_pos]):
 
 
+
                     instance_id = child_el.get('id')
+
+
                     if instance_id not in instance_id2offset:
                         continue
 
                     synset_id = instance_id2offset[instance_id]
+
+                    if instance_id in needed_instances:
+                        needed_instances.remove(instance_id)
 
                     # determine key for mapping
                     if args.abstraction_level in {'direct_hypernym', 'blc20'}:
@@ -244,11 +291,10 @@ for corpus_node in my_html_tree.xpath('body/corpus'):
 
                     mappings = the_mapping_function(key, the_mapping)
 
+
+
                     for a_mapping in mappings:
                         sent_annotations.append(a_mapping)
-
-                        stats[lemma] += 1
-
 
                         # case sensitive information
                         if all([token.istitle(),                    # startswith capital letter
@@ -267,8 +313,8 @@ for corpus_node in my_html_tree.xpath('body/corpus'):
                             lemma_lower_pos2meaning2freq_plural[freq_key][a_mapping] += 1
 
 
-                annotations.append(sent_annotations)
 
+                annotations.append(sent_annotations)
 
             for sentence_info in wn_utils.generate_training_instances_v2(sentence_tokens,
                                                                          sentence_lemmas,
@@ -279,21 +325,39 @@ for corpus_node in my_html_tree.xpath('body/corpus'):
                 token_annotation, \
                 sentence_tokens, \
                 training_example, \
-                target_index = sentence_info
+                    target_index = sentence_info
 
-                if target_lemma in target_lemmas:
+                if token_annotation in accepted_annotations:
+                    added_token_annotations.add(token_annotation)
+                    stats[target_lemma] += 1
                     outfile.write(training_example + '\n')
 
-		# add gold lp info 
-                lp_gold[(target_lemma, target_pos)].append((token_annotation, sentence_tokens, target_index))
-		
-                # add to label propagation dicts
-                if the_corpus == 'semcor':
-                    sc_lemma_pos2label_sent_index[(target_lemma, target_pos)].append((token_annotation, sentence_tokens, target_index))
-                elif the_corpus == 'mun':
-                    omsti_lemma_pos2label_sent_index[(target_lemma, target_pos)].append((None, sentence_tokens, target_index))
+
+                if token_annotation in annotation2lemma_pos:
+                    lp_lemma_pos = annotation2lemma_pos[token_annotation]
+
+                    print(token_annotation, lp_lemma_pos)
+                    for lp_lemma, lp_pos in lp_lemma_pos:
+
+                        # add gold lp info
+                        lp_gold[(lp_lemma, lp_pos)].append((token_annotation, sentence_tokens, target_index))
+
+                        # add to label propagation dicts
+                        if the_corpus == 'semcor':
+                            sc_lemma_pos2label_sent_index[(lp_lemma, lp_pos)].append((token_annotation, sentence_tokens, target_index))
+                        elif the_corpus == 'mun':
+                            omsti_lemma_pos2label_sent_index[(lp_lemma, lp_pos)].append((None, sentence_tokens, target_index))
 
 outfile.close()
+
+
+print('# added token annotations', len(added_token_annotations))
+print('instance ids not added', len(needed_instances))
+print('corpora', corpora_to_include)
+if corpora_to_include == {'semcor'}:
+    assert not needed_instances
+if corpora_to_include == {'mun', 'semcor'}:
+    assert not needed_instances
 
 # save case freq
 with open(case_freq_path, 'wb') as outfile:
@@ -328,22 +392,33 @@ with open(log_path, 'w') as outfile:
         num_sc = len(sc_info)
 
         num_omsti_before = len(omsti_info)
-        if len(omsti_info) > 1000:
-            omsti_info = sample(omsti_info, 1000)
+        #iif len(omsti_info) > 1000:
+        #    omsti_info = sample(omsti_info, 1000)
         num_omsti_after = len(omsti_info)
 
-        if all([num_sc > 10,
-                num_omsti_after > 10]):
-                
+        if all([num_sc > 1,
+                num_omsti_after > 1]):
+
             lp_input[(target_lemma, target_pos)] = sc_info + omsti_info
-            assert num_sc > 10
-            assert num_omsti_after > 10
+            assert num_sc > 1
+            assert num_omsti_after > 1
 
         outfile.write('\t'.join([target_lemma,
                                  target_pos,
                                  str(num_sc),
                                  str(num_omsti_before),
                                  str(num_omsti_after)]) + '\n')
+
+# save lp development output
+with open(lp_dev_path, 'wb') as outfile:
+    pickle.dump(lp_input, outfile)
+
+# save lp gold output
+with open(gold_lp_dev_path, 'wb') as outfile:
+    pickle.dump(lp_gold, outfile)
+
+
+
 
 # add test instances to it and save identifiers to df
 df['lp_index'] = [None for index, row in df.iterrows()]
@@ -396,9 +471,6 @@ with open(lp_path, 'wb') as outfile:
     pickle.dump(lp_input, outfile)
 
 
-# save one dictionary with gold label propagation
-with open(gold_lp_path, 'wb') as outfile:
-    pickle.dump(lp_gold, outfile)
 
 
 

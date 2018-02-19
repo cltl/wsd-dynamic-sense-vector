@@ -50,7 +50,6 @@ def ctx_embd_input(sentence):
 
     
 vocab = np.load(args.vocab_path)
-target_id, unkn_id, eos_id = vocab['<target>'], vocab['<unkn>'], vocab['<eos>']
 print('loaded vocab')
 
 synset2context_embds = defaultdict(list)
@@ -64,6 +63,10 @@ with tf.Session() as sess:  # your session object
     saver = tf.train.import_meta_graph(args.model_path + '.meta', clear_devices=True)
     saver.restore(sess, args.model_path)
     x, predicted_context_embs, lens = utils.load_tensors(sess)
+    #x = sess.graph.get_tensor_by_name('Model_1/x:0')
+    #predicted_context_embs = sess.graph.get_tensor_by_name('Model_1/predicted_context_embs:0')
+    #lens = sess.graph.get_tensor_by_name('Model_1/lens:0')
+
 
     with open(args.input_path) as infile:
         for n_lines in iter(lambda: tuple(islice(infile, batch_size)), ()):
@@ -89,7 +92,8 @@ with tf.Session() as sess:  # your session object
                     if args.setting == 'hdn':
                         base_synset, synset_id = synset_id.split('_')
 
-                    sentence_as_ids = [vocab.get(w) or unkn_id for w in tokens] + [eos_id]
+                    sentence_as_ids = [vocab.get(w) or vocab['<unkn>'] for w in tokens]
+                    target_id = vocab['<target>']
                     sentence_as_ids[index] = target_id
 
                     meaning_freqs[synset_id] += 1
@@ -111,10 +115,14 @@ with tf.Session() as sess:  # your session object
             for synset_id, target_embedding in zip(identifiers, target_embeddings):
                 synset2context_embds[synset_id].append(target_embedding)
 
+
+
 synset2avg_embedding = dict()
 for synset, embeddings in synset2context_embds.items():
     average = sum(embeddings) / len(embeddings)
     std = np.std(embeddings)
+    if len(embeddings) == 1:
+        assert all(average == embeddings[0])
     synset2avg_embedding[synset] = average, std
 
 with open(args.output_path, 'wb') as outfile:

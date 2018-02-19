@@ -417,7 +417,7 @@ def synsets_graph_info(wn_instance, wn_version, lemma, pos):
     return sy_id2under_lcs_info
 
 
-def get_synset2sensekeys(wn, target_lemma, pos):
+def get_synset2sensekeys(wn, wn_version, target_lemma, pos, debug=False):
     """
 
     :param str target_lemma: e.g. cat
@@ -429,9 +429,13 @@ def get_synset2sensekeys(wn, target_lemma, pos):
     """
     synset2sensekeys = dict()
     for synset in wn.synsets(target_lemma, pos):
-        sy_id = synset2identifier(synset, '30')
+        sy_id = synset2identifier(synset, wn_version)
         for lemma in synset.lemmas():
-            if lemma.key().startswith(target_lemma + '%'):
+            if lemma.key().startswith(target_lemma.lower() + '%'):
                 synset2sensekeys[sy_id] = lemma.key()
+
+        if debug:
+            if sy_id not in synset2sensekeys:
+                print('no sensekey found for %s %s wn %s sy_id %s' % (target_lemma, pos, wn_version, sy_id))
 
     return synset2sensekeys

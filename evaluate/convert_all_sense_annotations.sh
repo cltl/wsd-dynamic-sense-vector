@@ -1,6 +1,8 @@
 
 rm -rf higher_level_annotations && mkdir higher_level_annotations
 
+sleep 10
+
 sbatch convert_sense_annotations.job semcor synset
 sbatch convert_sense_annotations.job mun synset
 sbatch convert_sense_annotations.job semcor_mun synset
