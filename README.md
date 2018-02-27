@@ -118,7 +118,7 @@ These experiments measure how much the performance is affected by the randomness
 in training. Basically, we train smaller models many times, each time with 
 a different (but fixed) random seed.
 
-1. Pre-process GigaWord into plain text: `git checkout 694cb4d && sbatch cartesius/process-gigaword.job`
+1. Pre-process GigaWord into plain text: `git checkout 694cb4d && sbatch process-gigaword.job`
 2. More preprocessing to make binary files: `git checkout a453bc1 && sbatch cartesius/prepare-lstm-wsd.job`
 0. `git checkout ce8a024`
 1. Run at the same time: `sbatch cartesius/exp-variation1.job` and `cartesius/sbatch exp-variation2.job`
@@ -131,7 +131,7 @@ a different (but fixed) random seed.
 
 #### Reproduce (training speed) optimization experiment
 
-1. Pre-process GigaWord into plain text (if you haven't done so): `git checkout 694cb4d && sbatch cartesius/process-gigaword.job`
+1. Pre-process GigaWord into plain text (if you haven't done so): `git checkout 694cb4d && sbatch process-gigaword.job`
 0. `git checkout a74bda6`
 2. More preprocessing to make binary files: `sbatch cartesius/prepare-lstm-wsd.job`
 3. `git checkout e93fdb2`
@@ -139,8 +139,8 @@ a different (but fixed) random seed.
 
 #### Data size experiment
 
-1. Pre-process GigaWord into plain text (if you haven't done so): `git checkout 694cb4d && sbatch cartesius/process-gigaword.job`
-0. `git checkout a74bda6`
+1. Pre-process GigaWord into plain text (if you haven't done so): `git checkout 694cb4d && sbatch process-gigaword.job`
+0. `git checkout 36b6246`
 2. More preprocessing to make binary files: `sbatch cartesius/prepare-lstm-wsd.job`
 3. `git checkout 4e4a04a`
 4. Run `sbatch cartesius/exp-data-size.job {i}` with i="01",10,25,50,75
