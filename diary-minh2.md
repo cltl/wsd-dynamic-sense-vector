@@ -325,5 +325,31 @@ a healthy amount of 293G over the 400G quota.
 
 ## Fri 16 Feb
 
-Meet Jacopo again. Need to retrain models to rerun the analysis with Marten's 
-debugged code.
+Meet Jacopo and Marten again. Need to retrain models to rerun the analysis with Marten's 
+debugged code. My models on Cartesius were wiped out long ago so I need to retrain
+some of them.
+
+## Sun 18 Feb
+
+Started preprocessing again. The README wasn't entirely accurate so it took me
+a while to figure it out again.
+
+## Mon 19 Feb
+
+Preprocessing finished.
+
+Downloaded the models I put on Kyoto:
+
+    model-h100p10
+    model-h2048p512
+    model-h256p64
+    model-h512p128
+
+Now I need to re-run the evaluation script...
+
+TODO: 
+
+1. Undo the latest commits to remove <eos> treatments. We're not going to 
+include it in the paper any more so it just adds confusion. 
+2. Move <eos> stuff to a separate branch and leave some notes in README file. 
+3. Rerun Marten's scripts 
