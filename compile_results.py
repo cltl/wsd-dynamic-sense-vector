@@ -13,6 +13,7 @@ from sklearn.linear_model.base import LinearRegression
 import configs
 from configs import SmallConfig, H256P64, LargeConfig, GoogleConfig,\
     DefaultConfig
+from glob import glob
 
 ModelPerformance = namedtuple('ModelPerformance', ['name', 'semcor', 'mun'])
 
@@ -102,8 +103,8 @@ def draw_data_size_vs_performance_chart():
     df = pd.read_csv('output/data_size_vs_performance.csv')
     df['data_size'] = df['data_size']*(10**9)
     with PdfPages('output/data_size_vs_performance.pdf') as pdf:
-        semcor_handle, = plt.plot(df['data_size'], df['semcor'], label='SemEval13 (T: SemCor)')
-        mun_handle, = plt.plot(df['data_size'], df['mun'], label='SemEval13 (T: OMSTI)')
+        semcor_handle, = plt.plot(df['data_size'], df['semcor'], '-', label='SemEval13 (T: SemCor)')
+        mun_handle, = plt.plot(df['data_size'], df['mun'], '--', label='SemEval13 (T: OMSTI)')
         plt.legend(handles=[semcor_handle, mun_handle])
         plt.axis([1.8e7, 1e11, 0, 1])
         plt.ylabel('F1')
@@ -136,8 +137,8 @@ def draw_capacity_vs_performance_chart():
     df['num_params'] = compute_num_params(vocab_size, df['p'], df['h'])
     print(df)
     with PdfPages('output/capacity_vs_performance.pdf') as pdf:
-        semcor_handle, = plt.plot(df['num_params'], df['semcor'], label='SemEval13 (T: SemCor)')
-        mun_handle, = plt.plot(df['num_params'], df['mun'], label='SemEval13 (T: OMSTI)')
+        semcor_handle, = plt.plot(df['num_params'], df['semcor'], '-', label='SemEval13 (T: SemCor)')
+        mun_handle, = plt.plot(df['num_params'], df['mun'], '--', label='SemEval13 (T: OMSTI)')
         plt.legend(handles=[semcor_handle, mun_handle])
         plt.axis([1.9e7, 1.1e9, 0, 1])
         plt.ylabel('F1')
@@ -163,9 +164,22 @@ def report_model_params():
     df = pd.DataFrame(table, columns=['Vocab.', 'p', 'h', '#params'])
     print(df.to_latex(index=False))
 
+def report_performance():
+    paths = glob('output/model-h2048p512-mfs*/*/results.json')
+    jsons = []
+    for path in paths:
+        with open(path) as f:
+            jsons.extend(f.readlines())
+    json = '[%s]' %','.join(jsons)
+    df = pd.read_json(json, orient='records')
+    for competition in ['Senseval2', 'SemEval13']:
+        print('*** %s ***' %competition)
+        print(df.loc[df['competition'] == competition][['model', '+MFS', 'P', 'R', 'F1']].sort_values(['model', '+MFS']))
+
 if __name__ == '__main__':
 #     report_wsd_performance_vs_data_size()
 #     variation_experiment()
 #     draw_data_size_vs_performance_chart()
 #     draw_capacity_vs_performance_chart()
-    report_model_params()
+#     report_model_params()
+    report_performance()

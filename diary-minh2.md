@@ -386,6 +386,35 @@ script again
 Looks like the scripts didn't fail in Wednesday night. It just didn't say that
 it finished so I thought it was terminated. 
 
+`evaluate.job` doesn't work. Dug up Marten's instructions (it was 11 days ago!
+LREC and work made it impossible for me to work on this).
+
+    [minhle@fs0 evaluate]$ ./evaluate_in_parallel.sh ../output/model-h512p128/lstm-wsd-gigaword-large ../preprocessed-data/2018-01-19-36b6246/gigaword-for-lstm-wsd.index.pkl ../output/model-h512p128.results
+    Submitted batch job 1784361
+    Submitted batch job 1784362
+    Submitted batch job 1784363
+    Submitted batch job 1784364
+    Submitted batch job 1784365
+    Submitted batch job 1784366
+
+Looks like Marten's script is working.
+
+    ./evaluate_in_parallel.sh ../output/model-h2048p512/lstm-wsd-gigaword-google ../output/model-h2048p512/gigaword-lstm-wsd.index.pkl ../output/model-h2048p512-mfs-false.results False &
+    ./evaluate_in_parallel.sh ../output/model-h2048p512/lstm-wsd-gigaword-google ../output/model-h2048p512/gigaword-lstm-wsd.index.pkl ../output/model-h2048p512-mfs-true.results True &
+
+This is the results:
+
+    [minhle@fs0 wsd-dynamic-sense-vector]$ python3 compile_results.py
+                             model +MFS      P      R     F1
+    11         Our LSTM (T: OMSTI)   No  0.682  0.447  0.540
+    5          Our LSTM (T: OMSTI)  Yes  0.665  0.665  0.665
+    10        Our LSTM (T: SemCor)   No  0.706  0.656  0.680
+    3         Our LSTM (T: SemCor)  Yes  0.694  0.694  0.694
+    9   Our LSTM (T: SemCor+OMSTI)   No  0.683  0.635  0.658
+    4   Our LSTM (T: SemCor+OMSTI)  Yes  0.673  0.673  0.673
+
+Everything is lower than before...
+
 TODO: 
 
 1. Undo the latest commits to remove <eos> treatments. We're not going to 

@@ -72,7 +72,7 @@ def lookup_and_iter_sents(filename, word2id, include_ids=None, exclude_ids=None)
 
 def pad_batches(inp_path, word2id, include_ids, exclude_ids, max_sents=-1):
     sys.stderr.write('Dividing and padding...\n')
-    eos_id, pad_id = None, word2id['<pad>']
+    eos_id, pad_id = word2id.get('<eos>'), word2id['<pad>']
     batches = {}
     sent_lens = []
     curr_max_len = 0

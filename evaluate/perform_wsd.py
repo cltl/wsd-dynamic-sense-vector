@@ -359,7 +359,7 @@ print(num_correct)
 wsd_df.to_pickle(args.output_path)
 
 with open(args.results, 'w') as outfile:
-    outfile.write('%s' % num_correct)
+    outfile.write('%s\n' % num_correct)
 
 # json output path
 output_path_json = args.results.replace('.txt', '.json')
@@ -368,6 +368,7 @@ results = score_utils.experiment_results(wsd_df, args.mfs_fallback, args.wsd_df_
 
 with open(output_path_json, 'w') as outfile:
     json.dump(results, outfile)
+    outfile.write('\n')
 
 
 
