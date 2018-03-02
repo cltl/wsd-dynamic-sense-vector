@@ -105,7 +105,7 @@ class LabelPropagation(object):
     def _run_lstm(self, converted_data):
         print('Running LSTM...')
         # create one big matrix of LSTM input
-        target_id, pad_id, eos_id = self.vocab['<target>'], self.vocab['<pad>'], self.vocab['<eos>']
+        target_id, pad_id, eos_id = self.vocab['<target>'], self.vocab['<pad>'], self.vocab.get('<eos>')
         lstm_input = []
         for lemma in converted_data:
             for _, sentence_tokens, target_index in converted_data[lemma]:

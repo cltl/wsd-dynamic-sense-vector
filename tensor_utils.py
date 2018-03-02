@@ -8,9 +8,11 @@ def load_tensors(sess):
     return x, predicted_context_embs, lens
             
 def pad(sents, max_len, pad_id, eos_id):
-    arr = np.empty((len(sents), max_len+1), dtype=np.int32)
+    if eos_id is not None: max_len += 1
+    arr = np.empty((len(sents), max_len), dtype=np.int32)
     arr.fill(pad_id)
     for i, s in enumerate(sents):
         arr[i, :len(s)] = s
-        arr[i, len(s)] = eos_id
+        if eos_id is not None:
+            arr[i, len(s)] = eos_id
     return arr

@@ -46,10 +46,11 @@ class DummyModelTrain(object):
 class WSDModel(object):
     """A LSTM WSD model designed for fast training."""
 
-    def __init__(self, config, optimized=False, reuse_variables=False):
+    def __init__(self, config, optimized=False, reuse_variables=False, use_eos=False):
         self.config = config
         self.optimized = optimized
         self.reuse_variables = reuse_variables
+        self.use_eos = use_eos
         self._build_inputs()
         self._build_word_embeddings()
         self._build_lstm_output()
@@ -135,8 +136,9 @@ class WSDModel(object):
         for batch_no, batch_id in enumerate(samples):
             x, y_all, subvocab, lens = data[batch_id]
             batch_size = x.shape[0]
-            # lens is subtracted by 1 to avoid selecting <eos> as target
-            i = np.mod(np.random.randint(1000000, size=batch_size), lens-1)
+            # lens is subtracted by 1, if needed, to avoid selecting <eos> as target
+            i = np.mod(np.random.randint(1000000, size=batch_size), 
+                       lens-(1 if self.use_eos else 0))
             one_to_n = np.arange(batch_size)
             y = y_all[one_to_n,i]
             old_xi = x[one_to_n,i].copy() # old_xi might be different from y because of subvocab
@@ -184,8 +186,9 @@ class WSDModel(object):
         total_hit = 0.0
         for batch_x, _, _, batch_lens in data:
             batch_size = len(batch_lens)
-            # lens is subtracted by 1 to avoid selecting <eos> as target
-            target_indices = np.mod(rng.randint(1000000, size=batch_size), batch_lens-1)
+            # lens is subtracted by 1, if needed, to avoid selecting <eos> as target
+            target_indices = np.mod(rng.randint(1000000, size=batch_size), 
+                                    batch_lens-(1 if self.use_eos else 0))
             one_to_n = np.arange(batch_size)
             batch_y = batch_x[one_to_n, target_indices]
             batch_x[one_to_n, target_indices] = target_id

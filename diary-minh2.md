@@ -347,6 +347,45 @@ Downloaded the models I put on Kyoto:
 
 Now I need to re-run the evaluation script...
 
+## Wed 28 Feb
+
+Sent a tar file to Jacopo for model training. 
+
+I need to run this command:
+
+    ./evaluate.job ../output/model-h512p128/lstm-wsd-gigaword-large ../preprocessed-data/2018-01-19-36b6246/gigaword-for-lstm-wsd.index.pkl ../output/model-h512p128.results
+
+But before doing so I need to install Marten's evaluation framework first. One
+script stubbornly refuses to finish. Nohup'd it so I can go to bed >"<  
+
+    nohup ./convert_sense_annotations_171.job mun synset &
+
+## Thu 1 Mar
+
+For some reasons, the script still stopped in the middle. I rerun Marten's 
+script again
+
+    [minhle@fs0 evaluate]$ bash convert_all_sense_annotations.sh
+    Submitted batch job 1784349
+    Submitted batch job 1784350
+    Submitted batch job 1784351
+    Submitted batch job 1784352
+    Submitted batch job 1784353
+    Submitted batch job 1784354
+    [minhle@fs0 evaluate]$ squeue
+    ...
+           1784349      defq convert_   minhle  R       0:05      1 node062
+           1784350      defq convert_   minhle  R       0:05      1 node065
+           1784351      defq convert_   minhle  R       0:05      1 node066
+           1784352      defq convert_   minhle  R       0:05      1 node067
+           1784353      defq convert_   minhle  R       0:05      1 node068
+           1784354      defq convert_   minhle  R       0:05      1 node030
+
+## Fri 2 Mar
+
+Looks like the scripts didn't fail in Wednesday night. It just didn't say that
+it finished so I thought it was terminated. 
+
 TODO: 
 
 1. Undo the latest commits to remove <eos> treatments. We're not going to 

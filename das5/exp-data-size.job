@@ -10,7 +10,7 @@ module load cuDNN
 
 echo -n 'Started: ' && date
 
-preprocess_version="2018-01-19-36b6246"
+preprocess_version="2017-11-24-a74bda6"
 
 percent=$1
 base_dir=output/`python3 version.py`

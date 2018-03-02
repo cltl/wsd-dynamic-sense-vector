@@ -72,7 +72,7 @@ def lookup_and_iter_sents(filename, word2id, include_ids=None, exclude_ids=None)
 
 def pad_batches(inp_path, word2id, include_ids, exclude_ids, max_sents=-1):
     sys.stderr.write('Dividing and padding...\n')
-    eos_id, pad_id = word2id['<eos>'], word2id['<pad>']
+    eos_id, pad_id = None, word2id['<pad>']
     batches = {}
     sent_lens = []
     curr_max_len = 0
@@ -110,6 +110,7 @@ def pad_batches(inp_path, word2id, include_ids, exclude_ids, max_sents=-1):
 
 
 def shuffle_and_pad_batches(inp_path, word2id, dev_sent_ids):
+    eos_id, pad_id = word2id.get('<eos>'), word2id['<pad>']
     sys.stderr.write('Reading lengths...\n')
     lens = []
     with codecs.open(inp_path, 'r', 'utf-8') as f:
@@ -136,8 +137,11 @@ def shuffle_and_pad_batches(inp_path, word2id, dev_sent_ids):
         if sent_id not in dev_sent_ids:
             new_size = (len(curr_batch_lens)+1) * max(curr_max_len,l)
             if new_size >= batch_size:
+                max_len = max(curr_batch_lens)
+                if eos_id is not None:
+                    max_len += 1
                 batches['batch%d' %batch_id] = \
-                        np.empty((len(curr_batch_lens), max(curr_batch_lens)+1), dtype=np.int32)
+                        np.empty((len(curr_batch_lens), max_len), dtype=np.int32)
                 batches['lens%d' %batch_id] = np.array(curr_batch_lens, dtype=np.int32)
                 batch_id += 1
                 curr_max_len = 0
@@ -147,13 +151,12 @@ def shuffle_and_pad_batches(inp_path, word2id, dev_sent_ids):
             sent2batch[sent_id] = 'batch%d' %batch_id
     if curr_batch_lens:
         batches['batch%d' %batch_id] = \
-                np.empty((len(curr_batch_lens), max(curr_batch_lens)+1), dtype=np.int32)
+                np.empty((len(curr_batch_lens), max(curr_batch_lens)), dtype=np.int32)
         batches['lens%d' %batch_id] = np.array(curr_batch_lens, dtype=np.int32)
         batch_id += 1 # important to count num batches correctly
     sys.stderr.write('Calculating batch shapes... Done.\n')
     
     sys.stderr.write('Dividing and padding...\n')
-    eos_id, pad_id = word2id['<eos>'], word2id['<pad>']
     for i in range(batch_id): batches['batch%d'%i].fill(pad_id)
     nonpad_count = 0
     sent_counter = Counter()
@@ -162,7 +165,8 @@ def shuffle_and_pad_batches(inp_path, word2id, dev_sent_ids):
         batch_name = sent2batch.get(sent_id)
         if batch_name is not None: # could be in dev set
             batches[batch_name][sent_counter[batch_name], :len(sent)] = sent
-            batches[batch_name][sent_counter[batch_name], len(sent)] = eos_id
+            if eos_id is not None:
+                batches[batch_name][sent_counter[batch_name], len(sent)] = eos_id
             nonpad_count += len(sent)
             sent_counter[batch_name] += 1
     # check that we filled all arrays

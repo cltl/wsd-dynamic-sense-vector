@@ -87,13 +87,9 @@ Requirements: You'll need at least 64 GB of RAM to run the preparation script.
 
 #### Convert annotated corpora into input format LSTM
 
-0. `cd script`
-1. `bash convert_for_paper.sh` 
-The bash file calls the python script `sense_annotations2lstm_format.py`, which converts the sense annotations into the format needed to train the embeddings at the preferred granularity level (sensekey or synset).
-
-#### Prepare Gigaword for LSTM training with <eos>
-
-1. `git checkout 36b6246 && das5/prepare-lstm-wsd.job`
+0. cd script
+1. bash convert_for_paper.sh 
+The bash file calls the python script sense_annotations2lstm_format.py, which converts the sense annotations into the format needed to train the embeddings at the preferred granularity level (sensekey or synset).
 
 #### label propagation
 
@@ -131,7 +127,7 @@ a different (but fixed) random seed.
 
 #### Reproduce (training speed) optimization experiment
 
-1. Pre-process GigaWord into plain text (if you haven't done so): `git checkout 694cb4d && sbatch process-gigaword.job`
+1. Pre-process GigaWord into plain text (if you haven't done so): `git checkout a74bda6 && sbatch process-gigaword.job`
 0. `git checkout a74bda6`
 2. More preprocessing to make binary files: `sbatch cartesius/prepare-lstm-wsd.job`
 3. `git checkout e93fdb2`
@@ -140,7 +136,7 @@ a different (but fixed) random seed.
 #### Data size experiment
 
 1. Pre-process GigaWord into plain text (if you haven't done so): `git checkout 694cb4d && sbatch process-gigaword.job`
-0. `git checkout 36b6246`
+0. `git checkout a74bda6`
 2. More preprocessing to make binary files: `sbatch cartesius/prepare-lstm-wsd.job`
 3. `git checkout 4e4a04a`
 4. Run `sbatch cartesius/exp-data-size.job {i}` with i="01",10,25,50,75
