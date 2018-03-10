@@ -79,9 +79,12 @@ if args.wn_version == '171':
     wn = WordNetCorpusReader(path_to_wn_dict_folder, None)
 
 
+# competition
+comp = os.path.basename(args.competition_df)[:-2]
+
 # output path
 base_output_path = os.path.join(args.output_folder,
-                                args.abstraction_level + '-' + args.wn_version + '_' + '_'.join(corpora_to_include))
+                                comp + '-' + args.abstraction_level + '-' + args.wn_version + '_' + '_'.join(corpora_to_include))
 output_path = base_output_path + '.txt'
 log_path = base_output_path + '.log'
 stats_path = base_output_path + '.stats'

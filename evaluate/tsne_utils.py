@@ -7,7 +7,7 @@ import shutil
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.manifold import TSNE
-
+from sklearn.decomposition import PCA
 
 
 def load_id_2meta_info(df):
@@ -56,11 +56,17 @@ def create_tsne_visualizations(output_folder,
     :return: frame used as input for seaborn.lmplot plot
     """
     # reset folder
-    viz_output_folder = os.path.join(output_folder, 'tsne')
-    if os.path.exists(viz_output_folder):
-        shutil.rmtree(viz_output_folder)
+    tsne_output_folder = os.path.join(output_folder, 'tsne')
+    if os.path.exists(tsne_output_folder):
+        shutil.rmtree(tsne_output_folder)
 
-    os.mkdir(viz_output_folder)
+    os.mkdir(tsne_output_folder)
+
+    pca_output_folder = os.path.join(output_folder, 'pca')
+    if os.path.exists(pca_output_folder):
+        shutil.rmtree(pca_output_folder)
+
+    os.mkdir(pca_output_folder)
 
     path_wsd_df = os.path.join(output_folder, 'wsd_output.bin')
 
@@ -86,7 +92,6 @@ def create_tsne_visualizations(output_folder,
 
         candidates = output_info['candidates']
 
-        print('num candidates', len(candidates))
         if len(candidates) not in polysemy:
             continue
 
@@ -99,7 +104,6 @@ def create_tsne_visualizations(output_folder,
         hue.append('predicted_embedding')
 
         # add sense embeddings and instance embeddings
-        num_cand_with_embedding = 0
         for candidate in candidates:
 
             if meanings:
@@ -124,6 +128,7 @@ def create_tsne_visualizations(output_folder,
                     list_of_embeddings.append(embedding)
                     hue.append(label)
 
+            num_cand_with_embedding = 0
 
             if instances:
                 if candidate in sense_instance_embeddings:
@@ -135,43 +140,54 @@ def create_tsne_visualizations(output_folder,
                         list_of_embeddings.append(sense_instance)
                         hue.append(label)
 
-        print('num cand with embedding', num_cand_with_embedding)
         if num_cand_with_embedding not in num_embeddings:
             continue
 
-        # run tsne
-        X_tsne = TSNE(learning_rate=100).fit_transform(list_of_embeddings)
+        # run reduction techniques
 
-        # create df
-        list_of_lists = []
-        headers = ['x', 'y', 'label']
+        for method in ['tsne', 'pca']:
 
-        for index, (x, y) in enumerate(X_tsne):
-            one_row = [x, y, hue[index]]
-            list_of_lists.append(one_row)
+            if method == 'tsne':
+                output = TSNE(learning_rate=100).fit_transform(list_of_embeddings)
+            elif method == 'pca':
+                output = PCA(n_components=2).fit_transform(list_of_embeddings)
 
-        viz_df = pandas.DataFrame(list_of_lists, columns=headers)
+            # create df
+            list_of_lists = []
+            headers = ['x', 'y', 'label']
+
+            for index, (x, y) in enumerate(output):
+                one_row = [x, y, hue[index]]
+                list_of_lists.append(one_row)
+
+            viz_df = pandas.DataFrame(list_of_lists, columns=headers)
 
 
-        plot = sns.lmplot(x='x',
-                          y='y',
-                          data=viz_df,
-                          fit_reg=False,  # No regression line
-                          legend=False,
-                          hue='label')  # Color by evolution stage
+            plot = sns.lmplot(x='x',
+                              y='y',
+                              data=viz_df,
+                              fit_reg=False,  # No regression line
+                              legend=False,
+                              hue='label')  # Color by evolution stage
 
-        sns.set_context(rc={"figure.figsize": (50, 25)})
-        ax = plt.gca()
-        ax.set_title("System correct: %s Id: %s" % (system_correct, identifier))
-        ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.05), shadow=True, ncol=2)
+            sns.set_context(rc={"figure.figsize": (50, 25)})
+            ax = plt.gca()
+            ax.set_title("System correct: %s Id: %s" % (system_correct, identifier))
+            ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.05), shadow=True, ncol=2)
 
-        viz_output_path = os.path.join(viz_output_folder, identifier + '.svg')
-        plot.savefig(viz_output_path)
-        plt.close()
+
+            if method == 'pca':
+                viz_output_folder = pca_output_folder
+            elif method == 'tsne':
+                viz_output_folder = tsne_output_folder
+
+            viz_output_path = os.path.join(viz_output_folder, identifier + '.svg')
+            plot.savefig(viz_output_path)
+            plt.close()
 
 
 if __name__ == '__main__':
-    output_folder = 'visualization_input/debug/se2_semcor'
+    output_folder = 'debug/synset-se13-semcor'
 
     viz_df = create_tsne_visualizations(output_folder,
                                         correct={False},

@@ -51,9 +51,9 @@ def experiment_results(df, mfs_fallback, wsd_df_path):
     # competition
     basename = os.path.basename(wsd_df_path)
 
-    if '-171_' in basename:
+    if 'se2' in basename:
         competition = 'Senseval2'
-    elif '-30_' in basename:
+    elif 'se13' in basename:
         competition = 'SemEval13'
     
     # corpora

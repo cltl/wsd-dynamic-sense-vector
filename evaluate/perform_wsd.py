@@ -12,6 +12,7 @@ import morpho_utils
 import tensor_utils as utils
 import score_utils
 import tsne_utils
+import official_scorer
 
 parser = argparse.ArgumentParser(description='Perform WSD using LSTM model')
 parser.add_argument('-m', dest='model_path', required=True, help='path to model trained LSTM model')
@@ -359,7 +360,7 @@ print(num_correct)
 wsd_df.to_pickle(args.output_path)
 
 with open(args.results, 'w') as outfile:
-    outfile.write('%s\n' % num_correct)
+    outfile.write('%s' % num_correct)
 
 # json output path
 output_path_json = args.results.replace('.txt', '.json')
@@ -368,9 +369,12 @@ results = score_utils.experiment_results(wsd_df, args.mfs_fallback, args.wsd_df_
 
 with open(output_path_json, 'w') as outfile:
     json.dump(results, outfile)
-    outfile.write('\n')
 
-
+# official scorer if possible
+exp_folder = args.results.replace('/results.txt', '')
+official_scorer.create_key_file(wn, exp_folder, debug=1)
+official_scorer.score_using_official_scorer(exp_folder, 
+                                            scorer_folder='resources/WSD_Unified_Evaluation_Datasets')
 
 # write tsne visualizations
 visualize = False
