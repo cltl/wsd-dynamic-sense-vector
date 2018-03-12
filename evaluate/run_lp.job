@@ -1,0 +1,37 @@
+#!/bin/bash
+#BATCH --time=12:00:00
+#SBATCH -C TitanX
+#SBATCH --gres=gpu:1
+
+if [ $# -eq 0 ];
+then
+    echo
+    echo "Usage:                    : $0 system_path model_path vocab_path algo sim"
+    echo
+    echo
+    echo "system_path               : path to system input"
+    echo "model_path                : path to model"
+    echo "vocab_path                : path to .pkl file"
+    echo "algo                      : algorithm"
+    echo "sim                       : similarity function"
+    exit -1;
+fi
+
+module load python/3.5.2
+module load cuda80/toolkit
+module load cuda80/blas
+module load cuda80
+module load cuDNN/cuda80/6.0.21
+
+model_path=$1
+vocab_path=$2
+#assign command line arguments to variables and obtain basename
+export cwd=/${PWD#*/}
+export system_input=$1
+export model_path=$2
+export vocab_path=$3
+export algo=$4
+export sim=$5
+
+
+python3 debug_lp.py --system_input=$system_input --model=$model_path --vocab=$vocab_path --algo=$algo --sim=$sim --gamma=0.0
