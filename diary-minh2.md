@@ -405,15 +405,37 @@ Looks like Marten's script is working.
 This is the results:
 
     [minhle@fs0 wsd-dynamic-sense-vector]$ python3 compile_results.py
+    *** Senseval2 ***
                              model +MFS      P      R     F1
-    11         Our LSTM (T: OMSTI)   No  0.682  0.447  0.540
-    5          Our LSTM (T: OMSTI)  Yes  0.665  0.665  0.665
-    10        Our LSTM (T: SemCor)   No  0.706  0.656  0.680
-    3         Our LSTM (T: SemCor)  Yes  0.694  0.694  0.694
-    9   Our LSTM (T: SemCor+OMSTI)   No  0.683  0.635  0.658
-    4   Our LSTM (T: SemCor+OMSTI)  Yes  0.673  0.673  0.673
+    4          Our LSTM (T: OMSTI)   No  0.682  0.447  0.540
+    9          Our LSTM (T: OMSTI)  Yes  0.665  0.665  0.665
+    2         Our LSTM (T: SemCor)   No  0.706  0.656  0.680
+    11        Our LSTM (T: SemCor)  Yes  0.694  0.694  0.694
+    5   Our LSTM (T: SemCor+OMSTI)   No  0.683  0.635  0.658
+    10  Our LSTM (T: SemCor+OMSTI)  Yes  0.673  0.673  0.673
+    *** SemEval13 ***
+                            model +MFS      P      R     F1
+    3         Our LSTM (T: OMSTI)   No  0.676  0.501  0.575
+    6         Our LSTM (T: OMSTI)  Yes  0.651  0.651  0.651
+    0        Our LSTM (T: SemCor)   No  0.654  0.638  0.646
+    7        Our LSTM (T: SemCor)  Yes  0.648  0.648  0.648
+    1  Our LSTM (T: SemCor+OMSTI)   No  0.660  0.644  0.651
+    8  Our LSTM (T: SemCor+OMSTI)  Yes  0.653  0.653  0.653
 
-Everything is lower than before...
+Everything is lower than before... Emailed Marten. I have spent the whole morning
+on this project. I should be working on the coreference paper now.
+
+
+## Fri 9 Mar
+
+Get more numbers...
+
+    ./evaluate_in_parallel.sh ../output/model-h100p10/lstm-wsd-gigaword-google ../output/model-h100p10/gigaword-lstm-wsd.index.pkl ../output/model-h100p10-mfs-true.results True &
+    ./evaluate_in_parallel.sh ../output/model-h256p64/lstm-wsd-gigaword-google ../output/model-h256p64/gigaword-lstm-wsd.index.pkl ../output/model-h256p64-mfs-true.results True &
+    ./evaluate_in_parallel.sh ../output/model-h512p128/lstm-wsd-gigaword-google ../output/model-h512p128/gigaword-lstm-wsd.index.pkl ../output/model-h512p128-mfs-true.results True &
+
+Marten changed the evaluation script. Everything needs to be redone.
+
 
 TODO: 
 

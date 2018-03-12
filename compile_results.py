@@ -17,6 +17,7 @@ from glob import glob
 
 ModelPerformance = namedtuple('ModelPerformance', ['name', 'semcor', 'mun'])
 
+
 def read_performance(base_dir, name=None):
     num_examples = 1644
     mun_path = os.path.join(base_dir, 'mun/results.txt')
@@ -33,6 +34,7 @@ def read_performance(base_dir, name=None):
         if not os.path.exists(semcor_path):
             sys.stderr.write('Missing file: %s\n' %semcor_path)
         return None
+
 
 def variation_experiment():
     print('=' * 50)
@@ -57,6 +59,7 @@ def variation_experiment():
             result_dirs.append(os.path.join(output_dir, child))
     print_variation_results(result_dirs)
     
+    
 def print_variation_results(result_dirs):
     perf_list = []
     for result_dir in result_dirs:
@@ -68,6 +71,7 @@ def print_variation_results(result_dirs):
     print(df)
     print('Mean:', df['semcor'].mean(), df['mun'].mean())
     print('Std:', df['semcor'].std(), df['mun'].std())
+
 
 def report_wsd_performance_vs_data_size():
     print('=' * 50)
@@ -97,6 +101,7 @@ def report_wsd_performance_vs_data_size():
     csv_writer = csv.writer(sys.stdout)
     csv_writer.writerow(['Data size', 'Train NLL', 'Valid NLL'])
     csv_writer.writerows(rows)
+    
 
 def draw_data_size_vs_performance_chart():
     ''' Create figure for paper '''
@@ -121,6 +126,7 @@ def draw_data_size_vs_performance_chart():
     print('Extrapolated data size:')
     print(lr.predict([[0.75], [0.8]]))
 
+
 def compute_num_params(vocab_size, p, h):
     return (vocab_size*p*2 + # input and output embeddings
             p*h + h*h + h + # input gates
@@ -129,6 +135,7 @@ def compute_num_params(vocab_size, p, h):
             p*h + h*h + h*h + h + # output gates
             p*h # context layer
             )    
+    
 
 def draw_capacity_vs_performance_chart():
     ''' Create figure for paper '''
@@ -155,6 +162,7 @@ def draw_capacity_vs_performance_chart():
 #     print('Extrapolated data size:')
 #     print(lr.predict([[0.75], [0.8]]))
 
+
 def report_model_params():
     v = DefaultConfig.vocab_size
     models = [SmallConfig, H256P64, LargeConfig, GoogleConfig]
@@ -164,7 +172,8 @@ def report_model_params():
     df = pd.DataFrame(table, columns=['Vocab.', 'p', 'h', '#params'])
     print(df.to_latex(index=False))
 
-def report_performance():
+
+def report_performance_google_model():
     paths = glob('output/model-h2048p512-mfs*/*/results.json')
     jsons = []
     for path in paths:
@@ -176,10 +185,11 @@ def report_performance():
         print('*** %s ***' %competition)
         print(df.loc[df['competition'] == competition][['model', '+MFS', 'P', 'R', 'F1']].sort_values(['model', '+MFS']))
 
+
 if __name__ == '__main__':
 #     report_wsd_performance_vs_data_size()
 #     variation_experiment()
 #     draw_data_size_vs_performance_chart()
-#     draw_capacity_vs_performance_chart()
+    draw_capacity_vs_performance_chart()
 #     report_model_params()
-    report_performance()
+    report_performance_google_model()
