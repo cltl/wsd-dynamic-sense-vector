@@ -436,10 +436,37 @@ Get more numbers...
 
 Marten changed the evaluation script. Everything needs to be redone.
 
+## Sun 11 Mar
 
-TODO: 
+Marten's script was running quite slowly... I will check the results tomorrow.
 
-1. Undo the latest commits to remove <eos> treatments. We're not going to 
-include it in the paper any more so it just adds confusion. 
-2. Move <eos> stuff to a separate branch and leave some notes in README file. 
-3. Rerun Marten's scripts 
+    [minhle@node029 wsd-dynamic-sense-vector]$ cat evaluate-coling.sh
+    cd evaluate
+    ./evaluate_in_parallel.sh ../output/model-h2048p512/lstm-wsd-gigaword-google ../output/model-h2048p512/gigaword-lstm-wsd.index.pkl ../output/model-h2048p512-mfs-false.results False
+    ./evaluate_in_parallel.sh ../output/model-h2048p512/lstm-wsd-gigaword-google ../output/model-h2048p512/gigaword-lstm-wsd.index.pkl ../output/model-h2048p512-mfs-true.results True
+    ./evaluate_in_parallel.sh ../output/model-h100p10/lstm-wsd-gigaword-small_seed-124-best-model ../output/model-h100p10/gigaword-for-lstm-wsd.index.pkl ../output/model-h100p10-mfs-true.results True
+    ./evaluate_in_parallel.sh ../output/model-h256p64/lstm-wsd-gigaword-h256p64-seed_12-best-model ../output/model-h256p64/gigaword-for-lstm-wsd.index.pkl ../output/model-h256p64-mfs-true.results True
+    ./evaluate_in_parallel.sh ../output/model-h512p128/lstm-wsd-gigaword-large ../output/model-h512p128/gigaword-lstm-wsd.index.pkl ../output/model-h512p128-mfs-true.results True
+    
+## Mon 12 Mar
+
+Woke up to a bug in the previous commands. Google models were evaluate
+successfully but others have failed. Actually I saw some hints last night but
+didn't understand.
+
+Finished the evaluation before the working hours so Piek and Jacopo could have
+a look at the paper.
+
+## Tue 13
+
+Evaluate data-size-experiment models:
+
+    cd evaluate
+    ./evaluate_in_parallel.sh ../output/data-sizes/1/lstm-wsd-gigaword_01-pc_large-best-model ../preprocessed-data/2017-11-24-a74bda6/gigaword-for-lstm-wsd.index.pkl ../output/data-sizes/1.results True
+    ./evaluate_in_parallel.sh ../output/data-sizes/10/lstm-wsd-gigaword_10-pc_large-best-model ../preprocessed-data/2017-11-24-a74bda6/gigaword-for-lstm-wsd.index.pkl ../output/data-sizes/10.results True
+    ./evaluate_in_parallel.sh ../output/data-sizes/25/lstm-wsd-gigaword_25-pc_large-best-model ../preprocessed-data/2017-11-24-a74bda6/gigaword-for-lstm-wsd.index.pkl ../output/data-sizes/25.results True
+
+Added to paper
+
+TODO: get real num. of params. Hopefully I calculated them correctly. 
+see https://stackoverflow.com/questions/38160940/how-to-count-total-number-of-trainable-parameters-in-a-tensorflow-model

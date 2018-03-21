@@ -4,10 +4,10 @@
 #SBATCH --gres=gpu:1
 
 module load python/3.5.2
-module load cuda80/toolkit
-module load cuda80/blas
-module load cuda80
-module load cuDNN/cuda80/6.0.21
+module load cuda90/toolkit
+module load cuda90/blas
+module load cuda90
+module load cuDNN/cuda90rc
 
 if [ $# -eq 0 ];
 then
