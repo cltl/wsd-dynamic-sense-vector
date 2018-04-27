@@ -2,3 +2,4 @@
 /draft.py
 __pycache__
 slurm-*.out
+/.ipynb_checkpoints/

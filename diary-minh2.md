@@ -457,7 +457,7 @@ didn't understand.
 Finished the evaluation before the working hours so Piek and Jacopo could have
 a look at the paper.
 
-## Tue 13
+## Tue 13 Mar
 
 Evaluate data-size-experiment models:
 
@@ -470,3 +470,25 @@ Added to paper
 
 TODO: get real num. of params. Hopefully I calculated them correctly. 
 see https://stackoverflow.com/questions/38160940/how-to-count-total-number-of-trainable-parameters-in-a-tensorflow-model
+
+## Fri 27 Apr 2018
+
+Attempt to build a model to predict HDNs (highest disambiguating nodes).
+
+Plan: go through Gigaword and replace monosemous lemma by an HDN (of other 
+lemmas) that dominates it in WordNet hierarchy. Train an LSTM to predict this
+HDN (against competing HDNs).
+
+I built a simple script to generate a dataset. The output is not versioned yet,
+if the script finishes successfully, I'll rerun the script to give it a proper
+version.
+
+    [minhle@fs0 wsd-dynamic-sense-vector]$ sbatch das5/preprocess-hdn.job
+    Submitted batch job 1798960
+    [minhle@fs0 wsd-dynamic-sense-vector]$ tail -f slurm-1798960.out
+    Monosemous multi-word-expressions: 42820
+    All monosemous words: 101162
+    All lemmas: 119034
+    Proportion monosemous/all: 0.8498580237579179
+     61%|██████    | 106537103/175771829 [08:40<05:38, 204585.90it/s]
+
