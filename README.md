@@ -7,7 +7,7 @@
     pip3 install --user https://github.com/explosion/spacy-models/releases/download/en_core_web_md-1.2.1/en_core_web_md-1.2.1.tar.gz
     python3 -m spacy link en_core_web_md en_default
     pip3 install --user nltk
-    printf 'import nltk; nltk.download("wordnet")' | python3
+    python3 -m nltk.downloader wordnet
     pip3 install --user tensorflow-gpu
     pip3 install --user docopt
 
