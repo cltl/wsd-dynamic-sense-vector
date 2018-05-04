@@ -492,3 +492,21 @@ version.
     Proportion monosemous/all: 0.8498580237579179
      61%|██████    | 106537103/175771829 [08:40<05:38, 204585.90it/s]
 
+## Sat 29 Apr
+
+Tried to make batches out of the transformed dataset. Failed.
+
+    /cm/local/apps/slurm/var/spool/job1799463/slurm_script: line 4: 30937 Killed                  python3 -u preprocess_hdn.py
+
+I'll try to limit the size of data tomorrow.
+
+## Fri 4 May
+
+Limited training set size to 1.5e8 sentences.
+
+    [minhle@fs0 wsd-dynamic-sense-vector]$ !sbatch
+    sbatch das5/preprocess-hdn.job
+    Submitted batch job 1802365
+    [minhle@fs0 wsd-dynamic-sense-vector]$ tail -f slurm-1802365.out
+    
+

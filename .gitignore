@@ -3,3 +3,4 @@
 __pycache__
 slurm-*.out
 /.ipynb_checkpoints/
+/venv/

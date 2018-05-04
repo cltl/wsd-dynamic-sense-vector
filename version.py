@@ -13,7 +13,7 @@ from datetime import date
 changed = (os.popen('git diff --staged').read().strip() != '' or 
            os.popen('git diff').read().strip() != '')
 if changed:
-    version = date.today().strftime('%Y-%m-%d') + '-' + 'working'
+    version = date.today().strftime('%Y-%m-%d')
 else:
     version = (os.popen('git show -s --format=%ci').read()[:10] +
            os.popen('git show -s --format=-%h').read().strip())

@@ -8,13 +8,9 @@ Also borrow some parts from this guide:
     http://www.wildml.com/2016/08/rnns-in-tensorflow-a-practical-guide-and-undocumented-features/
 
 """
-import time
-
 import numpy as np
 import tensorflow as tf
-from tensorflow.python.client import timeline
-import sys
-from model import WSDModel, train_model
+from model import WSIModel, train_model
 from configs import get_config
 import random
 
@@ -51,18 +47,10 @@ def main(_):
         initializer = tf.random_uniform_initializer(-config.init_scale,
                                                     config.init_scale)
     with tf.variable_scope("Model", reuse=None, initializer=initializer):
-        m_train = WSDModel(config, optimized=True)
+        m_train = WSIModel(config, optimized=True)
     with tf.variable_scope("Model", reuse=True):
-        m_evaluate = WSDModel(config, reuse_variables=True)
-#     m_train.print_device_placement() # for debugging
+        m_evaluate = WSIModel(config, reuse_variables=True)
     train_model(m_train, m_evaluate, FLAGS, config)
-
-    if FLAGS.trace_timeline:
-        tl = timeline.Timeline(m_train.run_metadata.step_stats)
-        ctf = tl.generate_chrome_trace_format()
-        timeline_path = 'output/timeline.json'
-        with open(timeline_path, 'w') as f: f.write(ctf)
-        print('Timeline written to %s' %timeline_path)
 
 if __name__ == "__main__":
     tf.app.run()

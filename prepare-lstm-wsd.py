@@ -27,29 +27,7 @@ from utils import progress, count_lines_fast
 from configs import output_dir, special_symbols
 from version import version
 from tensor_utils import pad
-
-dev_sents = 20000 # absolute maximum
-dev_portion = 0.01 # relative maximum
-# if you get OOM (out of memory) error, reduce this number
-batch_size = 60000 # words
-vocab_size = 10**6
-min_count = 5
-
-def _build_vocab(filename):
-    sys.stderr.write('Building vocabulary...\n')
-    counter = collections.Counter()
-    with codecs.open(filename, 'r', 'utf-8') as f:
-        for line in progress(f):
-            words = line.strip().split()
-            counter.update(words)
-    sys.stderr.write('Total unique words: %d\n' %len(counter))
-    for sym in special_symbols: assert sym not in counter
-    words = special_symbols + [w for w, c in counter.most_common(vocab_size) 
-                               if c >= min_count] 
-    sys.stderr.write('Retained %d words\n' %len(words))
-    word2id = dict((words[i], i) for i in range(len(words)))
-    sys.stderr.write('Building vocabulary... Done.\n')
-    return word2id, words
+from preprocess_hdn import *
 
 def sort_sentences(inp_path, out_path):
     start = time()
@@ -190,14 +168,7 @@ def shuffle_and_pad_batches(inp_path, word2id, dev_sent_ids):
 
 def run(inp_path, out_path):
     index_path = out_path + '.index.pkl'
-    if os.path.exists(index_path):
-        sys.stderr.write('Reading vocabulary from %s... ' %index_path)
-        with open(index_path, 'rb') as f: word2id = pickle.load(f)
-        sys.stderr.write('Done.\n')
-    else:
-        assert os.path.isfile(inp_path)
-        word2id, words = _build_vocab(inp_path)
-        with open(index_path, 'wb') as f: pickle.dump(word2id, f)
+    word2id, words = build_vocab(inp_path, index_path)
 
     sorted_sents_path = out_path + '.sorted'
     if os.path.exists(sorted_sents_path):

@@ -233,47 +233,11 @@ class WSIModel(WSDModel):
                 tf.reshape(E_contexts, (-1, self.config.emb_dims))))
             self._logits = tf.reduce_max(tf.reshape(sense_logits,
                     (-1, self.config.vocab_size, self.config.num_senses)), axis=2)
-            
-    def _load_data2(self, data_path):
-        examples = []
-        with open(data_path) as f:
-            for line in f:
-                target, candidates, sentence = line.split(maxsplit=3)
-                candidates = candidates.split('/')
-                sentence = sentence.rtrim().split()
-                examples.append((target, candidates, sentence))
-
-        min_count = 5
-        vocab_size = 10**6
-        counter = collections.Counter()
-        for _, _, sentence in examples:
-            counter.update(sentence)
-        sys.stderr.write('Total unique words: %d\n' %len(counter))
-        for sym in special_symbols: assert sym not in counter
-        input_vocab = special_symbols + [w for w, c in counter.most_common(vocab_size) 
-                                         if c >= min_count] 
-        sys.stderr.write('Retained %d words\n' %len(input_vocab))
-        input_word2id = {word: i for i, word in enumerate(input_vocab)}
-        
-        output_vocab = list(set(word for _, candidates, _ in examples
-                                for word in candidates))
-        output_word2id = {word: i for i, word in enumerate(output_vocab)}
-        examples = [(output_word2id[target], 
-                     [output_word2id[w] for w in candidates],
-                     [input_word2id[w] for w in sentence])
-                    for target, candidates, sentence in examples]
-        
-        train_examples, valid_examples = \
-                train_test_split(examples, test_size=0.1, random_state=2852852)
-        train_examples = shuffle(train_examples, random_state=5729568)
-        
         
 
     def train2(self, data_path, dev_size=0.1):
         '''
         Train the model on a data set stored in a CSV file in the format:
-        <TARGET_WORD> <SPACE> <CANDIDATES> <SPACE> <SENTENCE>
-        where the sentence is a list of words separate by a space.   
         '''
         
             

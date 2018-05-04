@@ -1,0 +1,13 @@
+beautifulsoup4 
+sklearn 
+testfixtures 
+unittest2 
+pyemd 
+morfessor
+pandas==0.20.3 
+seaborn==0.8.1
+spacy==1.9.0
+https://github.com/explosion/spacy-models/releases/download/en_core_web_md-1.2.1/en_core_web_md-1.2.1.tar.gz
+nltk
+tensorflow-gpu
+docopt
