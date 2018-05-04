@@ -11,12 +11,18 @@ from tqdm import tqdm
 import spacy
 from configs import gigaword_path
 from version import version
-import sys
 
 def custom_pipeline(nlp):
     return (nlp.tagger, nlp.parser)
 
 nlp = spacy.load('en_default', create_pipeline=custom_pipeline)
+
+
+def iter_files(root_dir):
+    for root, _, files in os.walk(root_dir):
+        for fname in files:
+            if '.gz' in fname:
+                yield os.path.join(root, fname)
 
 
 def iter_paragraphs(paths):
@@ -28,13 +34,6 @@ def iter_paragraphs(paths):
         for p in paras: yield p.text.strip()
 
 
-def iter_files(root_dir):
-    for root, _, files in os.walk(root_dir):
-        for fname in files:
-            if '.gz' in fname:
-                yield os.path.join(root, fname)
-
-
 def iter_sents(paragraphs):
     for doc in nlp.pipe(paragraphs, batch_size=10000):
         for sent in doc.sents:
@@ -42,21 +41,24 @@ def iter_sents(paragraphs):
 
 
 def run():
-    preprocessed_gigaword_path = os.path.join('output', 'gigaword.%s.txt.gz' %version)
-    if os.path.exists(preprocessed_gigaword_path):
-        print('Found the output at %s, skipped.' %preprocessed_gigaword_path)
+    out_path = os.path.join('output', 'gigaword.%s.txt.gz' %version)
+    if os.path.exists(out_path):
+        print('Found the output at %s, skipped.' %out_path)
     else:
-        sys.stderr.write('Writing to %s\n' %preprocessed_gigaword_path)
-        with gzip.open(preprocessed_gigaword_path, 'wt', encoding='utf-8') as f:
+        temp_path = out_path + '.tmp'
+        print('Writing to %s' %temp_path)
+        with gzip.open(temp_path, 'wt', encoding='utf-8') as f:
             # sort to remove difference between machines
             paths = sorted(iter_files(gigaword_path))
-            paths = paths[:3] # for debugging
-            for sent in iter_sents(iter_paragraphs(tqdm(paths, total=len(paths)))):
+            paths = tqdm(paths, desc='Preprocessing GigaWord', unit='file')
+            for sent in iter_sents(iter_paragraphs(paths)):
                 for tok in sent:
                     f.write(tok)
                     f.write(' ')
                 f.write('\n')
-
+        os.rename(temp_path, out_path)
+        print('Successful! Result saved to %s' %out_path)
+        
 
 if __name__ == '__main__':
     run()
