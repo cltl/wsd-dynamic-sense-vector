@@ -18,7 +18,7 @@ if __name__ == '__main__':
             gzip.open(out_pattern %'train', 'wt', encoding='utf-8') as f_train, \
             gzip.open(out_pattern %'dev', 'wt', encoding='utf-8') as f_dev:
         inp_lines = tqdm(f_inp, total=num_lines, unit='line', 
-                         desc='Splitting GigaWord')
+                         desc='Splitting GigaWord', miniters=100000)
         for i, line in enumerate(inp_lines):
             if i in train_indices:
                 f_train.write(line)
