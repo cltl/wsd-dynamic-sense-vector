@@ -16,7 +16,7 @@ if changed:
     version = date.today().strftime('%Y-%m-%d')
 else:
     version = (os.popen('git show -s --format=%ci').read()[:10] +
-           os.popen('git show -s --format=-%h').read().strip())
+               os.popen('git show -s --format=-%h').read().strip())
     
 if __name__ == '__main__':
     print(version)

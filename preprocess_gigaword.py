@@ -50,6 +50,7 @@ def run():
         with gzip.open(temp_path, 'wt', encoding='utf-8') as f:
             # sort to remove difference between machines
             paths = sorted(iter_files(gigaword_path))
+            paths = paths[:3]
             paths = tqdm(paths, desc='Preprocessing GigaWord', unit='file')
             for sent in iter_sents(iter_paragraphs(paths)):
                 for tok in sent:
