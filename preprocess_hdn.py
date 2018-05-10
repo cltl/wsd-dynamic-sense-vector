@@ -25,35 +25,6 @@ vocab_size = 10**6
 min_count = 5
 
 
-def _build_vocab(filename):
-    sys.stderr.write('Building vocabulary...\n')
-    counter = collections.Counter()
-    with codecs.open(filename, 'r', 'utf-8') as f:
-        for line in tqdm(f, total=no_lines_gigaword, desc='counting words'):
-            words = line.strip().split()
-            counter.update(words)
-    sys.stderr.write('Total unique words: %d\n' %len(counter))
-    for sym in special_symbols: assert sym not in counter
-    words = special_symbols + [w for w, c in counter.most_common(vocab_size) 
-                               if c >= min_count] 
-    sys.stderr.write('Retained %d words\n' %len(words))
-    word2id = dict((words[i], i) for i in range(len(words)))
-    sys.stderr.write('Building vocabulary... Done.\n')
-    return word2id, words
-
-
-def build_vocab(inp_path, index_path):
-    if os.path.exists(index_path):
-        sys.stderr.write('Reading vocabulary from %s... ' %index_path)
-        with open(index_path, 'rb') as f: word2id = pickle.load(f)
-        sys.stderr.write('Done.\n')
-    else:
-        assert os.path.isfile(inp_path)
-        word2id, _ = _build_vocab(inp_path)
-        with open(index_path, 'wb') as f: pickle.dump(word2id, f)
-    return word2id
-
-
 def synset2identifier(synset, wn_version):
     """
     return synset identifier of
