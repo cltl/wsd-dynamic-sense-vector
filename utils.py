@@ -1,5 +1,6 @@
 from time import time
 import sys
+import gzip
 
 
 def progress(it, ticks=1000000, label='items', max_=None):
@@ -17,10 +18,13 @@ def count_lines_fast(path, block_size=65536):
     Credit: glglgl (https://stackoverflow.com/a/9631635/217802)
     Might miss out the last line but it doesn't matter for a huge file such as Gigaword
     '''
+    sys.stdout.write('Counting lines in %s... ' %path) 
     total_lines = 0
-    with open(path, 'rb') as f:
+    open_func = (gzip.open if path.endswith('.gz') else open) 
+    with open_func(path, 'rb') as f:
         while True:
             bl = f.read(block_size)
             if not bl: break
             total_lines += bl.count(b"\n")
+    sys.stdout.write('Done.\n')
     return total_lines

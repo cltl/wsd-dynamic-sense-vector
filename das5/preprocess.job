@@ -5,6 +5,6 @@ git reset --hard && \
     git checkout 149cde7 && python3 -u preprocess_gigaword.py && \
     git checkout f802d4d && ./deduplicate_gigaword.sh && \
     git checkout 9fd479f && python3 -u split_gigaword.py && \
-    git checkout && python3 -u vectorize_gigaword.py
+    git checkout 7d764e7 && python3 -u vectorize_gigaword.py
 
 git checkout -

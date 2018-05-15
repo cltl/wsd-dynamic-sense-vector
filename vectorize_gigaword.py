@@ -10,16 +10,17 @@ import os
 import pickle
 import collections
 from configs import special_symbols
-from subprocess import check_output
+from utils import count_lines_fast
 
 
+gigaword_pattern = os.path.join('output', 'gigaword-%s.2018-05-10-9fd479f.txt.gz')
 vocab_size = 10**6
 min_count = 5
 
 
 def _build_vocab(filename):
     counter = collections.Counter()
-    num_lines = int(check_output('zcat %s | wc -l' %filename, shell=True))
+    num_lines = count_lines_fast(filename)
     with gzip.open(filename, 'rt', encoding='utf-8') as f:
         lines = tqdm(f, desc='Building vocabulary', unit='line',
                      miniters=100000, total=num_lines)
@@ -53,7 +54,7 @@ def vectorize(inp_path, out_path, word2id, name='noname'):
         print('Found result at %s. Skipped.' %out_path)
     else:
         sents = []
-        num_lines = int(check_output('zcat %s | wc -l' %inp_path, shell=True))
+        num_lines = count_lines_fast(inp_path)
         with gzip.open(inp_path, 'rt', encoding='utf-8') as f:
             lines = tqdm(f, unit='line', total=num_lines, miniters=100000,
                          desc='Vectorizing "%s"' %name)
@@ -76,7 +77,6 @@ def vectorize(inp_path, out_path, word2id, name='noname'):
         
 
 def run():
-    gigaword_pattern = os.path.join('output', 'gigaword-%s.2018-05-10-9fd479f.txt.gz')
     index_path = os.path.join('output', 'vocab.%s.pkl' %version)
     out_pattern = os.path.join('output', 'gigaword-%%s.%s.npz' %version)
 

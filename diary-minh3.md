@@ -28,4 +28,25 @@ format sooner to speed up preprocessing.
     Preprocessing GigaWord: 100%|██████████| 737/737 [43:22:42<00:00, 211.89s/file]
     Successful! Result saved to output/gigaword.2018-05-04-149cde7.txt.gz
 
-Now I'll start deduplication
+Now I'll start deduplication...
+
+Deduplication is done and vectorization too:
+
+    [minhle@fs0 wsd-dynamic-sense-vector]$ python3 -u vectorize_gigaword.py
+    Building vocabulary: 100%|█████████████████████████████████████████████████████████████████| 109174684/109174684 [17:57<00:00, 101291.82line/s]
+    Total unique words: 3819567
+    Retained 936831 words
+    Vocabulary written to output/vocab.2018-05-10-7d764e7.pkl
+    Vectorizing "train": 100%|██████████████████████████████████████████████████████████████████| 109174684/109174684 [21:41<00:00, 83876.44line/s]
+    Result saved to output/gigaword-train.2018-05-10-7d764e7.npz
+    Vectorizing "dev": 100%|██████████████████████████████████████████████████████████████████████| 12130521/12130521 [02:06<00:00, 96134.14line/s]
+    Result saved to output/gigaword-dev.2018-05-10-7d764e7.npz
+
+## Tue 15 May
+
+Solidify the conversion of monosemous words to HDNs. It is very satisfying to 
+look at a neat source file.
+
+
+
+
