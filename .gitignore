@@ -2,5 +2,5 @@
 /draft.py
 __pycache__
 slurm-*.out
-/.ipynb_checkpoints/
+.ipynb_checkpoints
 /venv/

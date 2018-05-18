@@ -1,5 +1,13 @@
 '''
-This 
+This program takes a gzip'ed preprocessed Gigaword file and produce two 
+artifacts:
+
+- a vocabulary as dict(str -> int) stored in vocab.<version>.pkl
+- a vectorized version of Gigaword stored in gigaword-{train,dev}.<version>.npz
+  each file contains two Numpy arrays:
+  + 'buffer': all the words in the dataset, sentences are put next to each other
+              with no boundary
+  + 'sent_index': 2-D array, each row is <start_index>, <end_index>
 '''
 
 from tqdm import tqdm

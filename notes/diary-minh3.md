@@ -45,8 +45,24 @@ Deduplication is done and vectorization too:
 ## Tue 15 May
 
 Solidify the conversion of monosemous words to HDNs. It is very satisfying to 
-look at a neat source file.
+look at a neat source file. It's running now on DAS-5:
 
+    [minhle@fs0 wsd-dynamic-sense-vector]$ python3 version.py
+    2018-05-15-e200820
+    [minhle@fs0 wsd-dynamic-sense-vector]$ nohup python3 -u convert_mono2hdn.py > output/convert_mono2hdn.2018-05-15-e200820.out 2>&1 &
+    [1] 20356
+    [minhle@fs0 wsd-dynamic-sense-vector]$ tail -f output/convert_mono2hdn.2018-05-15-e200820.out
+    nohup: ignoring input
+    Looking for HDNs: 100%|██████████| 119034/119034 [00:29<00:00, 4100.90lemma/s]
+    Looking for monosemous nouns... Done.
+    All noun lemmas: 119034
+    Monosemous noun lemmas: 101168 (85.0%)
+    Monosemous multi-word-expressions: 58344 (57.7% of monosemous)
+        Samples: carissa_plum, Second_Earl_of_Guilford, rotary_converter, Christmas_holly, level_best
+    Lemmas that are not associated with any HDN: entity, physical_entity, abstract_entity, freshener, otherworld, whacker
+    Number of HDNs per lemma: mean=5.3, median=5.0, std=2.0)
+    Counting lines in output/gigaword-train.2018-05-10-9fd479f.txt.gz... Done.
+    Transforming "train":   0%|          | 110000/109174684 [00:13<3:43:07, 8146.95sentence/s]
 
 
 
