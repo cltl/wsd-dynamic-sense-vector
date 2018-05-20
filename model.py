@@ -2,10 +2,10 @@ import numpy as np
 import tensorflow as tf
 import time
 import sys
-import collections
-from configs import special_symbols
-from sklearn.cross_validation import train_test_split
-from sklearn.utils import shuffle
+import pickle
+from sklearn.metrics.classification import log_loss, accuracy_score
+from tqdm._tqdm import tqdm
+import random
 
 float_dtype = tf.float32
 
@@ -62,6 +62,7 @@ class WSDModel(object):
         self._build_context_embs()
         self._build_logits()
         self._build_cost()
+        self._build_output()
         self.run_options = self.run_metadata = None
 
     def _build_inputs(self):
@@ -117,16 +118,20 @@ class WSDModel(object):
         grads, _ = tf.clip_by_global_norm(tf.gradients(self._cost, tvars),
                                           self.config.max_grad_norm)
         optimizer = tf.train.AdagradOptimizer(self.config.learning_rate)
-        self._global_step = tf.contrib.framework.get_or_create_global_step()
+        self._global_step = tf.train.get_or_create_global_step()
         self._train_op = optimizer.apply_gradients(zip(grads, tvars),
                 global_step=self._global_step)
+    
+    def _build_output(self):
+        self._y_hat = tf.argmax(self._logits, axis=1)
+        self._probs = tf.nn.softmax(self._logits, axis=1)
     
     def trace_timeline(self):
         self.run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
         self.run_metadata = tf.RunMetadata()
 
     def train_epoch(self, session, data, target_id, verbose=False):
-        """Runs the model on the given data."""
+        """ Run the model through the data once, update parameters """
         total_cost = 0.0
         total_rows = 0
         
@@ -161,8 +166,8 @@ class WSDModel(object):
                                         run_metadata=self.run_metadata)
             x[one_to_n,i] = old_xi # restore the data
     
-            total_cost += batch_cost * x.shape[0] # because the cost is averaged
-            total_rows += x.shape[0]              # over rows in a batch
+            total_cost += batch_cost * batch_size # because the cost is averaged
+            total_rows += batch_size              # over rows in a batch
             
             if verbose and (batch_no+1) % 1000 == 0:
                 print("\tfinished %d of %d batches, sample batch cost: %.7f" 
@@ -217,10 +222,10 @@ class WSIModel(WSDModel):
     """A LSTM word sense induction (WSI) model designed for fast training."""
 
     def _build_logits(self):
+        E_contexts = tf.get_variable("context_embedding", 
+                [self.config.vocab_size, self.config.num_senses, self.config.emb_dims], 
+                dtype=float_dtype)
         if self.optimized and self.config.sampled_softmax:
-            E_contexts = tf.get_variable("context_embedding", 
-                    [self.config.vocab_size, self.config.num_senses, self.config.emb_dims], 
-                    dtype=float_dtype)
             subcontexts = tf.nn.embedding_lookup(E_contexts, self._subvocab)
             subvocab_size = tf.shape(self._subvocab)[0]
             sense_logits = tf.matmul(self._predicted_context_embs, tf.transpose(
@@ -228,19 +233,141 @@ class WSIModel(WSDModel):
             self._logits = tf.reduce_max(tf.reshape(sense_logits, 
                     (-1, subvocab_size, self.config.num_senses)), axis=2)
         else:
-            E_contexts = tf.get_variable("context_embedding")
             sense_logits = tf.matmul(self._predicted_context_embs, tf.transpose(
                 tf.reshape(E_contexts, (-1, self.config.emb_dims))))
             self._logits = tf.reduce_max(tf.reshape(sense_logits,
                     (-1, self.config.vocab_size, self.config.num_senses)), axis=2)
         
 
-    def train2(self, data_path, dev_size=0.1):
-        '''
-        Train the model on a data set stored in a CSV file in the format:
-        '''
+class HDNModel(WSDModel):
+
+    def __init__(self, config, reuse_variables=False):
+        self._build_masks(config)
+        WSIModel.__init__(self, config, optimized=False, 
+                          reuse_variables=reuse_variables, use_eos=True)
+
+    def _build_masks(self, config):
+        with open(config.hdn_vocab_path, 'rb') as f:
+            self.hdn2id = pickle.load(f) 
+        with open(config.hdn_list_vocab_path, 'rb') as f:
+            self.hdn_list2id = pickle.load(f) 
+        masks = np.zeros((len(self.hdn_list2id)+1, len(self.hdn2id)), dtype=np.float32)
+        for hdn_list, id1 in self.hdn_list2id.items():
+            for hdn in hdn_list:
+                masks[id1, self.hdn2id[hdn]] = 1
+        self._unmask_index = len(self.hdn_list2id)
+        masks[self._unmask_index,:] = 1
+        self._masks = tf.constant(masks, dtype=tf.bool)
+
+    def _build_inputs(self):
+        WSIModel._build_inputs(self)
+        self._candidates_list = tf.placeholder(tf.int32, shape=[None], name='candidate_list')
+
+    def _build_logits(self):
+        E_contexts = tf.get_variable("context_embedding", 
+                [len(self.hdn2id), self.config.num_senses, self.config.emb_dims], 
+                dtype=float_dtype)
+        sense_logits = tf.matmul(self._predicted_context_embs, tf.transpose(
+                tf.reshape(E_contexts, (-1, self.config.emb_dims))))
+        self._unmasked_logits = tf.reduce_max(tf.reshape(sense_logits,
+                (-1, len(self.hdn2id), self.config.num_senses)), axis=2)
+        my_masks = tf.nn.embedding_lookup(self._masks, self._candidates_list)
+        minus_inf = tf.ones_like(self._unmasked_logits)*(-np.inf)
+        self._logits = tf.where(my_masks, self._unmasked_logits, minus_inf)
+
+    @classmethod
+    def gen_batches(cls, data, batch_size, word2id):
+        buffer, indices = data
+        batch_boundaries = [0]
+        max_len = -1
+        for i, l in enumerate(indices['sent_len']):
+            new_max_len = max(l, max_len)
+            if (i-batch_boundaries[-1]+1)*(new_max_len+1) > batch_size:
+                batch_boundaries.append(i)
+                max_len = l
+            else:
+                max_len = new_max_len
+        batch_boundaries.append(len(indices))
         
+        batches = []
+        starts = tqdm(batch_boundaries[:-1], desc='Preparing batches', unit='batch')
+        stops = batch_boundaries[1:]
+        for start, stop in zip(starts, stops):
+            my_indices = indices.iloc[start:stop]
+            x = np.empty((len(my_indices), my_indices['sent_len'].max()+1), 
+                         dtype=np.int32)
+            assert x.size <= batch_size
+            x.fill(word2id['<pad>'])
+            for i, (_, row) in enumerate(my_indices.iterrows()):
+                x[i,:row['sent_len']] = buffer[row['sent_start']:row['sent_stop']]
+                x[i,row['sent_len']] = word2id['<eos>']
+            x[i,row['word_index']] = word2id['<target>']
+            batches.append((x, my_indices['sent_len'].values,
+                            my_indices['candidates'].values, 
+                            my_indices['hdn'].values))
+        return batches
+
+    def train_epoch(self, session, batches, verbose=False):
+        total_cost = 0.0
+        total_rows = 0
+        
+        random.shuffle(batches)
+        for batch_no, (x, lens, candidates, y) in enumerate(batches):
+            feed_dict = {self._x: x, self._y: y, 
+                         self._candidates_list: candidates, self._lens: lens}
+            state = session.run(self._initial_state, feed_dict)
+            c, h = self._initial_state
+            feed_dict[c] = state.c
+            feed_dict[h] = state.h
+    
+            batch_cost, _ = session.run([self._cost, self._train_op], feed_dict,
+                                        options=self.run_options, 
+                                        run_metadata=self.run_metadata)
+            batch_size = x.shape[0]
+            total_cost += batch_cost * batch_size # because the cost is averaged
+            total_rows += batch_size              # over rows in a batch
             
+            if verbose and (batch_no+1) % 1000 == 0:
+                print("\tfinished %d of %d batches, sample batch cost: %.7f" 
+                      %(batch_no+1, len(batches), batch_cost))
+        return total_cost / total_rows
+
+    def measure_dev_cost(self, session, batches, indices, word2id):
+        probs, y_hat = self._predict(session, (None, indices), word2id,
+                                     precomputed_batches=batches)
+        nll = log_loss(indices['hdn'].values, probs, labels=np.arange(probs.shape[1]))
+        acc = accuracy_score(indices['hdn'].values, y_hat)
+        return nll, acc
+        
+    def _predict(self, sess, data, word2id, precomputed_batches=None):
+        probs = np.empty((len(data[1]), len(self.hdn2id)), dtype=np.float32)
+        y_hat = np.empty(len(data[1]), dtype=np.int32)
+        batches = precomputed_batches or self._gen_batches(data, self.config.predict_batch_size, word2id)
+        start = 0
+        for x, lens, candidates, _ in batches:
+            candidates = candidates.copy()
+            candidates[candidates == -1] = self._unmask_index
+            feed_dict = {
+                self._x: x, 
+                self._lens: lens,
+                self._candidates_list: candidates
+            }
+            probs_batch, y_hat_batch = sess.run([self._probs, self._y_hat], 
+                                                feed_dict=feed_dict)
+            probs[start:start+len(x)] = probs_batch
+            y_hat[start:start+len(x)] = y_hat_batch
+            start += len(x)
+        assert start == len(y_hat) == len(probs)
+        return probs, y_hat
+        
+    def predict(self, sess, data, word2id):
+        _, y_hat = self._predict(sess, data, word2id)
+        return y_hat
+        
+    def predict_proba(self, sess, data, word2id):
+        probs, _ = self._predict(sess, data, word2id)
+        return probs
+    
             
 def from_npz_to_batches(npz, full_vocab, prepare_subvocabs):
     batches = []

@@ -64,5 +64,28 @@ look at a neat source file. It's running now on DAS-5:
     Counting lines in output/gigaword-train.2018-05-10-9fd479f.txt.gz... Done.
     Transforming "train":   0%|          | 110000/109174684 [00:13<3:43:07, 8146.95sentence/s]
 
+## Fri 18 May 2018
 
+I finally decided how to encode HDN datasets. I use a DataFrame to store the
+location of the sentence+target word, the HDN and its competing candidates.
+It's better than bare Numpy array because you can keep track of what each column
+means.
+
+    [minhle@fs0 wsd-dynamic-sense-vector]$ python3 version.py
+    2018-05-18-f48a06c
+    [minhle@fs0 wsd-dynamic-sense-vector]$ nohup python3 -u generate_hdn_datasets.py > output/generate_hdn_datasets.`python3 version.py`.out 2>&1 &
+    [1] 19151
+    [minhle@fs0 wsd-dynamic-sense-vector]$
+    [minhle@fs0 wsd-dynamic-sense-vector]$
+    [minhle@fs0 wsd-dynamic-sense-vector]$ tail -f output/generate_hdn_datasets.2018-05-18-f48a06c.out
+    nohup: ignoring input
+    Looking for HDNs:  25%|██▌       | 30000/119034 [00:07<00:22, 3923.06lemma/s]
+    ...
+    Extracting monosemous words from "train": 100%|██████████| 109174684/109174684 [1:25:59<00:00, 21161.01it/s]
+    Extracting examples from "train": 100%|██████████| 34967048/34967048 [09:15<00:00, 62949.74it/s]
+    Transformed dataset "train" written to output/gigaword-hdn-train.2018-05-18-f48a06c.pkl
+    Extracting monosemous words from "dev": 100%|██████████| 12130521/12130521 [09:42<00:00, 20808.11it/s]
+    Extracting examples from "dev": 100%|██████████| 3884335/3884335 [01:00<00:00, 64312.73it/s]
+    Transformed dataset "dev" written to output/gigaword-hdn-dev.2018-05-18-f48a06c.pkl
+            
 

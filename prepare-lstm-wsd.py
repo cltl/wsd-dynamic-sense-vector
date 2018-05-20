@@ -27,7 +27,6 @@ from utils import progress, count_lines_fast
 from configs import output_dir, special_symbols
 from version import version
 from tensor_utils import pad
-from preprocess_hdn import *
 
 def sort_sentences(inp_path, out_path):
     start = time()
