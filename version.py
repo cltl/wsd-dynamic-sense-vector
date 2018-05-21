@@ -10,12 +10,12 @@ from datetime import date
 from subprocess import check_output
 
 # git diff --staged is faster than git diff (of everything) so let's do it first
-changed = (check_output('git diff', shell=True) != '')
+changed = (check_output('git diff', shell=True) != b'')
 if changed:
     version = date.today().strftime('%Y-%m-%d')
 else:
     version = (check_output('git show -s --format=%ci', shell=True)[:10] +
-               check_output('git show -s --format=-%h', shell=True).strip())
-    
+               check_output('git show -s --format=-%h', shell=True).strip()).decode('utf-8')
+
 if __name__ == '__main__':
     print(version)
