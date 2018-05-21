@@ -9,5 +9,7 @@ seaborn==0.8.1
 spacy==1.9.0
 https://github.com/explosion/spacy-models/releases/download/en_core_web_md-1.2.1/en_core_web_md-1.2.1.tar.gz
 nltk
-tensorflow-gpu
+tensorflow-gpu==1.6.0
+tensorflow==1.6.0
 docopt
+block-timer

@@ -3,7 +3,6 @@ import tensorflow as tf
 import time
 import sys
 import pickle
-from sklearn.metrics.classification import log_loss, accuracy_score
 from tqdm._tqdm import tqdm
 import random
 
@@ -61,8 +60,8 @@ class WSDModel(object):
         self._build_lstm_output()
         self._build_context_embs()
         self._build_logits()
-        self._build_cost()
         self._build_output()
+        self._build_cost()
         self.run_options = self.run_metadata = None
 
     def _build_inputs(self):
@@ -112,6 +111,8 @@ class WSDModel(object):
         self._cost = tf.reduce_mean(
                 tf.nn.sparse_softmax_cross_entropy_with_logits(
                 logits=self._logits, labels=self._y))
+        self._accuracy = tf.reduce_mean(tf.cast(
+                tf.equal(self._y, self._y_hat), tf.float32))
         self._hit_at_100 = tf.reduce_mean(tf.cast(
                 tf.nn.in_top_k(self._logits, self._y, 100), float_dtype))
         tvars = tf.trainable_variables()
@@ -123,7 +124,7 @@ class WSDModel(object):
                 global_step=self._global_step)
     
     def _build_output(self):
-        self._y_hat = tf.argmax(self._logits, axis=1)
+        self._y_hat = tf.argmax(self._logits, axis=1, output_type=tf.int32)
         self._probs = tf.nn.softmax(self._logits, axis=1)
     
     def trace_timeline(self):
@@ -276,7 +277,7 @@ class HDNModel(WSDModel):
         self._logits = tf.where(my_masks, self._unmasked_logits, minus_inf)
 
     @classmethod
-    def gen_batches(cls, data, batch_size, word2id):
+    def gen_batches(cls, data, batch_size, word2id, name="noname"):
         buffer, indices = data
         batch_boundaries = [0]
         max_len = -1
@@ -290,7 +291,8 @@ class HDNModel(WSDModel):
         batch_boundaries.append(len(indices))
         
         batches = []
-        starts = tqdm(batch_boundaries[:-1], desc='Preparing batches', unit='batch')
+        starts = tqdm(batch_boundaries[:-1], unit='batch',
+                      desc='Preparing "%s" batches' %name)
         stops = batch_boundaries[1:]
         for start, stop in zip(starts, stops):
             my_indices = indices.iloc[start:stop]
@@ -307,65 +309,61 @@ class HDNModel(WSDModel):
                             my_indices['hdn'].values))
         return batches
 
-    def train_epoch(self, session, batches, verbose=False):
-        total_cost = 0.0
-        total_rows = 0
-        
-        random.shuffle(batches)
-        for batch_no, (x, lens, candidates, y) in enumerate(batches):
-            feed_dict = {self._x: x, self._y: y, 
-                         self._candidates_list: candidates, self._lens: lens}
-            state = session.run(self._initial_state, feed_dict)
-            c, h = self._initial_state
-            feed_dict[c] = state.c
-            feed_dict[h] = state.h
-    
-            batch_cost, _ = session.run([self._cost, self._train_op], feed_dict,
-                                        options=self.run_options, 
-                                        run_metadata=self.run_metadata)
-            batch_size = x.shape[0]
-            total_cost += batch_cost * batch_size # because the cost is averaged
-            total_rows += batch_size              # over rows in a batch
-            
-            if verbose and (batch_no+1) % 1000 == 0:
-                print("\tfinished %d of %d batches, sample batch cost: %.7f" 
-                      %(batch_no+1, len(batches), batch_cost))
-        return total_cost / total_rows
+    def _run_lstm(self, session, out_vars, batch):
+        x, lens, candidates, y = batch
+        feed_dict = {self._x: x, self._y: y, 
+                     self._candidates_list: candidates, 
+                     self._lens: lens}
+        state = session.run(self._initial_state, feed_dict)
+        c, h = self._initial_state
+        feed_dict[c] = state.c
+        feed_dict[h] = state.h
+        return session.run(out_vars, feed_dict,
+                           options=self.run_options, 
+                           run_metadata=self.run_metadata)
 
-    def measure_dev_cost(self, session, batches, indices, word2id):
-        probs, y_hat = self._predict(session, (None, indices), word2id,
-                                     precomputed_batches=batches)
-        nll = log_loss(indices['hdn'].values, probs, labels=np.arange(probs.shape[1]))
-        acc = accuracy_score(indices['hdn'].values, y_hat)
-        return nll, acc
+    def train_epoch(self, session, batches, verbose=False):
+        costs, weights = [], []
+        random.shuffle(batches)
+        for batch in tqdm(batches, unit='batch', desc="Training"):
+            batch_cost, _ = self._run_lstm(session, 
+                                           [self._cost, self._train_op], 
+                                           batch)
+            batch_size = len(batches[0])
+            costs.append(batch_cost)
+            weights.append(batch_size)
+        return np.average(costs, weights=weights)
+
+    def measure_dev_cost(self, session, batches):
+        results, weights = [], []
+        for batch in tqdm(batches, unit='batch', desc="Evaluating"):
+            results.append(self._run_lstm(session, [self._cost, self._accuracy], batch))
+            weights.append(len(batch[0]))
+        return np.average(results, axis=0, weights=weights)
         
-    def _predict(self, sess, data, word2id, precomputed_batches=None):
-        probs = np.empty((len(data[1]), len(self.hdn2id)), dtype=np.float32)
-        y_hat = np.empty(len(data[1]), dtype=np.int32)
-        batches = precomputed_batches or self._gen_batches(data, self.config.predict_batch_size, word2id)
+    def _predict(self, session, data, word2id, compute_probs=True, compute_y=True):
+        probs, y_hat = [], []
+        out_vars = [self._probs if compute_probs else [0],
+                    self._y_hat if compute_y else [0]]
+        batches = self._gen_batches(data, self.config.predict_batch_size, word2id)
         start = 0
         for x, lens, candidates, _ in batches:
             candidates = candidates.copy()
             candidates[candidates == -1] = self._unmask_index
-            feed_dict = {
-                self._x: x, 
-                self._lens: lens,
-                self._candidates_list: candidates
-            }
-            probs_batch, y_hat_batch = sess.run([self._probs, self._y_hat], 
-                                                feed_dict=feed_dict)
-            probs[start:start+len(x)] = probs_batch
-            y_hat[start:start+len(x)] = y_hat_batch
+            batch = (x, lens, candidates, None)
+            probs_batch, y_hat_batch = self._run_lstm(session, out_vars, batch)
+            probs.append(probs_batch)
+            y_hat.append(y_hat_batch)
             start += len(x)
         assert start == len(y_hat) == len(probs)
-        return probs, y_hat
+        return np.vstack(probs), np.vstack(y_hat)
         
     def predict(self, sess, data, word2id):
-        _, y_hat = self._predict(sess, data, word2id)
+        _, y_hat = self._predict(sess, data, word2id, compute_probs=False)
         return y_hat
         
     def predict_proba(self, sess, data, word2id):
-        probs, _ = self._predict(sess, data, word2id)
+        probs, _ = self._predict(sess, data, word2id, compute_y=False)
         return probs
     
             

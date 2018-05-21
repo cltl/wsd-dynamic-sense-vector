@@ -88,4 +88,18 @@ means.
     Extracting examples from "dev": 100%|██████████| 3884335/3884335 [01:00<00:00, 64312.73it/s]
     Transformed dataset "dev" written to output/gigaword-hdn-dev.2018-05-18-f48a06c.pkl
             
+## Mon 21 May
+
+Managed to train one epoch but the program broke at evaluation against devset.
+
+    Epoch #1 finished:
+        Train cost: 0.162
+    Traceback (most recent call last):
+    ...
+      File "/var/scratch/minhle/wsd-dynamic-sense-vector/model.py", line 337, in measure_dev_cost
+        precomputed_batches=batches)
+      File "/var/scratch/minhle/wsd-dynamic-sense-vector/model.py", line 343, in _predict
+        probs = np.empty((len(data[1]), len(self.hdn2id)), dtype=np.float32)
+    MemoryError
+
 
