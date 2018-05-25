@@ -299,19 +299,21 @@ class HDNModel(WSDModel):
             my_indices = indices.iloc[start:stop]
             x = np.empty((len(my_indices), my_indices['sent_len'].max()+1), 
                          dtype=np.int32)
+            word_targets = np.empty((len(my_indices)), dtype=np.int32)
             assert x.size <= batch_size
             x.fill(word2id['<pad>'])
             for i, (_, row) in enumerate(my_indices.iterrows()):
                 x[i,:row['sent_len']] = buffer[row['sent_start']:row['sent_stop']]
                 x[i,row['sent_len']] = word2id['<eos>']
+                word_targets[i] = x[i,row['word_index']]
                 x[i,row['word_index']] = word2id['<target>']
             batches.append((x, my_indices['sent_len'].values,
                             my_indices['candidates'].values, 
-                            my_indices['hdn'].values))
+                            my_indices['hdn'].values, word_targets))
         return batches
 
     def _run_lstm(self, session, out_vars, batch):
-        x, lens, candidates, y = batch
+        x, lens, candidates, y, _ = batch
         feed_dict = {self._x: x, self._y: y, 
                      self._candidates_list: candidates, 
                      self._lens: lens}
@@ -347,8 +349,10 @@ class HDNModel(WSDModel):
         out_vars = [self._probs if compute_probs else [0],
                     self._y_hat if compute_y else [0]]
         batches = self._gen_batches(data, self.config.predict_batch_size, word2id)
+        if len(batches) > 10:
+            batches = tqdm(batches, desc="Predicting", unit="batch")
         start = 0
-        for x, lens, candidates, _ in batches:
+        for x, lens, candidates, _, y in batches:
             candidates = candidates.copy()
             candidates[candidates == -1] = self._unmask_index
             batch = (x, lens, candidates, None)

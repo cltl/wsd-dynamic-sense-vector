@@ -23,6 +23,8 @@ class MyConfig(LargeConfig):
     gigaword_path_pattern = generate_hdn_datasets.inp_pattern
     word_vocab_path = generate_hdn_datasets.word_vocab_path
     hdn_path_pattern = 'output/gigaword-hdn-%s.2018-05-18-f48a06c.pkl'
+    hdn_vocab_path = 'output/hdn-vocab.2018-05-18-f48a06c.pkl'
+    hdn_list_vocab_path = 'output/hdn-list-vocab.2018-05-18-f48a06c.pkl'
     num_senses = 16
     predict_batch_size = 32000
     train_batch_size = 8000
@@ -46,13 +48,14 @@ def train_hdn_model(model, config):
         buffer_dev = np.load(config.gigaword_path_pattern %'dev')['buffer']
     with Timer('Read HDN dev indices from %s' %(config.hdn_path_pattern %'dev')):
         hdn_dev = pd.read_pickle(config.hdn_path_pattern %'dev')
+
     train_batches, _ = prepare_batches(buffer_train, hdn_train, 
                                        config.train_batch_size, word2id,
                                        name='train')
     dev_batches, _ = prepare_batches(buffer_dev, hdn_dev, 
                                      config.predict_batch_size, word2id,
                                      name='dev')
-
+    
     best_acc = None # don't know how to update this within a managed session yet
     stagnant_count = tf.get_variable("stagnant_count", initializer=0, dtype=tf.int32, trainable=False)
     reset_stag = tf.assign(stagnant_count, 0)
