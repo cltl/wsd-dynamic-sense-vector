@@ -13,6 +13,14 @@ vocab_path = generate_hdn_datasets.word_vocab_path
 gigaword_path_pattern = generate_hdn_datasets.inp_pattern
 hdn_path_pattern = 'output/gigaword-hdn-%s.2018-05-18-f48a06c.pkl'
 
+def stratified_subsampling(indices, buffer, n=100):
+    tqdm.pandas(desc="Extracting target words", unit="word")
+    get_word = lambda row: buffer[row["sent_start"]
+                                  :row["sent_stop"]][row["word_index"]]
+    indices['word'] = indices.progress_apply(get_word, axis=1)
+    return (indices.groupby('word', group_keys=False)
+            .apply(lambda x: x.sample(min(len(x), n))))
+
 if __name__ == '__main__':
     out_path = 'output/monosemous-context-embeddings.%s.npz' %version
     
@@ -20,6 +28,7 @@ if __name__ == '__main__':
         buffer_train = np.load(gigaword_path_pattern %'train')['buffer']
     with Timer('Read HDN training indices from %s' %(hdn_path_pattern %'train')):
         hdn_train = pd.read_pickle(hdn_path_pattern %'train')
+    hdn_train = stratified_subsampling(hdn_train, buffer_train, n=100)
     vocab = np.load(vocab_path)
     
     mono_words, mono_embs = [], []

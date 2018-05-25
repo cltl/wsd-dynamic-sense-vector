@@ -123,5 +123,13 @@ Started training a HDN model again:
     [minhle@fs0 wsd-dynamic-sense-vector]$ sbatch das5/train-lstm-hdn.job
     Submitted batch job 1822549
 
+Also extract embeddings:
+
+    [minhle@fs0 wsd-dynamic-sense-vector]$ python3 version.py
+    2018-05-25-3f0488c
+    [minhle@fs0 wsd-dynamic-sense-vector]$ sbatch das5/extract-embeddings-monosemous.job
+    Submitted batch job 1822550
+
+
 
  
