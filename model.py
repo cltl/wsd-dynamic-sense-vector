@@ -271,7 +271,8 @@ class HDNModel(WSDModel):
         sense_logits = tf.matmul(self._predicted_context_embs, tf.transpose(
                 tf.reshape(E_contexts, (-1, self.config.emb_dims))))
         self._unmasked_logits = tf.reduce_max(tf.reshape(sense_logits,
-                (-1, len(self.hdn2id), self.config.num_senses)), axis=2)
+                (-1, len(self.hdn2id), self.config.num_senses)), axis=2,
+                name='unmasked_logits')
         my_masks = tf.nn.embedding_lookup(self._masks, self._candidates_list)
         minus_inf = tf.ones_like(self._unmasked_logits)*(-np.inf)
         self._logits = tf.where(my_masks, self._unmasked_logits, minus_inf)
@@ -303,7 +304,7 @@ class HDNModel(WSDModel):
             for i, (_, row) in enumerate(my_indices.iterrows()):
                 x[i,:row['sent_len']] = buffer[row['sent_start']:row['sent_stop']]
                 x[i,row['sent_len']] = word2id['<eos>']
-            x[i,row['word_index']] = word2id['<target>']
+                x[i,row['word_index']] = word2id['<target>']
             batches.append((x, my_indices['sent_len'].values,
                             my_indices['candidates'].values, 
                             my_indices['hdn'].values))

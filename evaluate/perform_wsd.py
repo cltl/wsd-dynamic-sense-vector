@@ -13,6 +13,7 @@ import tensor_utils as utils
 import score_utils
 import tsne_utils
 import official_scorer
+from wn_utils import synset2identifier
 
 parser = argparse.ArgumentParser(description='Perform WSD using LSTM model')
 parser.add_argument('-m', dest='model_path', required=True, help='path to model trained LSTM model')
@@ -82,29 +83,6 @@ def lp_output(row, lp_info, candidate_synsets, debug=False):
 
     return synset_identifier
 
-def synset2identifier(synset, wn_version):
-    """
-    return synset identifier of
-    nltk.corpus.reader.wordnet.Synset instance
-
-    :param nltk.corpus.reader.wordnet.Synset synset: a wordnet synset
-    :param str wn_version: supported: '171 | 21 | 30'
-
-    :rtype: str
-    :return: eng-VERSION-OFFSET-POS (n | v | r | a)
-    e.g.
-    """
-    offset = str(synset.offset())
-    offset_8_char = offset.zfill(8)
-
-    pos = synset.pos()
-    if pos in {'s', 'j'}:
-        pos = 'a'
-
-    identifier = 'eng-{wn_version}-{offset_8_char}-{pos}'.format_map(locals())
-
-    return identifier
-
 def extract_sentence_wsd_competition(row):
     """
     given row in dataframe (representing task instance)
@@ -135,6 +113,112 @@ def extract_sentence_wsd_competition(row):
 
     return target_index, sentence_tokens, lemma, pos
 
+
+def load_tensors(sess):
+    x = sess.graph.get_tensor_by_name('Model/x:0')
+    logits = sess.graph.get_tensor_by_name('Model/Max:0') # should have had a name
+    lens = sess.graph.get_tensor_by_name('Model/lens:0')
+    candidates = sess.graph.get_tensor_by_name('Model/candidate_list:0')
+    
+    return x, logits, lens, candidates
+
+
+def synsets_graph_info(wn_instance, wn_version, lemma, pos):
+    """
+    extract:
+    1. hyponym under lowest least common subsumer
+
+    :param nltk.corpus.reader.wordnet.WordNetCorpusReader wn_instance: instance
+    of nltk.corpus.reader.wordnet.WordNetCorpusReader
+    :param str wn_version: supported: '171' | '21' | '30'
+    :param str lemma: a lemma
+    :param str pos: a pos
+
+    :rtype: dict
+    :return: mapping synset_id
+        -> 'under_lcs' -> under_lcs identifier
+        -> 'path_to_under_lcs' -> [sy1_iden, sy2_iden, sy3_iden, ...]
+    """
+    sy_id2under_lcs_info = dict()
+
+    synsets = wn_instance.synsets(lemma, pos=pos)
+
+    synsets = set(synsets)
+
+    if len(synsets) == 1:
+        sy_obj = synsets.pop()
+        target_sy_iden = synset2identifier(sy_obj, wn_version)
+        sy_id2under_lcs_info[target_sy_iden] = {'under_lcs': None,
+                                                'under_lcs_obj': None,
+                                                'sy_obj' : sy_obj,
+                                                'path_to_under_lcs': []}
+        return sy_id2under_lcs_info
+
+
+    for sy1 in synsets:
+
+        target_sy_iden = synset2identifier(sy1, wn_version)
+
+        min_path_distance = 100
+        closest_lcs = None
+
+        for sy2 in synsets:
+            if sy1 != sy2:
+                try:
+                    lcs_s = sy1.lowest_common_hypernyms(sy2, simulate_root=True)
+                    lcs = lcs_s[0]
+                except:
+                    lcs = None
+                    print('wordnet error', sy1, sy2)
+
+                path_distance = sy1.shortest_path_distance(lcs, simulate_root=True)
+
+                if path_distance < min_path_distance:
+                    closest_lcs = lcs
+                    min_path_distance = path_distance
+
+        under_lcs = None
+        for hypernym_path in sy1.hypernym_paths():
+            for first, second in  zip(hypernym_path, hypernym_path[1:]):
+                if first == closest_lcs:
+                    under_lcs = second
+
+                    index_under_lcs = hypernym_path.index(under_lcs)
+                    path_to_under_lcs = hypernym_path[index_under_lcs + 1:-1]
+
+                    under_lcs_iden = synset2identifier(under_lcs, wn_version)
+                    path_to_under_lcs_idens = [synset2identifier(synset, wn_version)
+                                               for synset in path_to_under_lcs]
+
+                    sy_id2under_lcs_info[target_sy_iden] = {'under_lcs': under_lcs_iden,
+                                                            'under_lcs_obj': under_lcs,
+                                                            'sy_obj' : sy1,
+                                                            'path_to_under_lcs': path_to_under_lcs_idens}
+
+    return sy_id2under_lcs_info
+
+def find_hdns(lemma):
+    graph_info = synsets_graph_info(wn_instance=wn,
+                                wn_version='30',
+                                lemma=lemma,
+                                pos='n')
+    hdn2synset = {info['under_lcs']: synset for synset, info in graph_info.items()}
+    hdn_list = tuple(sorted(info['under_lcs'] # sorted to avoid arbitrary order
+                        for info in graph_info.values() 
+                        if info['under_lcs']))
+    return hdn_list, hdn2synset
+
+
+import generate_hdn_datasets
+from block_timer.timer import Timer
+import pickle
+
+word_vocab_path = 'output/vocab.2018-05-10-7d764e7.pkl'
+word2id = pickle.load(open(word_vocab_path, 'rb'))
+hdn_vocab_path = 'output/hdn-vocab.2018-05-18-f48a06c.pkl'
+hdn2id = pickle.load(open(hdn_vocab_path, 'rb'))
+hdn_list_vocab_path = 'output/hdn-list-vocab.2018-05-18-f48a06c.pkl'
+hdn_list2id = pickle.load(open(hdn_list_vocab_path, 'rb'))
 
 def score_synsets(target_embedding, candidate_synsets, sense_embeddings, instance_id, lemma, pos, gran, synset2higher_level):
     """
@@ -201,188 +285,182 @@ def score_synsets(target_embedding, candidate_synsets, sense_embeddings, instanc
     return highest_synset, synset_std, candidate_freq, strategy
 
 
-# load wsd competition dataframe
-wsd_df = pandas.read_pickle(args.wsd_df_path)
+if __name__ == '__main__':
+        
+    # load wsd competition dataframe
+    wsd_df = pandas.read_pickle(args.wsd_df_path)
+    
+    # add output column
+    wsd_df['lstm_output'] = [None for _ in range(len(wsd_df))]
+    wsd_df['target_embedding'] = [None for _ in range(len(wsd_df))]
+    wsd_df['std_chosen_synset'] = [None for _ in range(len(wsd_df))]
+    wsd_df['lstm_acc'] = [None for _ in range(len(wsd_df))]
+    wsd_df['emb_freq'] = [None for _ in range(len(wsd_df))]
+    wsd_df['#_cand_synsets'] = [None for _ in range(len(wsd_df))]
+    wsd_df['#_new_cand_synsets'] = [None for _ in range(len(wsd_df))]
+    wsd_df['gold_in_new_cand_synsets'] = [None for _ in range(len(wsd_df))]
+    wsd_df['wsd_strategy'] = [None for _ in range(len(wsd_df))]
+    wsd_df['num_embeddings'] = [None for _ in range(len(wsd_df))]
+    wsd_df['has_gold_embedding'] = [None for _ in range(len(wsd_df))]
+    
+    # load sense embeddings
+    with open(args.sense_embeddings_path, 'rb') as infile:
+        sense_embeddings = pickle.load(infile)
+    
+    # num correct
+    num_correct = 0
+    
+    vocab = np.load(args.vocab_path)
+    with tf.Session() as sess:  # your session object
+        path = 'output/hdn-large.2018-05-21-b1d1867-best-model'
+        saver = tf.train.import_meta_graph(path + '.meta', clear_devices=True)
+        saver.restore(sess, path)
+        x, logits, lens, candidates = load_tensors(sess)
+        
+        #predicted_context_embs = sess.graph.get_tensor_by_name('Model/predicted_context_embs:0')
+        #x = sess.graph.get_tensor_by_name('Model/Placeholder:0')
+    
+        for row_index, row in wsd_df.iterrows():
+            target_index, sentence_tokens, lemma, pos =  extract_sentence_wsd_competition(row)
+            instance_id = row['token_ids'][0]
+            target_id = vocab['<target>']
+            sentence_as_ids = [vocab.get(w) or vocab['<unkn>'] for w in sentence_tokens]
+            sentence_as_ids[target_index] = target_id
+    
+            hdn_list, hdn2synset = find_hdns(lemma)
+            feed_dict = {x: [sentence_as_ids],
+                         lens: [len(sentence_as_ids)],
+                         candidates: [hdn_list2id[hdn_list]]}
+            target_embeddings = sess.run(logits, feed_dict=feed_dict)
+            scores = [target_embeddings[0,hdn2id[hdn]] for hdn in hdn_list]
+    
+            meaning2confidence = {hdn2synset[hdn]: score for hdn, score in zip(hdn_list, scores)}
 
-# add output column
-wsd_df['lstm_output'] = [None for _ in range(len(wsd_df))]
-wsd_df['target_embedding'] = [None for _ in range(len(wsd_df))]
-wsd_df['std_chosen_synset'] = [None for _ in range(len(wsd_df))]
-wsd_df['lstm_acc'] = [None for _ in range(len(wsd_df))]
-wsd_df['emb_freq'] = [None for _ in range(len(wsd_df))]
-wsd_df['#_cand_synsets'] = [None for _ in range(len(wsd_df))]
-wsd_df['#_new_cand_synsets'] = [None for _ in range(len(wsd_df))]
-wsd_df['gold_in_new_cand_synsets'] = [None for _ in range(len(wsd_df))]
-wsd_df['wsd_strategy'] = [None for _ in range(len(wsd_df))]
-wsd_df['num_embeddings'] = [None for _ in range(len(wsd_df))]
-wsd_df['has_gold_embedding'] = [None for _ in range(len(wsd_df))]
-
-# load sense embeddings
-with open(args.sense_embeddings_path, 'rb') as infile:
-    sense_embeddings = pickle.load(infile)
-
-# num correct
-num_correct = 0
-
-vocab = np.load(args.vocab_path)
-with tf.Session() as sess:  # your session object
-    saver = tf.train.import_meta_graph(args.model_path + '.meta', clear_devices=True)
-    saver.restore(sess, args.model_path)
-    x, predicted_context_embs, lens = utils.load_tensors(sess)
-    #predicted_context_embs = sess.graph.get_tensor_by_name('Model/predicted_context_embs:0')
-    #x = sess.graph.get_tensor_by_name('Model/Placeholder:0')
-
-    for row_index, row in wsd_df.iterrows():
-        target_index, sentence_tokens, lemma, pos =  extract_sentence_wsd_competition(row)
-        instance_id = row['token_ids'][0]
-        target_id = vocab['<target>']
-        sentence_as_ids = [vocab.get(w) or vocab['<unkn>'] for w in sentence_tokens]
-        sentence_as_ids[target_index] = target_id
-
-        target_embeddings = sess.run(predicted_context_embs, {x: [sentence_as_ids],
-                                                              lens: [len(sentence_as_ids)]})
-        for target_embedding in target_embeddings:
-            break
-
-        #target_embedding = sess.run(predicted_context_embs, {x: [sentence_as_ids]})[0]
-
-        # load token object
-        token_obj = row['tokens'][0]
-
-        # morphology reduced polysemy
-        pos = row['pos']
-        if the_wn_version in {'171'}:
-            pos = None
-        candidate_synsets, \
-        new_candidate_synsets, \
-        gold_in_candidates = morpho_utils.candidate_selection(wn,
-                                                              token=token_obj.text,
-                                                              target_lemma=row['target_lemma'],
-                                                              pos=row['pos'],
-                                                              morphofeat=token_obj.morphofeat,
-                                                              use_case=case_strategy,
-                                                              use_number=number_strategy,
-                                                              gold_lexkeys=row['lexkeys'],
-                                                              case_freq=case_freq,
-                                                              plural_freq=plural_freq,
-                                                              debug=False)
-
-        the_chosen_candidates = [synset2identifier(synset, wn_version=the_wn_version)
-                                 for synset in new_candidate_synsets]
-
-        # get mapping to higher abstraction level
-        synset2higher_level = dict()
-        if args.gran in {'sensekey', 'blc20', 'direct_hypernym'}:
-            label = 'synset2%s' % args.gran
-            synset2higher_level = row[label]
-
-        # determine wsd strategy used
-        if len(candidate_synsets) == 1:
-            wsd_strategy = 'monosemous'
-        elif len(new_candidate_synsets) == 1:
-            wsd_strategy = 'morphology_solved'
-        elif len(candidate_synsets) == len(new_candidate_synsets):
-            wsd_strategy = 'lstm'
-        elif len(new_candidate_synsets) < len(candidate_synsets):
-            wsd_strategy = 'morphology+lstm'
-
-        # possibly include label propagation strategy
-        if lp_strategy:
-            lp_result = lp_output(row, lp_info, new_candidate_synsets, debug=True)
-
-            print(lp_result, row['lp_index'], row['target_lemma'])
-
-            if lp_result:
-                the_chosen_candidates = [lp_result]
-                wsd_strategy = 'lp'
-
-        # perform wsd
-        if len(the_chosen_candidates) >= 2:
-            chosen_synset, \
-            candidate_std, \
-            candidate_freq, \
-            wsd_strategy = score_synsets(target_embedding,
-                                         the_chosen_candidates,
-                                         sense_embeddings,
-                                         instance_id,
-                                         lemma,
-                                         pos,
-                                         args.gran,
-                                         synset2higher_level)
-
-            #if strategy == 'mfs_fallback':
-            #    wsd_strategy = 'mfs_fallback'
-
-        else:
-            chosen_synset = None
-            candidate_std = None
-            if the_chosen_candidates:
-                chosen_synset = the_chosen_candidates[0]
-            candidate_freq = dict()
-
-        # add to dataframe
-        wsd_df.set_value(row_index, col='target_embedding', value=target_embedding)
-        wsd_df.set_value(row_index, col='lstm_output', value=chosen_synset)
-        wsd_df.set_value(row_index, col='std_chosen_synset', value=candidate_std)
-
-        wsd_df.set_value(row_index, col='#_cand_synsets', value=len(candidate_synsets))
-        wsd_df.set_value(row_index, col='#_new_cand_synsets', value=len(new_candidate_synsets))
-        wsd_df.set_value(row_index, col='gold_in_new_cand_synsets', value=gold_in_candidates)
-
-        # score it
-        lstm_acc = chosen_synset in row['source_wn_engs'] # used to be wn30_engs
-
-
-        has_gold_embedding = False
-
-        for source_wn_eng in row['source_wn_engs']:
-            if source_wn_eng in candidate_freq:
-                if candidate_freq[source_wn_eng]:
-                    has_gold_embedding = True
-
-        num_embeddings = 0
-        for synset_id, freq in candidate_freq.items():
-            if synset_id in sense_embeddings:
-                num_embeddings += 1
-
-        wsd_df.set_value(row_index, col='has_gold_embedding', value=has_gold_embedding)
-        wsd_df.set_value(row_index, col='num_embeddings', value=num_embeddings)
-        wsd_df.set_value(row_index, col='lstm_acc', value=lstm_acc)
-        wsd_df.set_value(row_index, col='emb_freq', value=candidate_freq)
-        wsd_df.set_value(row_index, col='wsd_strategy', value=wsd_strategy)
-
-        if lstm_acc:
-            num_correct += 1
-
-print(num_correct)
-
-# save it
-wsd_df.to_pickle(args.output_path)
-
-with open(args.results, 'w') as outfile:
-    outfile.write('%s' % num_correct)
-
-# json output path
-output_path_json = args.results.replace('.txt', '.json')
-
-results = score_utils.experiment_results(wsd_df, args.mfs_fallback, args.wsd_df_path)
-
-with open(output_path_json, 'w') as outfile:
-    json.dump(results, outfile)
-
-# official scorer if possible
-exp_folder = args.results.replace('/results.txt', '')
-official_scorer.create_key_file(wn, exp_folder, debug=1)
-official_scorer.score_using_official_scorer(exp_folder, 
-                                            scorer_folder='resources/WSD_Unified_Evaluation_Datasets')
-
-# write tsne visualizations
-visualize = False
-if visualize:
-    output_folder = args.results.replace('/results.txt', '')
-    tsne_utils.create_tsne_visualizations(output_folder,
-                                          correct={False, True},
-                                          meanings=True,
-                                          instances=True,
-                                          polysemy=range(2, 1000),
-                                          num_embeddings=range(2, 1000))
+            # load token object
+            token_obj = row['tokens'][0]
+    
+            # morphology reduced polysemy
+            pos = row['pos']
+            if the_wn_version in {'171'}:
+                pos = None
+            candidate_synsets, \
+            new_candidate_synsets, \
+            gold_in_candidates = morpho_utils.candidate_selection(wn,
+                                                                  token=token_obj.text,
+                                                                  target_lemma=row['target_lemma'],
+                                                                  pos=row['pos'],
+                                                                  morphofeat=token_obj.morphofeat,
+                                                                  use_case=case_strategy,
+                                                                  use_number=number_strategy,
+                                                                  gold_lexkeys=row['lexkeys'],
+                                                                  case_freq=case_freq,
+                                                                  plural_freq=plural_freq,
+                                                                  debug=False)
+    
+            the_chosen_candidates = [synset2identifier(synset, wn_version=the_wn_version)
+                                     for synset in new_candidate_synsets]
+    
+            # get mapping to higher abstraction level
+            synset2higher_level = dict()
+            if args.gran in {'sensekey', 'blc20', 'direct_hypernym'}:
+                label = 'synset2%s' % args.gran
+                synset2higher_level = row[label]
+    
+            # determine wsd strategy used
+            if len(candidate_synsets) == 1:
+                wsd_strategy = 'monosemous'
+            elif len(new_candidate_synsets) == 1:
+                wsd_strategy = 'morphology_solved'
+            elif len(candidate_synsets) == len(new_candidate_synsets):
+                wsd_strategy = 'lstm'
+            elif len(new_candidate_synsets) < len(candidate_synsets):
+                wsd_strategy = 'morphology+lstm'
+    
+            # possibly include label propagation strategy
+            if lp_strategy:
+                lp_result = lp_output(row, lp_info, new_candidate_synsets, debug=True)
+    
+                print(lp_result, row['lp_index'], row['target_lemma'])
+    
+                if lp_result:
+                    the_chosen_candidates = [lp_result]
+                    wsd_strategy = 'lp'
+    
+            # perform wsd
+            if len(the_chosen_candidates) >= 2:
+                chosen_synset = max(the_chosen_candidates, key=lambda m: meaning2confidence[m])
+                candidate_std = 0
+                candidate_freq = 0
+            else:
+                chosen_synset = None
+                candidate_std = None
+                if the_chosen_candidates:
+                    chosen_synset = the_chosen_candidates[0]
+                candidate_freq = dict()
+    
+            # add to dataframe
+            wsd_df.set_value(row_index, col='target_embedding', value=0)
+            wsd_df.set_value(row_index, col='lstm_output', value=chosen_synset)
+            wsd_df.set_value(row_index, col='std_chosen_synset', value=candidate_std)
+    
+            wsd_df.set_value(row_index, col='#_cand_synsets', value=len(candidate_synsets))
+            wsd_df.set_value(row_index, col='#_new_cand_synsets', value=len(new_candidate_synsets))
+            wsd_df.set_value(row_index, col='gold_in_new_cand_synsets', value=gold_in_candidates)
+    
+            # score it
+            lstm_acc = chosen_synset in row['source_wn_engs'] # used to be wn30_engs
+    
+    
+            has_gold_embedding = False
+    
+            for source_wn_eng in row['source_wn_engs']:
+                if source_wn_eng in candidate_freq:
+                    if candidate_freq[source_wn_eng]:
+                        has_gold_embedding = True
+    
+            num_embeddings = 0
+            for synset_id, freq in candidate_freq.items():
+                if synset_id in sense_embeddings:
+                    num_embeddings += 1
+    
+            wsd_df.set_value(row_index, col='has_gold_embedding', value=has_gold_embedding)
+            wsd_df.set_value(row_index, col='num_embeddings', value=num_embeddings)
+            wsd_df.set_value(row_index, col='lstm_acc', value=lstm_acc)
+            wsd_df.set_value(row_index, col='emb_freq', value=candidate_freq)
+            wsd_df.set_value(row_index, col='wsd_strategy', value=wsd_strategy)
+    
+            if lstm_acc:
+                num_correct += 1
+    
+    print(num_correct)
+    
+    # save it
+    wsd_df.to_pickle(args.output_path)
+    
+    with open(args.results, 'w') as outfile:
+        outfile.write('%s' % num_correct)
+    
+    # json output path
+    output_path_json = args.results.replace('.txt', '.json')
+    
+    results = score_utils.experiment_results(wsd_df, args.mfs_fallback, args.wsd_df_path)
+    
+    with open(output_path_json, 'w') as outfile:
+        json.dump(results, outfile)
+    
+    # official scorer if possible
+    exp_folder = args.results.replace('/results.txt', '')
+    official_scorer.create_key_file(wn, exp_folder, debug=1)
+    official_scorer.score_using_official_scorer(exp_folder, 
+                                                scorer_folder='resources/WSD_Unified_Evaluation_Datasets')
+    
+    # write tsne visualizations
+    visualize = False
+    if visualize:
+        output_folder = args.results.replace('/results.txt', '')
+        tsne_utils.create_tsne_visualizations(output_folder,
+                                              correct={False, True},
+                                              meanings=True,
+                                              instances=True,
+                                              polysemy=range(2, 1000),
+                                              num_embeddings=range(2, 1000))

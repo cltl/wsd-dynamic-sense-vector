@@ -22,8 +22,6 @@ from block_timer.timer import Timer
 class MyConfig(LargeConfig):
     gigaword_path_pattern = generate_hdn_datasets.inp_pattern
     word_vocab_path = generate_hdn_datasets.word_vocab_path
-    hdn_vocab_path = 'output/hdn-vocab.2018-05-18-f48a06c.pkl'
-    hdn_list_vocab_path = 'output/hdn-list-vocab.2018-05-18-f48a06c.pkl'
     hdn_path_pattern = 'output/gigaword-hdn-%s.2018-05-18-f48a06c.pkl'
     num_senses = 16
     predict_batch_size = 32000

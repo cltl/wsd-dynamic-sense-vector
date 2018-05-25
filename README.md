@@ -38,9 +38,9 @@ Requirements: You'll need at least 64 GB of RAM to run the preparation script.
 
 #### Convert annotated corpora into input format LSTM
 
-0. cd script
-1. bash convert_for_paper.sh 
-The bash file calls the python script sense_annotations2lstm_format.py, which converts the sense annotations into the format needed to train the embeddings at the preferred granularity level (sensekey or synset).
+0. `cd script`
+1. `bash convert_for_paper.sh` 
+The bash file calls the python script `sense_annotations2lstm_format.py`, which converts the sense annotations into the format needed to train the embeddings at the preferred granularity level (sensekey or synset).
 
 #### label propagation
 

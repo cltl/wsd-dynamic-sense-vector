@@ -102,4 +102,20 @@ Managed to train one epoch but the program broke at evaluation against devset.
         probs = np.empty((len(data[1]), len(self.hdn2id)), dtype=np.float32)
     MemoryError
 
+Avoid allocating one big `probs` array but accumulate batch costs and accuracies.
+I made my code cleaner and more modular.
 
+## Fri 25 May
+
+Use this model: `output/hdn-large.2018-05-21-b1d1867-best-model` produced by
+`das5/train-lstm-hdn.job`.
+Evaluated my HDN model, [it didn't work](https://github.com/cltl/LSTM-WSD/commit/96c43a923ac01d88882a4b66a3d2cc5db6c571a6).
+The precision is around 40% which is terrible.
+
+Found [a terrible bug](https://github.com/cltl/wsd-dynamic-sense-vector/blob/b1d18670b0c8ca59ad93a48768dea6724439c57d/model.py#L306). I knew this problem 
+before but still, why Python allows a loop variable to persist outside of 
+its loop??? >"<
+
+
+
+ 
