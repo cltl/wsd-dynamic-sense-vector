@@ -116,6 +116,12 @@ Found [a terrible bug](https://github.com/cltl/wsd-dynamic-sense-vector/blob/b1d
 before but still, why Python allows a loop variable to persist outside of 
 its loop??? >"<
 
+Started training a HDN model again:
+
+    [minhle@fs0 wsd-dynamic-sense-vector]$ python3 version.py
+    2018-05-25-e069882
+    [minhle@fs0 wsd-dynamic-sense-vector]$ sbatch das5/train-lstm-hdn.job
+    Submitted batch job 1822549
 
 
  

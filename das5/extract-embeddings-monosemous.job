@@ -1,0 +1,15 @@
+#!/bin/bash
+#SBATCH --time=2-00:00:00
+#SBATCH -C TitanX
+#SBATCH --gres=gpu:1
+
+module load cuda90/toolkit
+module load cuda90/blas
+module load cuda90
+module load cuDNN/cuda90rc
+
+echo -n 'Started: ' && date
+
+python3 -u extract_embeddings_monosemous.py
+
+echo -n 'Finished: ' && date
