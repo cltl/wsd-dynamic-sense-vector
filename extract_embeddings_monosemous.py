@@ -44,7 +44,7 @@ if __name__ == '__main__':
             context_embeddings = sess.run(predicted_context_embs, feed_dict)
             mono_words.append(y)
             mono_embs.append(context_embeddings)
-    mono_words = np.vstack(mono_words)
+    mono_words = np.concatenate(mono_words)
     mono_embs = np.vstack(mono_embs)
     
     np.savez(out_path, mono_words=mono_words, mono_embs=mono_embs)

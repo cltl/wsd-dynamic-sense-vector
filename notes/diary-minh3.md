@@ -130,6 +130,7 @@ Also extract embeddings:
     [minhle@fs0 wsd-dynamic-sense-vector]$ sbatch das5/extract-embeddings-monosemous.job
     Submitted batch job 1822550
 
+We know that 50% of monosemous cases in Gigaword is "percent". It wouldn't make
+sense to maintain that much redundancy so I subsampled to 100 example per word.
 
 
- 
