@@ -1,10 +1,9 @@
 import tensorflow as tf
-from evaluate import tensor_utils
 import numpy as np
 import generate_hdn_datasets
 from block_timer.timer import Timer
 import pandas as pd
-from model import HDNModel
+from model import HDNModel, LSTMLanguageModel
 from tqdm import tqdm
 from version import version
 
@@ -18,8 +17,9 @@ def stratified_subsampling(indices, buffer, n=100):
     get_word = lambda row: buffer[row["sent_start"]
                                   :row["sent_stop"]][row["word_index"]]
     indices['word'] = indices.progress_apply(get_word, axis=1)
+    tqdm.pandas(desc="Stratified subsampling", unit="group")
     return (indices.groupby('word', group_keys=False)
-            .apply(lambda x: x.sample(min(len(x), n))))
+            .progress_apply(lambda x: x.sample(min(len(x), n))))
 
 if __name__ == '__main__':
     out_path = 'output/monosemous-context-embeddings.%s.npz' %version
@@ -29,22 +29,25 @@ if __name__ == '__main__':
     with Timer('Read HDN training indices from %s' %(hdn_path_pattern %'train')):
         hdn_train = pd.read_pickle(hdn_path_pattern %'train')
     hdn_train = stratified_subsampling(hdn_train, buffer_train, n=100)
+    # make later processing more efficient
+    hdn_train = hdn_train.sort_values(by='sent_len', axis='index')
     vocab = np.load(vocab_path)
     
-    mono_words, mono_embs = [], []
+    mono_words, mono_hdn_lists, mono_embs = [], [], []
     with tf.Session() as sess:
-        saver = tf.train.import_meta_graph(model_path + '.meta', clear_devices=True)
-        saver.restore(sess, model_path)
-        x, predicted_context_embs, lens = tensor_utils.load_tensors(sess)
-
+        lm = LSTMLanguageModel(sess, model_path)
         batches = HDNModel.gen_batches((buffer_train, hdn_train), 32000, vocab)
         batches = tqdm(batches, desc="Generating context embeddings", unit="batch")
-        for x_val, lens_val, _, _, y in batches:
-            feed_dict = {x: x_val, lens: lens_val}
-            context_embeddings = sess.run(predicted_context_embs, feed_dict)
+        for x, lens, candidates, _, y in batches:
+            context_embeddings = lm.get_embeddings_batch(sess, x, lens)
             mono_words.append(y)
+            mono_hdn_lists.append(candidates)
             mono_embs.append(context_embeddings)
     mono_words = np.concatenate(mono_words)
+    mono_hdn_lists = np.concatenate(mono_hdn_lists)
     mono_embs = np.vstack(mono_embs)
     
-    np.savez(out_path, mono_words=mono_words, mono_embs=mono_embs)
+    np.savez(out_path, 
+             mono_words=mono_words, 
+             mono_hdn_lists=mono_hdn_lists,
+             mono_embs=mono_embs)

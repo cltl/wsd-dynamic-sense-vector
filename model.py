@@ -449,3 +449,34 @@ def train_model(m_train, m_evaluate, FLAGS, config):
                         break
             print("\tElapsed time: %.1f minutes" %((time.time()-start_time)/60))
             sess.run(inc_epoch)
+
+class LSTMLanguageModel(object):
+    
+    def __init__(self, sess, model_path, vocab_path=None):
+        saver = tf.train.import_meta_graph(model_path + '.meta', clear_devices=True)
+        saver.restore(sess, model_path)
+
+        self._x = sess.graph.get_tensor_by_name('Model_1/x:0')
+        self._predicted_context_embs = sess.graph.get_tensor_by_name('Model_1/predicted_context_embs:0')
+        self._lens = sess.graph.get_tensor_by_name('Model_1/lens:0')
+        if vocab_path:
+            self._vocab = np.load(vocab_path) 
+        
+    def get_embeddings_batch(self, sess, x, lens):
+        feed_dict = {self._x: x, self._lens: lens}
+        return sess.run(self._predicted_context_embs, feed_dict)
+
+    def get_embeddings_sentence(self, sess, sentence, target_index):
+        '''
+        @param sentence: a list of tokens (list(str))
+        @param target_index: index of word to predict context embeddings for (int)
+        '''
+        x = [self._vocab.get(w) or self._vocab['<unkn>'] for w in sentence]
+        x[target_index] = target_index
+        x.append(self._vocab['<eos>'])
+        return self.get_embeddings_batch(sess, [x], [len(x)])[0]
+        
+        
+        
+        
+        

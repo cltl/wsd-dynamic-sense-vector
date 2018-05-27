@@ -134,3 +134,8 @@ We know that 50% of monosemous cases in Gigaword is "percent". It wouldn't make
 sense to maintain that much redundancy so I subsampled to 100 example per word.
 
 
+## Sun 27 May
+
+Model trained with the bug fixed (#e069882) didn't change the performance much: 
+it went up to 44% which is still terrible.
+
