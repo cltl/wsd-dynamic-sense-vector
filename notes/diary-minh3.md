@@ -136,6 +136,20 @@ sense to maintain that much redundancy so I subsampled to 100 example per word.
 
 ## Sun 27 May
 
-Model trained with the bug fixed (#e069882) didn't change the performance much: 
+Model trained [with the bug fixed](https://github.com/cltl/wsd-dynamic-sense-vector/commit/e06988277823dd4aa1b186591fb4207227144fda) 
+didn't change the performance much: 
 it went up to 44% which is still terrible.
+
+There's another problem: I didn't add the end-of-sentence token in the test code.
+[Fixing this](https://github.com/cltl/LSTM-WSD/commit/76a46bd60b48f88d06fca38510635824c3312703) 
+doesn't change the performance though.
+
+Tried a [different strategy](https://github.com/cltl/LSTM-WSD/commit/620915e6bb3111a073009d33ab557b7382b4735a): 
+use the LSTM trained on full Gigaword, query 
+related monosemous instances and compute the cosine similarity between the 
+sentences they're in and the current sentence. Each monosemous word is related
+to a synset via an HDN (which is also an inherited hypernymy of the monosemous
+word) and the positive scores of each synset is summed.
+I hoped that the monosemous words would provide evidence for or against each
+candidate synset. However, the result was negative. Accuracy is still around 43%. 
 

@@ -51,3 +51,4 @@ if __name__ == '__main__':
              mono_words=mono_words, 
              mono_hdn_lists=mono_hdn_lists,
              mono_embs=mono_embs)
+    print('Results written to %s' %out_path)
