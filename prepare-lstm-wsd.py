@@ -157,7 +157,8 @@ def shuffle_and_pad_batches(inp_path, word2id, dev_sent_ids):
     sys.stderr.write('Calculating batch shapes... Done.\n')
     
     sys.stderr.write('Dividing and padding...\n')
-    for i in range(batch_id): batches['batch%d'%i].fill(pad_id)
+    for i in range(batch_id): 
+        batches['batch%d'%i].fill(pad_id)
     nonpad_count = 0
     sent_counter = Counter()
     for sent_id, sent in progress(enumerate(lookup_and_iter_sents(inp_path, word2id)), label='sentences'):
