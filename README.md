@@ -100,4 +100,4 @@ in a later version.
 with their length (e.g. "24 Under the settlements , including Georgia 's , 
 Liggett agreed to put the warning ' ' smoking is addictive '' on its packs ."),
 this likely decreases the performance a bit.
-3. 
+3. On line 110 of the file [evaluate/test-lstm_v2.py](https://github.com/cltl/wsd-dynamic-sense-vector/blob/c2ee1d90aa06b4bd854cdf421f3f7f235cb45157/evaluate/test-lstm_v2.py#L110), **<unkn>** should have been **<pad>**. We tried to rerun for one experiment with this change applied and found no difference in the results.
