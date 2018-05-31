@@ -405,19 +405,90 @@ Looks like Marten's script is working.
 This is the results:
 
     [minhle@fs0 wsd-dynamic-sense-vector]$ python3 compile_results.py
+    *** Senseval2 ***
                              model +MFS      P      R     F1
-    11         Our LSTM (T: OMSTI)   No  0.682  0.447  0.540
-    5          Our LSTM (T: OMSTI)  Yes  0.665  0.665  0.665
-    10        Our LSTM (T: SemCor)   No  0.706  0.656  0.680
-    3         Our LSTM (T: SemCor)  Yes  0.694  0.694  0.694
-    9   Our LSTM (T: SemCor+OMSTI)   No  0.683  0.635  0.658
-    4   Our LSTM (T: SemCor+OMSTI)  Yes  0.673  0.673  0.673
+    4          Our LSTM (T: OMSTI)   No  0.682  0.447  0.540
+    9          Our LSTM (T: OMSTI)  Yes  0.665  0.665  0.665
+    2         Our LSTM (T: SemCor)   No  0.706  0.656  0.680
+    11        Our LSTM (T: SemCor)  Yes  0.694  0.694  0.694
+    5   Our LSTM (T: SemCor+OMSTI)   No  0.683  0.635  0.658
+    10  Our LSTM (T: SemCor+OMSTI)  Yes  0.673  0.673  0.673
+    *** SemEval13 ***
+                            model +MFS      P      R     F1
+    3         Our LSTM (T: OMSTI)   No  0.676  0.501  0.575
+    6         Our LSTM (T: OMSTI)  Yes  0.651  0.651  0.651
+    0        Our LSTM (T: SemCor)   No  0.654  0.638  0.646
+    7        Our LSTM (T: SemCor)  Yes  0.648  0.648  0.648
+    1  Our LSTM (T: SemCor+OMSTI)   No  0.660  0.644  0.651
+    8  Our LSTM (T: SemCor+OMSTI)  Yes  0.653  0.653  0.653
 
-Everything is lower than before...
+Everything is lower than before... Emailed Marten. I have spent the whole morning
+on this project. I should be working on the coreference paper now.
 
-TODO: 
 
-1. Undo the latest commits to remove <eos> treatments. We're not going to 
-include it in the paper any more so it just adds confusion. 
-2. Move <eos> stuff to a separate branch and leave some notes in README file. 
-3. Rerun Marten's scripts 
+## Fri 9 Mar
+
+Get more numbers...
+
+    ./evaluate_in_parallel.sh ../output/model-h100p10/lstm-wsd-gigaword-google ../output/model-h100p10/gigaword-lstm-wsd.index.pkl ../output/model-h100p10-mfs-true.results True &
+    ./evaluate_in_parallel.sh ../output/model-h256p64/lstm-wsd-gigaword-google ../output/model-h256p64/gigaword-lstm-wsd.index.pkl ../output/model-h256p64-mfs-true.results True &
+    ./evaluate_in_parallel.sh ../output/model-h512p128/lstm-wsd-gigaword-google ../output/model-h512p128/gigaword-lstm-wsd.index.pkl ../output/model-h512p128-mfs-true.results True &
+
+Marten changed the evaluation script. Everything needs to be redone.
+
+## Sun 11 Mar
+
+Marten's script was running quite slowly... I will check the results tomorrow.
+
+    [minhle@node029 wsd-dynamic-sense-vector]$ cat evaluate-coling.sh
+    cd evaluate
+    ./evaluate_in_parallel.sh ../output/model-h2048p512/lstm-wsd-gigaword-google ../output/model-h2048p512/gigaword-lstm-wsd.index.pkl ../output/model-h2048p512-mfs-false.results False
+    ./evaluate_in_parallel.sh ../output/model-h2048p512/lstm-wsd-gigaword-google ../output/model-h2048p512/gigaword-lstm-wsd.index.pkl ../output/model-h2048p512-mfs-true.results True
+    ./evaluate_in_parallel.sh ../output/model-h100p10/lstm-wsd-gigaword-small_seed-124-best-model ../output/model-h100p10/gigaword-for-lstm-wsd.index.pkl ../output/model-h100p10-mfs-true.results True
+    ./evaluate_in_parallel.sh ../output/model-h256p64/lstm-wsd-gigaword-h256p64-seed_12-best-model ../output/model-h256p64/gigaword-for-lstm-wsd.index.pkl ../output/model-h256p64-mfs-true.results True
+    ./evaluate_in_parallel.sh ../output/model-h512p128/lstm-wsd-gigaword-large ../output/model-h512p128/gigaword-lstm-wsd.index.pkl ../output/model-h512p128-mfs-true.results True
+    
+## Mon 12 Mar
+
+Woke up to a bug in the previous commands. Google models were evaluate
+successfully but others have failed. Actually I saw some hints last night but
+didn't understand.
+
+Finished the evaluation before the working hours so Piek and Jacopo could have
+a look at the paper.
+
+## Tue 13 Mar
+
+Evaluate data-size-experiment models:
+
+    cd evaluate
+    ./evaluate_in_parallel.sh ../output/data-sizes/1/lstm-wsd-gigaword_01-pc_large-best-model ../preprocessed-data/2017-11-24-a74bda6/gigaword-for-lstm-wsd.index.pkl ../output/data-sizes/1.results True
+    ./evaluate_in_parallel.sh ../output/data-sizes/10/lstm-wsd-gigaword_10-pc_large-best-model ../preprocessed-data/2017-11-24-a74bda6/gigaword-for-lstm-wsd.index.pkl ../output/data-sizes/10.results True
+    ./evaluate_in_parallel.sh ../output/data-sizes/25/lstm-wsd-gigaword_25-pc_large-best-model ../preprocessed-data/2017-11-24-a74bda6/gigaword-for-lstm-wsd.index.pkl ../output/data-sizes/25.results True
+
+Added to paper
+
+TODO: get real num. of params. Hopefully I calculated them correctly. 
+see https://stackoverflow.com/questions/38160940/how-to-count-total-number-of-trainable-parameters-in-a-tensorflow-model
+
+## Fri 27 Apr 2018
+
+Attempt to build a model to predict HDNs (highest disambiguating nodes).
+
+Plan: go through Gigaword and replace monosemous lemma by an HDN (of other 
+lemmas) that dominates it in WordNet hierarchy. Train an LSTM to predict this
+HDN (against competing HDNs).
+
+I built a simple script to generate a dataset. The output is not versioned yet,
+if the script finishes successfully, I'll rerun the script to give it a proper
+version.
+
+    [minhle@fs0 wsd-dynamic-sense-vector]$ sbatch das5/preprocess-hdn.job
+    Submitted batch job 1798960
+    [minhle@fs0 wsd-dynamic-sense-vector]$ tail -f slurm-1798960.out
+    Monosemous multi-word-expressions: 42820
+    All monosemous words: 101162
+    All lemmas: 119034
+    Proportion monosemous/all: 0.8498580237579179
+     61%|██████    | 106537103/175771829 [08:40<05:38, 204585.90it/s]
+

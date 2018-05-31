@@ -2,6 +2,10 @@ import numpy as np
 import tensorflow as tf
 import time
 import sys
+import collections
+from configs import special_symbols
+from sklearn.cross_validation import train_test_split
+from sklearn.utils import shuffle
 
 float_dtype = tf.float32
 
@@ -42,6 +46,7 @@ class DummyModelTrain(object):
     
     def print_device_placement(self):
         pass
+
 
 class WSDModel(object):
     """A LSTM WSD model designed for fast training."""
@@ -207,6 +212,7 @@ class WSDModel(object):
             batch_x[one_to_n, target_indices] = batch_y
         return total_cost / total_examples, total_hit / total_examples
 
+
 class WSIModel(WSDModel):
     """A LSTM word sense induction (WSI) model designed for fast training."""
 
@@ -228,6 +234,50 @@ class WSIModel(WSDModel):
             self._logits = tf.reduce_max(tf.reshape(sense_logits,
                     (-1, self.config.vocab_size, self.config.num_senses)), axis=2)
             
+    def _load_data2(self, data_path):
+        examples = []
+        with open(data_path) as f:
+            for line in f:
+                target, candidates, sentence = line.split(maxsplit=3)
+                candidates = candidates.split('/')
+                sentence = sentence.rtrim().split()
+                examples.append((target, candidates, sentence))
+
+        min_count = 5
+        vocab_size = 10**6
+        counter = collections.Counter()
+        for _, _, sentence in examples:
+            counter.update(sentence)
+        sys.stderr.write('Total unique words: %d\n' %len(counter))
+        for sym in special_symbols: assert sym not in counter
+        input_vocab = special_symbols + [w for w, c in counter.most_common(vocab_size) 
+                                         if c >= min_count] 
+        sys.stderr.write('Retained %d words\n' %len(input_vocab))
+        input_word2id = {word: i for i, word in enumerate(input_vocab)}
+        
+        output_vocab = list(set(word for _, candidates, _ in examples
+                                for word in candidates))
+        output_word2id = {word: i for i, word in enumerate(output_vocab)}
+        examples = [(output_word2id[target], 
+                     [output_word2id[w] for w in candidates],
+                     [input_word2id[w] for w in sentence])
+                    for target, candidates, sentence in examples]
+        
+        train_examples, valid_examples = \
+                train_test_split(examples, test_size=0.1, random_state=2852852)
+        train_examples = shuffle(train_examples, random_state=5729568)
+        
+        
+
+    def train2(self, data_path, dev_size=0.1):
+        '''
+        Train the model on a data set stored in a CSV file in the format:
+        <TARGET_WORD> <SPACE> <CANDIDATES> <SPACE> <SENTENCE>
+        where the sentence is a list of words separate by a space.   
+        '''
+        
+            
+            
 def from_npz_to_batches(npz, full_vocab, prepare_subvocabs):
     batches = []
     num_batches = sum(1 for key in npz if key.startswith('batch'))
@@ -245,6 +295,7 @@ def from_npz_to_batches(npz, full_vocab, prepare_subvocabs):
         batches.append((sentences, outputs, batch_vocab, lens))
     return batches
             
+            
 def load_data(FLAGS, prepare_subvocabs=False):
     sys.stderr.write('Loading data from data_path=%s, vocab_path=%s, dev_path=%s...\n'
                      %(FLAGS.data_path, getattr(FLAGS, 'vocab_path', ''), getattr(FLAGS, 'dev_path', '')))
@@ -257,6 +308,7 @@ def load_data(FLAGS, prepare_subvocabs=False):
     dev_batches = from_npz_to_batches(dev, full_vocab, False)
     sys.stderr.write('Loading data... Done.\n')
     return full_vocab, train_batches, dev_batches
+
 
 def train_model(m_train, m_evaluate, FLAGS, config):
     vocab, train_batches, dev_batches = load_data(FLAGS, prepare_subvocabs=config.sampled_softmax)

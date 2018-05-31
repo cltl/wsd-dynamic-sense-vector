@@ -12,7 +12,6 @@ def progress(it, ticks=1000000, label='items', max_=None):
                              %(i+1, max_str, label, (time()-start)/60))
 
 
-
 def count_lines_fast(path, block_size=65536):
     '''
     Credit: glglgl (https://stackoverflow.com/a/9631635/217802)
