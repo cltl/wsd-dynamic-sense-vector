@@ -16,6 +16,10 @@
 ## Requirements
 Using slurm version slurm 17.02.2, we ran our experiments using `cuda80` and Python version 3.5.2.
 
+## git checkout to correct commit
+ 
+Please run `git checkout 50b898e`
+ 
 ## Downloading resources
 
 Please run `bash install.sh`
