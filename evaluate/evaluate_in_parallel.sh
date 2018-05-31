@@ -62,18 +62,18 @@ command='sbatch' #change to bash when you are on a specific node
 $command one_experiment.job $model $vocab "$out/synset-se2-framework-semcor" higher_level_annotations/se2-aw-framework-synset-30_semcor synset False $mfs_fallback
 $command one_experiment.job $model $vocab "$out/synset-se2-framework-omsti"  higher_level_annotations/se2-aw-framework-synset-30_mun synset False $mfs_fallback
 $command one_experiment.job $model $vocab "$out/synset-se2-framework-semcor_mun" higher_level_annotations/se2-aw-framework-synset-30_semcor_mun synset  False $mfs_fallback
-#$command one_experiment.job $model $vocab "$out/synset-se2-framework-semcor_mun-lp" higher_level_annotations/se2-aw-framework-synset-30_semcor_mun synset True $mfs_fallback
+$command one_experiment.job $model $vocab "$out/synset-se2-framework-semcor_mun-lp" higher_level_annotations/se2-aw-framework-synset-30_semcor_mun synset True $mfs_fallback
 
-#$command one_experiment.job $model $vocab "$out/sensekey-se2-framework-semcor" higher_level_annotations/se2-aw-framework-sensekey-30_semcor sensekey False $mfs_fallback
-#$command one_experiment.job $model $vocab "$out/sensekey-se2-framework-omsti"  higher_level_annotations/se2-aw-framework-sensekey-30_mun sensekey False $mfs_fallback
-#$command one_experiment.job $model $vocab "$out/sensekey-se2-framework-semcor_mun" higher_level_annotations/se2-aw-framework-sensekey-30_semcor_mun sensekey  False $mfs_fallback
+$command one_experiment.job $model $vocab "$out/sensekey-se2-framework-semcor" higher_level_annotations/se2-aw-framework-sensekey-30_semcor sensekey False $mfs_fallback
+$command one_experiment.job $model $vocab "$out/sensekey-se2-framework-omsti"  higher_level_annotations/se2-aw-framework-sensekey-30_mun sensekey False $mfs_fallback
+$command one_experiment.job $model $vocab "$out/sensekey-se2-framework-semcor_mun" higher_level_annotations/se2-aw-framework-sensekey-30_semcor_mun sensekey  False $mfs_fallback
 
 $command one_experiment.job $model $vocab "$out/synset-se13-framework-semcor" higher_level_annotations/se13-aw-framework-synset-30_semcor synset False $mfs_fallback
 $command one_experiment.job $model $vocab "$out/synset-se13-framework-omsti"  higher_level_annotations/se13-aw-framework-synset-30_mun synset False $mfs_fallback
 $command one_experiment.job $model $vocab "$out/synset-se13-framework-semcor_mun" higher_level_annotations/se13-aw-framework-synset-30_semcor_mun synset  False $mfs_fallback
-#$command one_experiment.job $model $vocab "$out/synset-se13-framework-semcor_mun-lp" higher_level_annotations/se13-aw-framework-synset-30_semcor_mun synset True $mfs_fallback
+$command one_experiment.job $model $vocab "$out/synset-se13-framework-semcor_mun-lp" higher_level_annotations/se13-aw-framework-synset-30_semcor_mun synset True $mfs_fallback
 
 
-#$command one_experiment.job $model $vocab "$out/sensekey-se13-framework-semcor" higher_level_annotations/se13-aw-framework-sensekey-30_semcor sensekey False $mfs_fallback
-#$command one_experiment.job $model $vocab "$out/sensekey-se13-framework-omsti"  higher_level_annotations/se13-aw-framework-sensekey-30_mun sensekey False $mfs_fallback
-#$command one_experiment.job $model $vocab "$out/sensekey-se13-framework-semcor_mun" higher_level_annotations/se13-aw-framework-sensekey-30_semcor_mun sensekey False $mfs_fallback
+$command one_experiment.job $model $vocab "$out/sensekey-se13-framework-semcor" higher_level_annotations/se13-aw-framework-sensekey-30_semcor sensekey False $mfs_fallback
+$command one_experiment.job $model $vocab "$out/sensekey-se13-framework-omsti"  higher_level_annotations/se13-aw-framework-sensekey-30_mun sensekey False $mfs_fallback
+$command one_experiment.job $model $vocab "$out/sensekey-se13-framework-semcor_mun" higher_level_annotations/se13-aw-framework-sensekey-30_semcor_mun sensekey False $mfs_fallback
