@@ -151,5 +151,70 @@ sentences they're in and the current sentence. Each monosemous word is related
 to a synset via an HDN (which is also an inherited hypernymy of the monosemous
 word) and the positive scores of each synset is summed.
 I hoped that the monosemous words would provide evidence for or against each
-candidate synset. However, the result was negative. Accuracy is still around 43%. 
+candidate synset. <s>However, the result was negative. Accuracy is still around 43%.</s> 
 
+## Sat 2 Jun
+
+<s>[Tried WUP similarity](https://github.com/cltl/LSTM-WSD/commit/2730c27b3ca0034e13f503995b66ff7300ea010e)
+but it didn't lead to any improvement (performance around 41%).</s>
+
+<s>Things are better with [averaging the similarities](https://github.com/cltl/LSTM-WSD/commit/4b9c38a354f2c1199d245d7a6a1be6de8ebd2ec4):</s>
+
+    {'P': 0.436, 'R': 0.436, 'F1': 0.436}
+
+<s>[Do it more properly](https://github.com/cltl/LSTM-WSD/commit/e0bc03c1af41a9abb7b0c6051ccb38d9c71eeb7e) 
+and you get a bit higher:</s>
+
+    {'P': 0.44, 'R': 0.44, 'F1': 0.44}
+
+This is the original results from our reimplementation of Yuan et al.:
+
+    Minhs-MacBook-Pro:LSTM-WSD cumeo$ python3 perform_wsd.py --exp=synset---se13---semcor
+    ...
+    {'P': 0.649, 'R': 0.649, 'F1': 0.649}
+
+<s>Looks like calculating cosine similarity before averaging is not a good idea.
+When I did that, the results dropped to 0.46, just slightly above what I've got
+with monosemous embeddings. That makes me wonder if I could get similar results
+to Yuan et al. with monosemous embeddings + averaging before sim?</s>
+
+<s>I still think that including vectors that have a negative similarity to the 
+target is a bad idea. Intuitively, it doesn't make sense. Besides, if all 
+similarity scores are non-negative, it would be easier to balance the 
+importance of annotated senses and monosemous senses.
+Turns out [it decreases the performance](https://github.com/cltl/LSTM-WSD/commit/667b5b8157c6c65805f10aead703ece9626dfb7d).</s>
+
+[found a bug that invalidates everything I did for 6 days](https://github.com/cltl/LSTM-WSD/commit/d2d9f746f7859a25ea6adc452d986e806037c835)!!! In short, I used the wrong
+vocabulary so every score dropped 20% absolute. 
+I'll now try again most of the things I tried. The evaluation is painfully
+slow. If I actually find any interesting result. I'll need to rewrite the 
+code completely.
+
+[Tried removing vectors of negative similarity again](https://github.com/cltl/LSTM-WSD/commit/1ce375d06de6475e7c841065aaccd267eab3aa4f)
+It still decrease the performance but only a tiny bit.
+
+[Tried combining annotated instances and monosemous instances](https://github.com/cltl/LSTM-WSD/commit/d313c925673674ec70268081147fb37730ba47a7) and got a slight improvement:
+
+    {'P': 0.653, 'R': 0.653, 'F1': 0.653}
+
+I used a "trust factor" of 0.5 which reduces the contribution of monosemous
+senses. This is a tunable parameter.
+
+Steps to reproduce this result on DAS-5:
+
+    git clone https://github.com/cltl/LSTM-WSD.git
+    cd LSTM-WSD/
+    git checkout 1ce375d06de6475e7c841065aaccd267eab3aa4f
+    <prepare corpora as in one_experiment.sh>
+    SRC_DIR=/home/minhle/scratch/wsd-dynamic-sense-vector/output
+    cp $SRC_DIR/vocab.2018-05-10-7d764e7.pkl output/
+    cp $SRC_DIR/monosemous-context-embeddings.2018-05-27-5cd9 output/
+    cp $SRC_DIR/hdn-vocab.2018-05-18-f48a06c.pkl output/
+    cp $SRC_DIR/hdn-list-vocab.2018-05-18-f48a06c.pkl output/
+    module load cuda90/toolkit
+    module load cuda90/blas
+    module load cuda90
+    module load cuDNN/cuda90rc
+    python3 perform_wsd2.py --exp=synset---se13---semcor
+    git checkout d313c925673674ec70268081147fb37730ba47a7
+    python3 perform_wsd2.py --exp=synset---se13---semcor
