@@ -1,9 +1,31 @@
+## A Deep Dive into Word Sense Disambiguation with LSTM
+
+This package contains the code replicate the experiments from:
+
+```xml
+@InProceedings{C18-1030,
+  author = 	"Le, Minh
+		and Postma, Marten
+		and Urbani, Jacopo
+		and Vossen, Piek",
+  title = 	"A Deep Dive into Word Sense Disambiguation with LSTM",
+  booktitle = 	"Proceedings of the 27th International Conference on Computational Linguistics",
+  year = 	"2018",
+  publisher = 	"Association for Computational Linguistics",
+  pages = 	"354--365",
+  location = 	"Santa Fe, New Mexico, USA",
+  url = 	"http://aclweb.org/anthology/C18-1030"
+}
+```
+## Demo
+For a demo, we refer to [here](https://github.com/cltl/LSTM-WSD)
+
 
 ## Setup
 
     pip3 install --user beautifulsoup4 sklearn testfixtures unittest2 pyemd morfessor
     pip3 install --user pandas==0.20.3 seaborn==0.8.1
-    pip3 install --user spacy 
+    pip3 install --user spacy
     pip3 install --user https://github.com/explosion/spacy-models/releases/download/en_core_web_md-1.2.1/en_core_web_md-1.2.1.tar.gz
     python3 -m spacy link en_core_web_md en_default
     pip3 install --user nltk
@@ -23,7 +45,7 @@ Make sure you have a Java JDK installed.
 
 ## Training models
 
-Requirements: You'll need at least 64 GB of RAM to run the preparation script. 
+Requirements: You'll need at least 64 GB of RAM to run the preparation script.
 
 You don't need access to Dutch DAS-5 or Cartesius to run these steps.
 The `*.job` files are bash script that you could run on any Unix machine.
@@ -31,7 +53,7 @@ The `*.job` files are bash script that you could run on any Unix machine.
 ### Reproduce variation/stability experiments
 
 These experiments measure how much the performance is affected by the randomness
-in training. Basically, we train smaller models many times, each time with 
+in training. Basically, we train smaller models many times, each time with
 a different (but fixed) random seed.
 
 1. Pre-process GigaWord into plain text: `git checkout 694cb4d && sbatch process-gigaword.job`
@@ -93,11 +115,11 @@ node. You might ssh to one of the compute nodes to continue your work.
 
 ## Known issues
 
-1. The reported results were produced using a model that didn't use `<eos>` 
+1. The reported results were produced using a model that didn't use `<eos>`
 (end of sentence) tokens, different from Yuan et al. We added `<eos>`
 in a later version.
-2. The models were trained on sentences that were accidentally prepended 
-with their length (e.g. "24 Under the settlements , including Georgia 's , 
+2. The models were trained on sentences that were accidentally prepended
+with their length (e.g. "24 Under the settlements , including Georgia 's ,
 Liggett agreed to put the warning ' ' smoking is addictive '' on its packs ."),
 this likely decreases the performance a bit.
 3. On line 110 of the file [evaluate/test-lstm_v2.py](https://github.com/cltl/wsd-dynamic-sense-vector/blob/c2ee1d90aa06b4bd854cdf421f3f7f235cb45157/evaluate/test-lstm_v2.py#L110), **<unkn>** should have been **<pad>**. We tried to rerun for one experiment with this change applied and found no difference in the results.
