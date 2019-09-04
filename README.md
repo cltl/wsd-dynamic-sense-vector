@@ -45,6 +45,8 @@ Make sure you have a Java JDK installed.
 
 ## Training models
 
+The scripts you will find in the repo are meant to capture exactly what how we carried out our experiments, i.e., like a lab log. These experiments are very computing intensive -- we have run different parts of them in 3 different high-performance clusters -- so anyone trying to reproduce them likely needs to arrange their own supercomputer. As we don't have control over what computing environment people will use, we can't guarantee that the scripts can run as-is.
+
 Requirements: You'll need at least 64 GB of RAM to run the preparation script.
 
 You don't need access to Dutch DAS-5 or Cartesius to run these steps.
